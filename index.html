@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Moves</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Moves">
+<meta name="theme-color" content="#1B1714">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#1B1714;
+    --surface:#241D19;
+    --surface-raised:#2C231E;
+    --line:#3A2F28;
+    --wine:#8C3B4A;
+    --wine-bright:#B0505F;
+    --gold:#C9A961;
+    --text:#EFE7DC;
+    --text-dim:#9C8F83;
+    --text-faint:#6E6259;
+    --good:#7C9473;
+    --radius-s:6px;
+    --radius-m:10px;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  h1,h2,h3{font-family:var(--serif); font-weight:500; margin:0;}
+  a{color:inherit;}
+  button{font-family:var(--sans); cursor:pointer;}
+  input,select,textarea{font-family:var(--sans);}
+  ::selection{background:var(--wine); color:var(--text);}
+
+  #app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding:22px 20px 14px;
+  }
+  .topbar .wordmark{font-family:var(--serif); font-size:22px; letter-spacing:0.2px; color:var(--gold);}
+  .topbar .version{font-size:11px; color:var(--text-faint);}
+
+  /* ---------- generic layout ---------- */
+  .screen{padding:0 20px 100px; flex:1;}
+  .center-screen{flex:1; display:flex; flex-direction:column; justify-content:center; padding:20px;}
+  .stack{display:flex; flex-direction:column; gap:14px;}
+  .field label{display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px;}
+  .field input, .field textarea, .field select{
+    width:100%; background:var(--surface); border:1px solid var(--line); color:var(--text);
+    border-radius:var(--radius-s); padding:11px 12px; font-size:15px;
+  }
+  .field textarea{resize:vertical; min-height:70px;}
+  .field input:focus, .field textarea:focus, .field select:focus{
+    outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius:var(--radius-s); padding:12px 18px;
+    font-size:14.5px; font-weight:600; width:100%;
+  }
+  .btn-primary{background:var(--wine); color:#fff;}
+  .btn-primary:active{background:var(--wine-bright);}
+  .btn-ghost{background:transparent; color:var(--text-dim); border:1px solid var(--line);}
+  .btn-gold{background:var(--gold); color:#1B1714;}
+  .btn-row{display:flex; gap:10px;}
+  .btn-row .btn{width:auto; flex:1;}
+  .btn-small{padding:8px 12px; font-size:13px; width:auto;}
+  .btn:disabled{opacity:0.45;}
+  .link-btn{background:none; border:none; color:var(--text-dim); text-decoration:underline; font-size:13px; padding:6px 0;}
+
+  .error-text{color:var(--wine-bright); font-size:13px;}
+  .hint-text{color:var(--text-faint); font-size:12.5px;}
+
+  .divider{height:1px; background:var(--line); margin:22px 0;}
+
+  /* ---------- auth screen ---------- */
+  .auth-hero{margin-bottom:34px;}
+  .auth-hero h1{font-size:30px; color:var(--text); margin-bottom:6px;}
+  .auth-hero p{color:var(--text-dim); font-size:14px; max-width:34ch;}
+  .auth-tabs{display:flex; gap:22px; margin-bottom:20px; border-bottom:1px solid var(--line);}
+  .auth-tab{background:none; border:none; color:var(--text-faint); padding:8px 0; font-size:14px; font-weight:600; border-bottom:2px solid transparent;}
+  .auth-tab.active{color:var(--gold); border-bottom-color:var(--gold);}
+
+  /* ---------- pairing ---------- */
+  .code-display{
+    font-family:var(--serif); font-size:38px; letter-spacing:6px; color:var(--gold);
+    text-align:center; padding:26px 0; background:var(--surface); border-radius:var(--radius-m);
+    border:1px solid var(--line);
+  }
+
+  /* ---------- status banner (home) ---------- */
+  .status-strip{
+    padding:16px 20px; margin:0 -20px 22px; background:var(--surface);
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  .status-strip .status-label{font-size:11.5px; color:var(--text-faint); margin-bottom:3px;}
+  .status-strip .status-value{font-family:var(--serif); font-size:19px; color:var(--text);}
+  .status-strip .status-value.awaiting{color:var(--gold);}
+
+  /* ---------- scoreboard ---------- */
+  .scoreboard{display:flex; gap:12px; margin-bottom:18px;}
+  .score-card{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:16px;}
+  .score-card.leading{border-color:var(--gold);}
+  .score-card .name{font-size:12px; color:var(--text-dim); margin-bottom:4px;}
+  .score-card .points{font-family:var(--serif); font-size:32px; color:var(--text);}
+  .score-card .points span{font-size:14px; color:var(--text-faint);}
+
+  /* ---------- heat meter ---------- */
+  .heat-block{margin-bottom:22px;}
+  .heat-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+  .heat-head .label{font-size:12px; color:var(--text-dim);}
+  .heat-head .pct{font-family:var(--serif); font-size:16px; color:var(--gold);}
+  .heat-track{height:8px; background:var(--surface); border-radius:99px; overflow:hidden; border:1px solid var(--line);}
+  .heat-fill{height:100%; background:linear-gradient(90deg, var(--wine), var(--gold)); transition:width 0.5s ease;}
+  .heat-next{font-size:12px; color:var(--text-faint); margin-top:6px;}
+
+  /* ---------- section headers ---------- */
+  .section-head{display:flex; justify-content:space-between; align-items:center; margin:26px 0 12px;}
+  .section-head h2{font-size:15px; color:var(--text); font-weight:600; font-family:var(--sans);}
+  .section-head .see-all{font-size:12.5px; color:var(--text-faint); background:none; border:none;}
+
+  /* ---------- dare card ---------- */
+  .dare{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:16px; margin-bottom:10px; position:relative; overflow:hidden;
+  }
+  .dare.locked{border-left:3px solid var(--wine);}
+  .dare.unlocked{border-left:3px solid var(--gold);}
+  .dare-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
+  .dare-title{font-family:var(--serif); font-size:17px; color:var(--text);}
+  .dare-meta{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .pill{
+    font-size:11px; padding:3px 9px; border-radius:99px; border:1px solid var(--line); color:var(--text-dim);
+    white-space:nowrap;
+  }
+  .pill.intensity-tease{color:#B7C9A8; border-color:#3A4030;}
+  .pill.intensity-risque{color:#D7A96B; border-color:#453423;}
+  .pill.intensity-bold{color:#D7896B; border-color:#452B23;}
+  .pill.intensity-wild{color:var(--wine-bright); border-color:#4A2429;}
+  .dare-body{color:var(--text-dim); font-size:13.5px; margin-bottom:12px;}
+  .dare-instructions{color:var(--text); font-size:14px; margin-bottom:12px; line-height:1.55;}
+  .dare-points{font-size:12px; color:var(--gold);}
+
+  /* ---------- notification / toast ---------- */
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--surface-raised); border:1px solid var(--gold); color:var(--text);
+    padding:12px 18px; border-radius:var(--radius-s); font-size:13.5px; max-width:88%;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4); z-index:200;
+  }
+
+  /* ---------- bottom nav ---------- */
+  .tabbar{
+    position:fixed; bottom:0; left:0; right:0; background:var(--surface-raised);
+    border-top:1px solid var(--line); padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+    display:flex; max-width:520px; margin:0 auto;
+  }
+  .tab{
+    flex:1; background:none; border:none; color:var(--text-faint); font-size:11px;
+    display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0;
+  }
+  .tab.active{color:var(--gold);}
+  .tab .dot{width:6px; height:6px; border-radius:50%; background:var(--wine-bright); position:absolute; margin-left:14px; margin-top:-2px;}
+
+  .empty-state{color:var(--text-faint); font-size:13.5px; padding:24px 0; text-align:center;}
+
+  .qa-row{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:16px; margin-bottom:10px;}
+  .qa-cat{font-size:11px; color:var(--text-faint); margin-bottom:4px;}
+  .qa-title{font-size:14.5px; color:var(--text); margin-bottom:3px;}
+  .qa-explain{font-size:12.5px; color:var(--text-dim); margin-bottom:12px;}
+  .qa-options{display:flex; gap:6px; flex-wrap:wrap;}
+  .qa-opt{
+    background:var(--bg); border:1px solid var(--line); color:var(--text-dim);
+    padding:7px 11px; border-radius:99px; font-size:12.5px;
+  }
+  .qa-opt.selected{background:var(--gold); color:#1B1714; border-color:var(--gold); font-weight:600;}
+
+  .boundary-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line);}
+  .boundary-row:last-child{border-bottom:none;}
+  .boundary-row .cat{font-size:14px; color:var(--text);}
+  .boundary-row .lvl{font-size:12px; color:var(--text-faint);}
+  .boundary-row.excluded{opacity:0.4;}
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:300;
+    display:flex; align-items:flex-end;
+  }
+  .modal-sheet{
+    background:var(--surface-raised); width:100%; max-width:520px; margin:0 auto;
+    border-radius:16px 16px 0 0; padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal-sheet h2{font-size:19px; margin-bottom:16px;}
+
+  .loading{display:flex; align-items:center; justify-content:center; height:100vh; color:var(--text-faint); font-size:13px;}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Opening…</div></div>
+
+<script>
+/* ======================================================================
+   CONFIG — replace with your new Supabase project's values
+   ====================================================================== */
+const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
+const APP_VERSION = '1.0.0';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+<script src="app.js"></script>
+</body>
+</html>
