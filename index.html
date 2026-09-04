@@ -324,7 +324,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.24.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.25.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -332,7 +332,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.24.0';
+const APP_VERSION = '1.25.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1187,6 +1187,24 @@ function renderBoundariesTab(unanswered) {
   `;
 }
 
+function renderDareLibraryList() {
+  if (!state.dareLibrary.length) return `<div class="empty-state">No library dares yet.</div>`;
+  const byCategory = {};
+  state.dareLibrary.forEach(d => { (byCategory[d.category] = byCategory[d.category] || []).push(d); });
+  return Object.keys(byCategory).map(cat => `
+    <div class="hint-text" style="margin:14px 0 4px; font-weight:600; color:var(--text)">${esc(cat)}</div>
+    ${byCategory[cat].map(d => `
+      <div class="category-row" data-edit-dare="${d.id}" style="cursor:pointer">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${esc(d.title)}</div>
+          <div class="cat-count"><span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span></div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    `).join('')}
+  `).join('');
+}
+
 function renderSetupArea(adminMode) {
   if (state.openCategory) return renderDeckView(adminMode);
 
@@ -1229,7 +1247,11 @@ function renderSetupArea(adminMode) {
     <div class="divider"></div>
     <div class="section-head"><h2>Dare library</h2></div>
     <p class="hint-text" style="margin-bottom:14px">${state.dareLibrary.length} dare${state.dareLibrary.length===1?'':'s'} in the library. Suggested to whoever's sending a move, matched to a heading and capped to what it currently allows.</p>
-    <button class="btn btn-ghost" id="btn-import-dares-csv" style="width:100%">Import dare library from CSV</button>
+    <div class="btn-row" style="margin-bottom:14px">
+      <button class="btn btn-ghost" id="btn-add-dare">Add a dare</button>
+      <button class="btn btn-ghost" id="btn-import-dares-csv">Import from CSV</button>
+    </div>
+    ${renderDareLibraryList()}
     ${state.dareLibrary.length ? `<button class="link-btn" id="btn-delete-all-dares" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.dareLibrary.length} library dares</button>` : ''}
     ` : ''}
   `;
@@ -1662,6 +1684,12 @@ function attachMainHandlers() {
   if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
   const importDaresCsvBtn = document.getElementById('btn-import-dares-csv');
   if (importDaresCsvBtn) importDaresCsvBtn.onclick = openImportDaresCsvModal;
+  const addDareBtn = document.getElementById('btn-add-dare');
+  if (addDareBtn) addDareBtn.onclick = () => openLibraryDareModal(null);
+  $app.querySelectorAll('[data-edit-dare]').forEach(el => el.onclick = () => {
+    const dare = state.dareLibrary.find(d => d.id === el.dataset.editDare);
+    if (dare) openLibraryDareModal(dare);
+  });
   const deleteAllDaresBtn = document.getElementById('btn-delete-all-dares');
   if (deleteAllDaresBtn) deleteAllDaresBtn.onclick = async () => {
     if (!confirm(`Delete all ${state.dareLibrary.length} library dares? This can't be undone.`)) return;
@@ -2107,6 +2135,68 @@ async function runCsvImport(rows) {
   // the summary we just wrote directly into the DOM. Categories/questions are
   // already reloaded, so the boundaries list will show fresh counts as soon
   // as the modal is closed.
+}
+
+function openLibraryDareModal(existing) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${existing ? 'Edit dare' : 'Add a dare'}</h2>
+        <form id="library-dare-form" class="stack">
+          <div class="field"><label>Heading</label>
+            <select id="ld-category">
+              ${state.categories.map(c => `<option value="${esc(c.name)}" ${existing && existing.category===c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Title</label><input type="text" id="ld-title" value="${existing ? esc(existing.title) : ''}" required></div>
+          <div class="field"><label>Teaser (optional)</label><input type="text" id="ld-teaser" value="${existing && existing.teaser ? esc(existing.teaser) : ''}"></div>
+          <div class="field"><label>Instructions</label><textarea id="ld-instructions" required>${existing ? esc(existing.instructions) : ''}</textarea></div>
+          <div class="field"><label>Intensity</label>
+            <select id="ld-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${existing && existing.intensity===i ? 'selected' : ''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
+          </div>
+          <div id="library-dare-error" class="error-text"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">${existing ? 'Save changes' : 'Add dare'}</button>
+          </div>
+          ${existing ? `<button type="button" class="link-btn" id="btn-delete-dare" style="margin-top:10px; color:var(--wine-bright)">Delete this dare</button>` : ''}
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+
+  document.getElementById('library-dare-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('library-dare-error');
+    const payload = {
+      p_category: document.getElementById('ld-category').value,
+      p_title: document.getElementById('ld-title').value.trim(),
+      p_teaser: document.getElementById('ld-teaser').value.trim() || null,
+      p_instructions: document.getElementById('ld-instructions').value.trim(),
+      p_intensity: document.getElementById('ld-intensity').value
+    };
+    const { error } = existing
+      ? await sb.rpc('update_library_dare', { p_id: existing.id, ...payload })
+      : await sb.rpc('add_library_dare', payload);
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    await loadDareLibrary();
+    render();
+    showToast(existing ? 'Dare updated.' : 'Dare added.');
+  };
+
+  const deleteBtn = document.getElementById('btn-delete-dare');
+  if (deleteBtn) deleteBtn.onclick = async () => {
+    if (!confirm('Delete this dare?')) return;
+    const { error } = await sb.from('dare_library').delete().eq('id', existing.id);
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadDareLibrary();
+    render();
+    showToast('Dare deleted.');
+  };
 }
 
 function openImportDaresCsvModal() {

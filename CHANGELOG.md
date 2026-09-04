@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.25.0 — full admin control over the dare library
+
+- The dare library now has the same admin capabilities headings and
+  cards already had: browse every dare (grouped by heading), add one at
+  a time through a form, tap any dare to edit it, and delete individually
+  — not just bulk CSV import and delete-all-at-once.
+- Database access for editing/deleting individual dares already existed
+  from when the library was first built; this was purely a missing app
+  screen, now added.
+
 ## 1.24.0 — dare library, and dares now validate against heading access
 
 - Dares are now judged against the heading-level running average — the
