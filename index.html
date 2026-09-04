@@ -308,7 +308,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.13.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.14.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -316,7 +316,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -333,7 +333,7 @@ const ANSWER_LABELS = {
 };
 const ANSWER_ORDER = ['full_spark', 'warming_up', 'blushing_yes', 'just_for_you', 'cold_card'];
 const GAUGE_ORDER = ['cold_card', 'just_for_you', 'blushing_yes', 'warming_up', 'full_spark'];
-const GAUGE_ICONS = { full_spark: '❤️', warming_up: '', blushing_yes: '', just_for_you: '', cold_card: '❄️' };
+const GAUGE_ICONS = { full_spark: '❤️', warming_up: '🧡', blushing_yes: '🤍', just_for_you: '💙', cold_card: '❄️' };
 const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
 const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
 const TYPE_LABELS = { apart: 'Apart', together: 'Together', either: 'Either', reunion: 'Reunion' };
@@ -1020,10 +1020,10 @@ function renderDaresTab() {
    ========================================================================== */
 const ACCESS_LABELS = {
   pending: 'Waiting on both of you to answer',
-  closed: 'Closed — a Cold Card here',
-  discover_only: 'Discover open',
-  discover_explore: 'Discover & Explore open',
-  full: 'Fully open — Discover, Explore & Unleash'
+  closed: 'Not on the table',
+  discover_only: 'Getting Warmer',
+  discover_explore: 'Good Match',
+  full: 'Perfect Match'
 };
 const ACCESS_CLASSES = {
   pending: '',
@@ -1032,6 +1032,20 @@ const ACCESS_CLASSES = {
   discover_explore: 'intensity-bold',
   full: 'access-full'
 };
+
+function renderOverallStanding() {
+  if (!state.headingAccess.length) return '';
+  const counts = {};
+  state.headingAccess.forEach(h => { counts[h.access] = (counts[h.access] || 0) + 1; });
+  const order = ['full', 'discover_explore', 'discover_only', 'closed', 'pending'];
+  const parts = order.filter(a => counts[a]).map(a => `${counts[a]} ${esc(ACCESS_LABELS[a])}`);
+  return `
+    <div class="status-strip" style="margin-bottom:18px">
+      <div class="status-label">Overall, across all ${state.headingAccess.length} headings</div>
+      <div class="status-value">${parts.join(' · ')}</div>
+    </div>
+  `;
+}
 
 function renderHeadingAccessList() {
   if (!state.headingAccess.length) return `<div class="empty-state">Answer the 6 general questions to see this.</div>`;
@@ -1079,11 +1093,11 @@ function renderBoundariesTab(unanswered) {
   if (state.viewingSetup) return renderSetupArea();
 
   const generalQuestions = getWizardQuestions();
-  const mutualList = state.boundary.filter(b => b.permitted);
+  const partnerName = state.partner ? state.partner.display_name : 'your partner';
 
   return `
     <div class="section-head" style="margin-top:0"><h2>Your answers</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Change any of these any time — you don't need to wait for Jacki, and changing yours never shows her which way you moved it, only the mutual result below.</p>
+    <p class="hint-text" style="margin-bottom:14px">Change any of these any time — you don't need to wait for ${esc(partnerName)}, and changing yours never shows ${esc(partnerName)} which way you moved it, only the mutual result below.</p>
     ${generalQuestions.map(q => `
       <div style="margin-bottom:18px">
         <div class="cat" style="margin-bottom:4px">${esc(q.category)}</div>
@@ -1092,17 +1106,9 @@ function renderBoundariesTab(unanswered) {
     `).join('')}
 
     <div class="divider"></div>
-    <div class="section-head"><h2>Your shared boundary</h2></div>
-    ${mutualList.length ? mutualList.map(b => `
-      <div class="boundary-row">
-        <div class="cat">${esc(b.title)}</div>
-        <div class="lvl">up to ${b.intensity_cap ? INTENSITY_LABELS[b.intensity_cap] : '—'}</div>
-      </div>
-    `).join('') : `<div class="empty-state">Nothing mutual yet — keep answering to find out.</div>`}
-
-    <div class="divider"></div>
     <div class="section-head"><h2>Heading access</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Based on your answers to the 6 general questions above — this decides which tiers (Discover, Explore, Unleash) are open in each heading. Moves as your answers do.</p>
+    <p class="hint-text" style="margin-bottom:14px">Based on your answers to the 6 general questions above — moves as your answers do. As you add more cards, a stronger match here can open up more, and a weaker one can close things off.</p>
+    ${renderOverallStanding()}
     ${renderHeadingAccessList()}
 
     <div class="divider"></div>

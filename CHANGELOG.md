@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.14.0 — icons, wording, a real bug fix, and one redundant section removed
+
+- Fixed a real bug: the report screen said "you don't need to wait for
+  Jacki" regardless of who was actually logged in — it should say whoever
+  your actual partner is. Confirmed while investigating: Martin and Jacki
+  are genuinely separate accounts, this was purely a hardcoded name.
+- Filled in the 3 middle gauge stops with colour-graded hearts (orange,
+  white, blue) between the red heart and the snowflake, so the gauge
+  reads as one continuous gradient instead of 3 blank circles.
+- Removed "Discover/Explore/Unleash" wording from the heading-access
+  labels — now just Getting Warmer / Good Match / Perfect Match / Not on
+  the Table. The underlying tiers still exist for later use, just not
+  named in the interface yet.
+- Added an overall rollup line above the per-heading breakdown — a quick
+  "X Perfect Match · Y Good Match · Z Getting Warmer" summary across all 6
+  headings at a glance.
+- Removed the old "Your shared boundary" section — leftover from before
+  the general-question wizard and card report existed, showing the same
+  information as the card report below it but with more confusing,
+  legacy wording ("up to Tease"). One less thing saying the same thing
+  two different ways.
+
 ## 1.13.0 — "your partner already started" teaser
 
 - If you log in and your partner has already answered some of the 6
