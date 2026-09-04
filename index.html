@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.2.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.3.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -842,6 +842,7 @@ function renderBoundariesTab(unanswered) {
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
+    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
   `;
 }
 
@@ -876,6 +877,7 @@ function renderDeckView() {
             <button class="deck-answer-btn ${state.answers[q.id]===a?'selected':''}" data-answer-q="${q.id}" data-answer-v="${a}">${ANSWER_LABELS[a]}</button>
           `).join('')}
         </div>
+        <button class="link-btn" data-delete-card="${q.id}" style="margin-top:10px; color:var(--wine-bright)">Delete this card</button>
       </div>
     </div>
     <div class="deck-nav">
@@ -883,6 +885,7 @@ function renderDeckView() {
       <button id="btn-add-card">+ Add a card here</button>
       <button data-deck-next="1" ${idx===cards.length-1?'disabled':''}>Next ›</button>
     </div>
+    <button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>
   `;
 }
 
@@ -1144,6 +1147,42 @@ function attachMainHandlers() {
   if (newHeadingBtn) newHeadingBtn.onclick = openAddHeadingModal;
   const importCsvBtn = document.getElementById('btn-import-csv');
   if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
+
+  $app.querySelectorAll('[data-delete-card]').forEach(el => el.onclick = async () => {
+    if (!confirm('Delete this card? This also removes any answers either of you gave to it.')) return;
+    const { error } = await sb.from('boundary_questions').delete().eq('id', el.dataset.deleteCard);
+    if (error) { showToast(error.message); return; }
+    if (state.deckIndex > 0) state.deckIndex -= 1;
+    await loadQuestions();
+    await loadBoundary();
+    render();
+    showToast('Card deleted.');
+  });
+
+  const deleteAllHeadingBtn = document.querySelector('[data-delete-all-heading]');
+  if (deleteAllHeadingBtn) deleteAllHeadingBtn.onclick = async () => {
+    const cat = deleteAllHeadingBtn.dataset.deleteAllHeading;
+    if (!confirm(`Delete every card in "${cat}"? This can't be undone.`)) return;
+    const { error } = await sb.from('boundary_questions').delete().eq('category', cat);
+    if (error) { showToast(error.message); return; }
+    state.deckIndex = 0;
+    await loadQuestions();
+    await loadBoundary();
+    render();
+    showToast(`All cards in "${cat}" deleted.`);
+  };
+
+  const deleteAllCardsBtn = document.getElementById('btn-delete-all-cards');
+  if (deleteAllCardsBtn) deleteAllCardsBtn.onclick = async () => {
+    if (!confirm('Delete every card across every heading? This removes all your boundary content and can\'t be undone. Headings themselves stay.')) return;
+    const { error } = await sb.from('boundary_questions').delete().eq('couple_id', state.coupleId);
+    if (error) { showToast(error.message); return; }
+    state.openCategory = null; state.deckIndex = 0;
+    await loadQuestions();
+    await loadBoundary();
+    render();
+    showToast('All cards deleted.');
+  };
 
   $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;

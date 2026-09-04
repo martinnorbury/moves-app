@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0 — delete boundary cards
+
+- You can now delete boundary cards, which wasn't possible before (no
+  database policy allowed it). Three levels: delete a single card from
+  inside its deck, delete every card in one heading at once, or delete
+  every card across every heading (headings themselves stay — only the
+  cards inside them are removed). Each asks for confirmation first.
+- Deleting a card also removes any private answers either of you gave to
+  it — nothing orphaned left behind.
+
 ## 1.2.1 — CSV import no longer case-sensitive
 
 - Fixed the CSV import skipping every row when the source file's column
