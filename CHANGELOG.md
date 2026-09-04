@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.1.1 — original answer scale
+
+- Replaced the 4-option answer scale (which was close to Privé's own
+  wording) with an original 5-tier one: Full Spark, Warming Up, Blushing
+  Yes, Just For You, Cold Card. Same underlying idea — enthusiastic
+  through to hard no — just our own words, with a bit more room in the
+  middle, and tied into the app's existing Heat Meter language.
+- The mutual-boundary matching logic was rewritten for the 5-tier scale —
+  a "Cold Card" from either side still excludes it outright; otherwise the
+  less enthusiastic of the two answers sets how cautiously you start.
+
+## 1.1.0 — headings, your own cards, and a lighter look
+
+- Colour scheme reworked: no more dark "chocolate" theme. Each of you picks
+  a lighter theme at signup (or once, on next login, if your account
+  already existed) — purely a colour choice, nothing else depends on it.
+- The boundary questionnaire is now built around **headings** you manage
+  yourselves — Positions, Roleplay & Fantasy, Control & Surrender, Toys &
+  Accessories, and the rest of the original set — rather than a fixed demo
+  question list. Add your own headings, and your own cards under each one
+  (title, description, an optional photo, suggested intensity), from inside
+  the app.
+- Cards are browsed one at a time as a deck under each heading, with an
+  image if you've added one, rather than one long scrolling list.
+- Images you attach are stored privately — only your couple can ever see
+  them, enforced at the storage level, not just hidden in the interface.
+- The answer scale changed to four options — Love this / Yes, but I'm shy /
+  If they want it / Definitely no — and the mutual-boundary logic was
+  rewritten to match: a "definitely no" from either side still excludes it
+  completely; otherwise the less enthusiastic answer sets how cautiously
+  you start.
+- Fixed a real security gap found while building this: several database
+  functions were callable by anyone, even without being signed in, because
+  Supabase grants that access by default on new functions and revoking it
+  from the general "public" group alone doesn't remove it — the direct
+  grant to anonymous visitors needs revoking explicitly too. All functions
+  are now confirmed, by direct database query rather than just the
+  automated check, to be callable only by signed-in players.
+
 ## 1.0.3 — invite code no longer disappears
 
 - Fixed `gen_random_bytes` errors when generating an invite code — a

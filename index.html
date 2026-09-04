@@ -14,21 +14,50 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#1B1714;
-    --surface:#241D19;
-    --surface-raised:#2C231E;
-    --line:#3A2F28;
-    --wine:#8C3B4A;
-    --wine-bright:#B0505F;
-    --gold:#C9A961;
-    --text:#EFE7DC;
-    --text-dim:#9C8F83;
-    --text-faint:#6E6259;
-    --good:#7C9473;
+    /* Neutral default, used before a theme (gender) is chosen — auth/signup only */
+    --bg:#F6F3F0;
+    --surface:#FFFFFF;
+    --surface-raised:#EFEAE4;
+    --line:#E2DAD2;
+    --wine:#8C5A46;
+    --wine-bright:#A8735D;
+    --gold:#B98A4E;
+    --text:#2B2622;
+    --text-dim:#71675D;
+    --text-faint:#A89C90;
+    --good:#6B8F63;
     --radius-s:6px;
     --radius-m:10px;
     --serif: 'Fraunces', Georgia, serif;
     --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  /* Lighter, warmer theme */
+  body.theme-female{
+    --bg:#FBF2F3;
+    --surface:#FFFFFF;
+    --surface-raised:#FCE8EB;
+    --line:#F1D6DC;
+    --wine:#C2607B;
+    --wine-bright:#D97C97;
+    --gold:#B98A4E;
+    --text:#3D2A30;
+    --text-dim:#8C6E76;
+    --text-faint:#B79CA3;
+    --good:#6B8F63;
+  }
+  /* Lighter, cooler theme */
+  body.theme-male{
+    --bg:#F1F5FA;
+    --surface:#FFFFFF;
+    --surface-raised:#E6EDF5;
+    --line:#D6E2EE;
+    --wine:#3D6690;
+    --wine-bright:#4F7FAE;
+    --gold:#B98A4E;
+    --text:#24313E;
+    --text-dim:#66788A;
+    --text-faint:#9AACBC;
+    --good:#6B8F63;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
@@ -38,6 +67,7 @@
     color:var(--text);
     font-family:var(--sans);
     font-size:15px;
+
     line-height:1.5;
     -webkit-font-smoothing:antialiased;
     padding-bottom:env(safe-area-inset-bottom);
@@ -152,10 +182,10 @@
     font-size:11px; padding:3px 9px; border-radius:99px; border:1px solid var(--line); color:var(--text-dim);
     white-space:nowrap;
   }
-  .pill.intensity-tease{color:#B7C9A8; border-color:#3A4030;}
-  .pill.intensity-risque{color:#D7A96B; border-color:#453423;}
-  .pill.intensity-bold{color:#D7896B; border-color:#452B23;}
-  .pill.intensity-wild{color:var(--wine-bright); border-color:#4A2429;}
+  .pill.intensity-tease{background:#EAF3E4; color:#4B6B3E; border-color:#CFE3C2;}
+  .pill.intensity-risque{background:#FBEEDC; color:#8A5A1E; border-color:#F0D9B0;}
+  .pill.intensity-bold{background:#FBE6DC; color:#9A4A22; border-color:#F0C3AC;}
+  .pill.intensity-wild{background:#FBE3E6; color:#9A2F3D; border-color:#F0BEC5;}
   .dare-body{color:var(--text-dim); font-size:13.5px; margin-bottom:12px;}
   .dare-instructions{color:var(--text); font-size:14px; margin-bottom:12px; line-height:1.55;}
   .dare-points{font-size:12px; color:var(--gold);}
@@ -200,7 +230,39 @@
   .boundary-row .lvl{font-size:12px; color:var(--text-faint);}
   .boundary-row.excluded{opacity:0.4;}
 
+  .category-row{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:16px; margin-bottom:8px;
+  }
+  .category-row .cat-name{font-family:var(--serif); font-size:16px; color:var(--text);}
+  .category-row .cat-count{font-size:12px; color:var(--text-faint); margin-top:2px;}
+  .category-row .cat-arrow{color:var(--text-faint); font-size:18px;}
+
+  .deck-progress{font-size:12px; color:var(--text-faint); text-align:center; margin-bottom:10px;}
+  .deck-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:0; margin-bottom:16px; overflow:hidden;
+  }
+  .deck-card img{width:100%; display:block; aspect-ratio:4/3; object-fit:cover; background:var(--surface-raised);}
+  .deck-card-body{padding:18px;}
+  .deck-card-title{font-family:var(--serif); font-size:20px; color:var(--text); margin-bottom:8px;}
+  .deck-card-explain{font-size:14px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;}
+  .deck-answers{display:flex; flex-direction:column; gap:8px;}
+  .deck-answer-btn{
+    background:var(--bg); border:1px solid var(--line); color:var(--text);
+    padding:13px 14px; border-radius:var(--radius-s); font-size:14px; text-align:left;
+  }
+  .deck-answer-btn.selected{background:var(--wine); border-color:var(--wine); color:#fff; font-weight:600;}
+  .deck-nav{display:flex; justify-content:space-between; align-items:center; margin-top:14px;}
+  .deck-nav button{background:none; border:none; color:var(--text-dim); font-size:14px; padding:8px;}
+  .deck-nav button:disabled{opacity:0.3;}
+
+  .image-upload-row{display:flex; align-items:center; gap:12px;}
+  .image-preview{width:64px; height:64px; border-radius:var(--radius-s); object-fit:cover; background:var(--surface-raised); border:1px solid var(--line);}
+
   .modal-backdrop{
+
     position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:300;
     display:flex; align-items:flex-end;
   }
@@ -215,7 +277,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.0.3)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.1.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -223,7 +285,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.1.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -236,7 +298,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $app = document.getElementById('app');
 
 const ANSWER_LABELS = {
-  yes: 'Yes', maybe: 'Maybe', not_now: 'Not now', no: 'No', already_enjoy: 'Already enjoy'
+  full_spark: 'Full Spark', warming_up: 'Warming Up', blushing_yes: 'Blushing Yes', just_for_you: 'Just For You', cold_card: 'Cold Card'
 };
 const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
 const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
@@ -249,9 +311,13 @@ let state = {
   coupleId: null,
   partner: null,
   tab: 'home',
+  categories: [],      // boundary_categories rows
   questions: [],
   answers: {},        // question_id -> answer
   boundary: [],        // computed shared boundary rows
+  imageUrls: {},        // image_path -> signed URL
+  openCategory: null,    // category name currently open as a deck, or null for the list view
+  deckIndex: 0,          // position within the open deck
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -295,20 +361,29 @@ async function boot() {
 
 function resetState() {
   state.profile = null; state.coupleId = null; state.partner = null;
-  state.questions = []; state.answers = {}; state.boundary = [];
+  state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
+  state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
+  applyTheme(null);
+}
+
+function applyTheme(gender) {
+  document.body.classList.remove('theme-male', 'theme-female');
+  if (gender === 'male') document.body.classList.add('theme-male');
+  if (gender === 'female') document.body.classList.add('theme-female');
 }
 
 async function loadEverything() {
   state.loading = true; render();
   try {
     await loadProfile();
+    applyTheme(state.profile ? state.profile.gender : null);
     if (state.profile) {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadQuestions(), loadOwnAnswers(), loadBoundary(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
         ]);
         subscribeRealtime();
@@ -341,6 +416,10 @@ async function loadCouple() {
   }
 }
 
+async function loadCategories() {
+  const { data } = await sb.from('boundary_categories').select('*').order('sort_order');
+  state.categories = data || [];
+}
 async function loadQuestions() {
   const { data } = await sb.from('boundary_questions').select('*').eq('active', true).order('sort_order');
   state.questions = data || [];
@@ -395,6 +474,7 @@ function render() {
   if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
   if (!state.profile) { $app.innerHTML = renderCreateProfile(); attachCreateProfileHandlers(); return; }
+  if (!state.profile.gender) { $app.innerHTML = renderChooseTheme(); attachChooseThemeHandlers(); return; }
   if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
   if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
 
@@ -436,7 +516,13 @@ function renderAuth() {
       </div>
       <form id="auth-form" class="stack">
         ${state.authMode==='signup' ? `
-        <div class="field"><label>Your name</label><input type="text" id="auth-name" placeholder="How your partner will see you" required></div>` : ''}
+        <div class="field"><label>Your name</label><input type="text" id="auth-name" placeholder="How your partner will see you" required></div>
+        <div class="field"><label>Theme</label>
+          <select id="auth-gender">
+            <option value="female">Lighter, warmer theme</option>
+            <option value="male">Lighter, cooler theme</option>
+          </select>
+        </div>` : ''}
         <div class="field"><label>Email</label><input type="email" id="auth-email" required></div>
         <div class="field"><label>Password</label><input type="password" id="auth-password" minlength="8" required></div>
         ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
@@ -458,10 +544,11 @@ function attachAuthHandlers() {
     try {
       if (state.authMode === 'signup') {
         const name = document.getElementById('auth-name').value.trim();
+        const gender = document.getElementById('auth-gender').value;
         const { data, error } = await sb.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
-          await sb.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0] });
+          await sb.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0], gender });
         }
         state.session = data.session;
       } else {
@@ -483,6 +570,12 @@ function renderCreateProfile() {
       <div class="auth-hero"><h1>Almost there</h1><p>What should your partner see you as?</p></div>
       <form id="profile-form" class="stack">
         <div class="field"><input type="text" id="profile-name" placeholder="Your name" required></div>
+        <div class="field"><label>Theme</label>
+          <select id="profile-gender">
+            <option value="female">Lighter, warmer theme</option>
+            <option value="male">Lighter, cooler theme</option>
+          </select>
+        </div>
         <button type="submit" class="btn btn-primary">Continue</button>
       </form>
     </div>
@@ -492,9 +585,28 @@ function attachCreateProfileHandlers() {
   document.getElementById('profile-form').onsubmit = async (e) => {
     e.preventDefault();
     const name = document.getElementById('profile-name').value.trim();
-    await sb.from('profiles').insert({ id: state.session.user.id, display_name: name });
+    const gender = document.getElementById('profile-gender').value;
+    await sb.from('profiles').insert({ id: state.session.user.id, display_name: name, gender });
     await loadEverything();
   };
+}
+
+function renderChooseTheme() {
+  return `
+    <div class="center-screen">
+      <div class="auth-hero"><h1>Pick a theme</h1><p>You can't change this later without asking me to — but it's just a colour, nothing else depends on it.</p></div>
+      <div class="stack">
+        <button class="btn btn-primary" data-pick-gender="female">Lighter, warmer theme</button>
+        <button class="btn btn-primary" data-pick-gender="male">Lighter, cooler theme</button>
+      </div>
+    </div>
+  `;
+}
+function attachChooseThemeHandlers() {
+  $app.querySelectorAll('[data-pick-gender]').forEach(el => el.onclick = async () => {
+    await sb.from('profiles').update({ gender: el.dataset.pickGender }).eq('id', state.session.user.id);
+    await loadEverything();
+  });
 }
 
 /* ==========================================================================
@@ -687,33 +799,18 @@ function renderDaresTab() {
    BOUNDARIES TAB
    ========================================================================== */
 function renderBoundariesTab(unanswered) {
-  const grouped = {};
-  state.questions.forEach(q => { (grouped[q.category] = grouped[q.category] || []).push(q); });
+  if (state.openCategory) return renderDeckView();
 
-  const permittedMap = {};
-  state.boundary.forEach(b => permittedMap[b.question_id] = b);
-
-  let questionnaireHtml = Object.keys(grouped).map(cat => `
-    <div class="section-head"><h2>${esc(cat)}</h2></div>
-    ${grouped[cat].map(q => `
-      <div class="qa-row">
-        <div class="qa-cat">${TYPE_LABELS[q.suitable_for]}</div>
-        <div class="qa-title">${esc(q.title)}</div>
-        ${q.explanation ? `<div class="qa-explain">${esc(q.explanation)}</div>` : ''}
-        <div class="qa-options">
-          ${Object.keys(ANSWER_LABELS).map(a => `
-            <button class="qa-opt ${state.answers[q.id]===a?'selected':''}" data-answer-q="${q.id}" data-answer-v="${a}">${ANSWER_LABELS[a]}</button>
-          `).join('')}
-        </div>
-      </div>
-    `).join('')}
-  `).join('');
+  const countByCategory = {};
+  state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
+  const answeredByCategory = {};
+  state.questions.forEach(q => {
+    if (state.answers[q.id]) answeredByCategory[q.category] = (answeredByCategory[q.category] || 0) + 1;
+  });
 
   const mutualList = state.boundary.filter(b => b.permitted);
 
   return `
-    ${unanswered > 0 ? `<div class="status-strip"><div class="status-label">Your private answers</div><div class="status-value awaiting">${unanswered} left to answer</div></div>` : ''}
-
     <div class="section-head"><h2>Your shared boundary</h2></div>
     ${mutualList.length ? mutualList.map(b => `
       <div class="boundary-row">
@@ -723,11 +820,78 @@ function renderBoundariesTab(unanswered) {
     `).join('') : `<div class="empty-state">Nothing mutual yet — keep answering to find out.</div>`}
 
     <div class="divider"></div>
-    <div class="section-head"><h2>Your private answers</h2></div>
-    <p class="hint-text" style="margin-bottom:16px">Only you see these. Your partner only ever sees the mutual result above.</p>
-    ${questionnaireHtml}
+    <div class="section-head"><h2>Headings</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards. Only you see your own answers — your partner only ever sees the mutual result above.</p>
+
+    ${state.categories.map(c => {
+      const total = countByCategory[c.name] || 0;
+      const answered = answeredByCategory[c.name] || 0;
+      return `
+        <div class="category-row" data-open-category="${esc(c.name)}">
+          <div>
+            <div class="cat-name">${esc(c.name)}</div>
+            <div class="cat-count">${total} card${total===1?'':'s'}${total ? ` · ${answered} answered` : ' · none yet'}</div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+      `;
+    }).join('')}
+
+    <button class="btn btn-ghost" id="btn-new-heading" style="margin-top:14px">Add a new heading</button>
   `;
 }
+
+function renderDeckView() {
+  const cards = state.questions.filter(q => q.category === state.openCategory);
+  const idx = Math.min(state.deckIndex, Math.max(0, cards.length - 1));
+  const q = cards[idx];
+
+  if (!q) {
+    return `
+      <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
+      <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
+      <button class="btn btn-gold" id="btn-add-card">Add the first card</button>
+    `;
+  }
+
+  if (q.image_path && !state.imageUrls[q.image_path]) {
+    fetchSignedImageUrl(q.image_path);
+  }
+  const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
+
+  return `
+    <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
+    <div class="deck-progress" style="margin-top:14px">${esc(state.openCategory)} — card ${idx + 1} of ${cards.length}</div>
+    <div class="deck-card">
+      ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
+      <div class="deck-card-body">
+        <div class="deck-card-title">${esc(q.title)}</div>
+        ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
+        <div class="deck-answers">
+          ${Object.keys(ANSWER_LABELS).map(a => `
+            <button class="deck-answer-btn ${state.answers[q.id]===a?'selected':''}" data-answer-q="${q.id}" data-answer-v="${a}">${ANSWER_LABELS[a]}</button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="deck-nav">
+      <button data-deck-prev="1" ${idx===0?'disabled':''}>‹ Previous</button>
+      <button id="btn-add-card">+ Add a card here</button>
+      <button data-deck-next="1" ${idx===cards.length-1?'disabled':''}>Next ›</button>
+    </div>
+  `;
+}
+
+async function fetchSignedImageUrl(path) {
+  if (state.imageUrls[path] === 'pending') return;
+  state.imageUrls[path] = 'pending';
+  const { data } = await sb.storage.from('boundary-images').createSignedUrl(path, 3600);
+  if (data && data.signedUrl) {
+    state.imageUrls[path] = data.signedUrl;
+    render();
+  }
+}
+
 
 /* ==========================================================================
    REWARDS TAB
@@ -961,12 +1125,31 @@ function attachMainHandlers() {
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
 
+  $app.querySelectorAll('[data-open-category]').forEach(el => el.onclick = () => {
+    state.openCategory = el.dataset.openCategory; state.deckIndex = 0; render();
+  });
+  const closeDeck = document.querySelector('[data-close-deck]');
+  if (closeDeck) closeDeck.onclick = () => { state.openCategory = null; render(); };
+  const deckPrev = document.querySelector('[data-deck-prev]');
+  if (deckPrev) deckPrev.onclick = () => { state.deckIndex = Math.max(0, state.deckIndex - 1); render(); };
+  const deckNext = document.querySelector('[data-deck-next]');
+  if (deckNext) deckNext.onclick = () => { state.deckIndex = state.deckIndex + 1; render(); };
+  const addCardBtn = document.getElementById('btn-add-card');
+  if (addCardBtn) addCardBtn.onclick = openAddCardModal;
+  const newHeadingBtn = document.getElementById('btn-new-heading');
+  if (newHeadingBtn) newHeadingBtn.onclick = openAddHeadingModal;
+
   $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;
     state.answers[qId] = val;
     render();
     await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
     await loadBoundary();
+    // Auto-advance to the next card in the deck, if there is one
+    if (state.openCategory) {
+      const cards = state.questions.filter(x => x.category === state.openCategory);
+      if (state.deckIndex < cards.length - 1) state.deckIndex += 1;
+    }
     render();
   });
 
@@ -989,6 +1172,108 @@ function attachMainHandlers() {
 
   const backdrop = document.getElementById('modal-backdrop');
   if (backdrop) backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+}
+
+function openAddHeadingModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Add a new heading</h2>
+        <form id="heading-form" class="stack">
+          <div class="field"><input type="text" id="heading-name" placeholder="e.g. Travel Fantasies" required></div>
+          <div id="heading-form-error" class="error-text"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('heading-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('heading-name').value.trim();
+    const { error } = await sb.rpc('add_boundary_category', { p_name: name });
+    if (error) { document.getElementById('heading-form-error').textContent = error.message; return; }
+    closeModal();
+    await loadCategories();
+    render();
+  };
+}
+
+function openAddCardModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Add a card</h2>
+        <form id="card-form" class="stack">
+          <div class="field"><label>Heading</label>
+            <select id="card-category">
+              ${state.categories.map(c => `<option value="${esc(c.name)}" ${c.name===state.openCategory?'selected':''}>${esc(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Title</label><input type="text" id="card-title" required></div>
+          <div class="field"><label>Description</label><textarea id="card-explain"></textarea></div>
+          <div class="field"><label>Image (optional)</label>
+            <div class="image-upload-row">
+              <img class="image-preview" id="card-image-preview" style="display:none">
+              <input type="file" id="card-image" accept="image/*">
+            </div>
+          </div>
+          <div class="field"><label>Suggested top intensity</label>
+            <select id="card-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}">${INTENSITY_LABELS[i]}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Best suited for</label>
+            <select id="card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
+          </div>
+          <div id="card-form-error" class="error-text"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add card</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+
+  const fileInput = document.getElementById('card-image');
+  fileInput.onchange = () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const preview = document.getElementById('card-image-preview');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  };
+
+  document.getElementById('card-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('card-form-error');
+    let imagePath = null;
+    const file = fileInput.files[0];
+    if (file) {
+      const ext = file.name.split('.').pop();
+      const path = `${state.coupleId}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await sb.storage.from('boundary-images').upload(path, file);
+      if (uploadError) { errEl.textContent = 'Image upload failed: ' + uploadError.message; return; }
+      imagePath = path;
+    }
+    const { error } = await sb.rpc('add_boundary_question', {
+      p_category: document.getElementById('card-category').value,
+      p_title: document.getElementById('card-title').value.trim(),
+      p_explanation: document.getElementById('card-explain').value.trim() || null,
+      p_image_path: imagePath,
+      p_max_intensity: document.getElementById('card-intensity').value,
+      p_suitable_for: document.getElementById('card-suitable').value
+    });
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    await loadQuestions();
+    render();
+  };
 }
 
 function openCompleteModal(dareId) {
