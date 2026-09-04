@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
 <style>
   :root{
     /* Neutral default, used before a theme (gender) is chosen — auth/signup only */
@@ -277,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.1.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.2.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -285,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -837,7 +838,10 @@ function renderBoundariesTab(unanswered) {
       `;
     }).join('')}
 
-    <button class="btn btn-ghost" id="btn-new-heading" style="margin-top:14px">Add a new heading</button>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
+      <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
+    </div>
   `;
 }
 
@@ -1138,6 +1142,8 @@ function attachMainHandlers() {
   if (addCardBtn) addCardBtn.onclick = openAddCardModal;
   const newHeadingBtn = document.getElementById('btn-new-heading');
   if (newHeadingBtn) newHeadingBtn.onclick = openAddHeadingModal;
+  const importCsvBtn = document.getElementById('btn-import-csv');
+  if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
 
   $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;
@@ -1274,6 +1280,86 @@ function openAddCardModal() {
     await loadQuestions();
     render();
   };
+}
+
+const VALID_INTENSITIES = ['tease', 'risque', 'bold', 'wild'];
+const VALID_TYPES = ['apart', 'together', 'either', 'reunion'];
+
+function openImportCsvModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Import cards from CSV</h2>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). Headings that don't exist yet are created automatically. No images via CSV — add those individually afterwards if you want them.</p>
+        <input type="file" id="csv-file" accept=".csv">
+        <div id="import-progress" class="hint-text" style="margin-top:14px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('csv-file').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => runCsvImport(results.data)
+    });
+  };
+}
+
+async function runCsvImport(rows) {
+  const progressEl = document.getElementById('import-progress');
+  const knownCategories = new Set(state.categories.map(c => c.name));
+  let added = 0, skipped = 0;
+  const errors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const lineNum = i + 2; // account for header row, 1-indexed
+    const category = (row.category || '').trim();
+    const title = (row.title || '').trim();
+    const explanation = (row.explanation || '').trim() || null;
+    let intensity = (row.max_intensity || '').trim().toLowerCase();
+    let suitable = (row.suitable_for || '').trim().toLowerCase();
+
+    if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
+
+    if (!category || !title) {
+      skipped++; errors.push(`Row ${lineNum}: missing category or title — skipped.`); continue;
+    }
+    if (!VALID_INTENSITIES.includes(intensity)) {
+      skipped++; errors.push(`Row ${lineNum}: invalid max_intensity "${row.max_intensity || ''}" — skipped.`); continue;
+    }
+    if (!VALID_TYPES.includes(suitable)) suitable = 'either';
+
+    if (!knownCategories.has(category)) {
+      const { error: catErr } = await sb.rpc('add_boundary_category', { p_name: category });
+      if (catErr) { skipped++; errors.push(`Row ${lineNum}: couldn't create heading "${category}" — skipped.`); continue; }
+      knownCategories.add(category);
+    }
+
+    const { error } = await sb.rpc('add_boundary_question', {
+      p_category: category, p_title: title, p_explanation: explanation, p_image_path: null,
+      p_max_intensity: intensity, p_suitable_for: suitable
+    });
+    if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
+    added++;
+  }
+
+  await loadCategories();
+  await loadQuestions();
+  if (progressEl) {
+    progressEl.innerHTML = `<b>${added} card${added===1?'':'s'} added, ${skipped} skipped.</b>` +
+      (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
+  }
+  // Note: intentionally not calling render() here — state.modal is a static
+  // snapshot taken when the modal opened, and re-rendering it would wipe out
+  // the summary we just wrote directly into the DOM. Categories/questions are
+  // already reloaded, so the boundaries list will show fresh counts as soon
+  // as the modal is closed.
 }
 
 function openCompleteModal(dareId) {

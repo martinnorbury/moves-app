@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0 — bulk import from CSV
+
+- Added a CSV import to the Boundaries tab ("Import from CSV") for adding
+  many cards at once instead of one at a time. Expects columns: category,
+  title, explanation, max_intensity, suitable_for. Headings that don't
+  exist yet are created automatically as part of the import. Images aren't
+  part of the CSV — add those individually afterwards if wanted.
+- Invalid rows (missing title/category, or an unrecognised intensity) are
+  skipped rather than breaking the whole import, and you get a summary of
+  what was added versus skipped, with the reason for each skip.
+
 ## 1.1.1 — original answer scale
 
 - Replaced the 4-option answer scale (which was close to Privé's own
