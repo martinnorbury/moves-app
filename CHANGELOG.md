@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.24.0 — dare library, and dares now validate against heading access
+
+- Dares are now judged against the heading-level running average — the
+  same "Perfect Match / Good Match / Getting Warmer / Worth A Try" system
+  driving everything else — instead of the old per-card system. Tested
+  directly against the database: a Perfect Match heading allows Wild, a
+  Getting Warmer heading rejects anything above Risqué, and a closed
+  heading rejects everything, even Tease.
+- Added a dare library: admin imports a CSV of pre-written dares (each
+  tagged with a heading and a fixed intensity), and "Create a move" now
+  suggests matching ones for whichever heading you pick — capped to what
+  that heading currently allows, so you're never shown something outside
+  the boundary. Writing your own from scratch is still one tap away.
+- Type (Apart/Together/Either/Reunion) is deliberately not part of a
+  library dare — you pick that fresh every time you send one, since it
+  depends on the moment, not the dare itself.
+- Library import is admin-only, same as everything else that adds or
+  changes content; browsing suggestions and sending a move is usage,
+  open to both accounts.
+
+## 1.23.0 — Step 1 complete milestone
+
+- Added a genuine one-time celebration screen, shown once ever (a real
+  database flag, not something that reappears every login) once every
+  heading has moved past "waiting on both of you" — meaning you've both
+  actually answered all 6 general questions. Shows a recap of where
+  everything landed, then hands off to "Step 2: your first move."
+
+## 1.22.1 — Admin holds only content-management tools, nothing else
+
+- Removed "Your card report" from the Admin tab entirely — it was
+  reporting data, not a content-management function, and it duplicated
+  the per-heading expansion already on Kinks showing the same thing.
+  Admin now contains exactly five things: add a heading, add a card,
+  import CSV, attach images, delete — nothing that only reads or reports.
+- The test going forward: if an action doesn't create, modify, or remove
+  content, it isn't admin — regardless of which screen it happens to live
+  on. Browsing headings and answering cards under Kinks stays there
+  because it fits that test; it was never misplaced.
+
 ## 1.22.0 — a personal welcome, with your own photo
 
 - Home now opens with "Welcome back, [your name]" in large type, plus a

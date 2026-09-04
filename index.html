@@ -324,7 +324,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.22.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.24.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -332,7 +332,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.24.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -375,6 +375,7 @@ let state = {
   expandedHeadings: new Set(),  // which headings are expanded in the Kinks tab accordion
   headingAccess: [],          // per-heading tier unlock, from get_heading_access()
   cardReport: [],              // per-card joint tiers, from get_card_report()
+  dareLibrary: [],              // admin-written dare templates, browsable by both partners
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
   viewingSetup: false,          // whether the Boundaries tab is showing the Setup area instead of the report
@@ -449,7 +450,7 @@ async function loadEverything() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
         ]);
         subscribeRealtime();
@@ -511,6 +512,10 @@ async function loadHeadingAccess() {
 async function loadCardReport() {
   const { data, error } = await sb.rpc('get_card_report');
   state.cardReport = error ? [] : (data || []);
+}
+async function loadDareLibrary() {
+  const { data, error } = await sb.from('dare_library').select('*').eq('active', true).order('sort_order');
+  state.dareLibrary = error ? [] : (data || []);
 }
 async function loadPartnerTeaser() {
   const { data, error } = await sb.rpc('get_partner_teaser');
@@ -631,6 +636,33 @@ function attachPartnerTeaserHandlers() {
   if (btn) btn.onclick = () => { state.viewedTeaser = true; render(); };
 }
 
+function renderStep1Complete() {
+  return `
+    <div class="screen" style="padding-top:22px">
+      <div class="auth-hero">
+        <h1>Step 1 complete 🎉</h1>
+        <p>You've both answered the general question for every heading. Here's where that leaves you.</p>
+      </div>
+      ${renderOverallStanding()}
+      ${renderHeadingAccessList()}
+      <div class="divider"></div>
+      <div class="auth-hero" style="margin-top:0">
+        <h1 style="font-size:22px">Step 2: your first move</h1>
+        <p>Next up is actually sending each other a dare. We'll figure out together how that gets suggested to you — for now, head into the app and take a look around.</p>
+      </div>
+      <button class="btn btn-gold" id="btn-step1-continue" style="width:100%">Let's go</button>
+    </div>
+  `;
+}
+function attachStep1CompleteHandlers() {
+  const btn = document.getElementById('btn-step1-continue');
+  if (btn) btn.onclick = async () => {
+    state.profile.seen_step1_complete = true;
+    render();
+    await sb.from('profiles').update({ seen_step1_complete: true }).eq('id', state.session.user.id);
+  };
+}
+
 function renderWizard(q, remaining) {
   if (q.image_path && !state.imageUrls[q.image_path]) fetchSignedImageUrl(q.image_path);
   const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
@@ -681,6 +713,11 @@ function render() {
     $app.innerHTML = renderPartnerTeaser(); attachPartnerTeaserHandlers(); return;
   }
   if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
+
+  const step1Complete = state.headingAccess.length > 0 && state.headingAccess.every(h => h.access !== 'pending');
+  if (step1Complete && state.profile && !state.profile.seen_step1_complete) {
+    $app.innerHTML = renderStep1Complete(); attachStep1CompleteHandlers(); return;
+  }
 
   const unanswered = getWizardQuestions().filter(q => !state.answers[q.id]).length;
 
@@ -1093,21 +1130,6 @@ function renderHeadingExpansion(category) {
   `;
 }
 
-function renderCardReport() {
-  const offTableCount = state.cardReport.filter(c => c.tier === 'off_table').length;
-  const shown = state.cardReport.filter(c => c.tier !== 'off_table')
-    .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
-
-  if (!shown.length && !offTableCount) {
-    return `<div class="empty-state">Neither of you has answered a specific card yet — head into Setup to start on a heading.</div>`;
-  }
-
-  return `
-    ${shown.map(c => renderScoredCardRow(c, true)).join('')}
-    ${offTableCount ? `<p class="hint-text" style="margin-top:14px">${offTableCount} other card${offTableCount===1?'':'s'} you've both answered ${offTableCount===1?"isn't":"aren't"} currently on the table — not listed here, since who said no isn't shown either.</p>` : ''}
-  `;
-}
-
 function renderAllAnswers() {
   const answered = getOrderedQuestions().filter(q => state.answers[q.id]);
   const filterText = state.allAnswersFilter.trim().toLowerCase();
@@ -1205,9 +1227,10 @@ function renderSetupArea(adminMode) {
     ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
 
     <div class="divider"></div>
-    <div class="section-head"><h2>Your card report</h2></div>
-    <p class="hint-text" style="margin-bottom:6px">For specific cards you've both answered, grouped by how well matched you are.</p>
-    ${renderCardReport()}
+    <div class="section-head"><h2>Dare library</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">${state.dareLibrary.length} dare${state.dareLibrary.length===1?'':'s'} in the library. Suggested to whoever's sending a move, matched to a heading and capped to what it currently allows.</p>
+    <button class="btn btn-ghost" id="btn-import-dares-csv" style="width:100%">Import dare library from CSV</button>
+    ${state.dareLibrary.length ? `<button class="link-btn" id="btn-delete-all-dares" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.dareLibrary.length} library dares</button>` : ''}
     ` : ''}
   `;
 }
@@ -1362,19 +1385,23 @@ function renderTabbar() {
 /* ==========================================================================
    MODALS: create dare / create reward / counter
    ========================================================================== */
+const TIER_MAX_INTENSITY = { favorites: 'wild', strong_interest: 'bold', worth_trying: 'risque', if_both_up_for_it: 'tease' };
+
 function openCreateDareModal() {
-  const eligible = state.boundary.filter(b => b.permitted);
+  const eligible = state.headingAccess.filter(h => h.access !== 'off_table' && h.access !== 'pending');
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Create a move</h2>
-        ${eligible.length === 0 ? `<p class="hint-text">No shared boundary categories yet — answer more questions together first.</p>` : `
-        <form id="dare-form" class="stack">
-          <div class="field"><label>Category</label>
-            <select id="d-question">
-              ${eligible.map(b => `<option value="${b.question_id}" data-cap="${b.intensity_cap||''}">${esc(b.title)}</option>`).join('')}
-            </select>
-          </div>
+        ${eligible.length === 0 ? `<p class="hint-text">No headings are open for a move yet — answer more questions together first.</p>` : `
+        <div class="field"><label>Heading</label>
+          <select id="d-category">
+            ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
+          </select>
+        </div>
+        <div id="d-suggestions" style="margin:14px 0"></div>
+        <button type="button" class="btn btn-ghost" id="btn-write-own" style="margin-bottom:14px">Write my own instead</button>
+        <form id="dare-form" class="stack" style="display:none">
           <div class="field"><label>Title</label><input type="text" id="d-title" required></div>
           <div class="field"><label>Teaser (shown before they reveal it)</label><input type="text" id="d-teaser"></div>
           <div class="field"><label>Full instructions</label><textarea id="d-instructions" required></textarea></div>
@@ -1382,7 +1409,7 @@ function openCreateDareModal() {
             <select id="d-type">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
           <div class="field"><label>Intensity</label>
-            <select id="d-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}">${INTENSITY_LABELS[i]} — ${INTENSITY_POINTS[i]} pts</option>`).join('')}</select>
+            <select id="d-intensity"></select>
           </div>
           <div class="field"><label>Deadline (optional)</label><input type="datetime-local" id="d-deadline"></div>
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
@@ -1400,22 +1427,80 @@ function openCreateDareModal() {
   `;
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
+  if (eligible.length === 0) return;
+
+  const categorySelect = document.getElementById('d-category');
+  const intensitySelect = document.getElementById('d-intensity');
+  const writeOwnBtn = document.getElementById('btn-write-own');
   const form = document.getElementById('dare-form');
-  if (form) form.onsubmit = async (e) => {
+
+  function currentMaxIntensity() {
+    return categorySelect.options[categorySelect.selectedIndex].dataset.max;
+  }
+  function populateIntensityOptions() {
+    const max = currentMaxIntensity();
+    const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
+    intensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]} — ${INTENSITY_POINTS[i]} pts</option>`).join('');
+  }
+  function renderSuggestions() {
+    const cat = categorySelect.value;
+    const max = currentMaxIntensity();
+    const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
+    const matches = state.dareLibrary.filter(d => d.category === cat && allowed.includes(d.intensity));
+    const box = document.getElementById('d-suggestions');
+    if (!matches.length) {
+      box.innerHTML = `<p class="hint-text">No library dares for this heading yet.</p>`;
+      return;
+    }
+    box.innerHTML = `<p class="hint-text" style="margin-bottom:8px">Suggested for you:</p>` + matches.map(d => `
+      <div class="category-row" data-pick-library="${d.id}" style="cursor:pointer">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${esc(d.title)}</div>
+          <div class="cat-count"><span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span></div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    `).join('');
+    box.querySelectorAll('[data-pick-library]').forEach(el => el.onclick = () => {
+      const d = matches.find(x => x.id === el.dataset.pickLibrary);
+      document.getElementById('d-title').value = d.title;
+      document.getElementById('d-teaser').value = d.teaser || '';
+      document.getElementById('d-instructions').value = d.instructions;
+      populateIntensityOptions();
+      intensitySelect.value = d.intensity;
+      form.style.display = '';
+      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  categorySelect.onchange = () => { populateIntensityOptions(); renderSuggestions(); };
+  writeOwnBtn.onclick = () => {
+    populateIntensityOptions();
+    document.getElementById('d-title').value = '';
+    document.getElementById('d-teaser').value = '';
+    document.getElementById('d-instructions').value = '';
+    form.style.display = '';
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+  populateIntensityOptions();
+  renderSuggestions();
+
+  form.onsubmit = async (e) => {
     e.preventDefault();
     const errEl = document.getElementById('dare-form-error');
     const deadlineVal = document.getElementById('d-deadline').value;
     const { error } = await sb.rpc('create_dare', {
-      p_question_id: document.getElementById('d-question').value,
+      p_category: categorySelect.value,
       p_title: document.getElementById('d-title').value.trim(),
       p_instructions: document.getElementById('d-instructions').value.trim(),
       p_teaser: document.getElementById('d-teaser').value.trim() || null,
       p_dare_type: document.getElementById('d-type').value,
-      p_intensity: document.getElementById('d-intensity').value,
+      p_intensity: intensitySelect.value,
       p_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
       p_requires_confirmation: document.getElementById('d-confirm').checked,
       p_reward_text: null,
-      p_reusable: false
+      p_reusable: false,
+      p_question_id: null
     });
     if (error) { errEl.textContent = error.message; return; }
     closeModal();
@@ -1575,6 +1660,17 @@ function attachMainHandlers() {
   if (newHeadingBtn) newHeadingBtn.onclick = openAddHeadingModal;
   const importCsvBtn = document.getElementById('btn-import-csv');
   if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
+  const importDaresCsvBtn = document.getElementById('btn-import-dares-csv');
+  if (importDaresCsvBtn) importDaresCsvBtn.onclick = openImportDaresCsvModal;
+  const deleteAllDaresBtn = document.getElementById('btn-delete-all-dares');
+  if (deleteAllDaresBtn) deleteAllDaresBtn.onclick = async () => {
+    if (!confirm(`Delete all ${state.dareLibrary.length} library dares? This can't be undone.`)) return;
+    const { error } = await sb.from('dare_library').delete().eq('couple_id', state.coupleId);
+    if (error) { showToast(error.message); return; }
+    await loadDareLibrary();
+    render();
+    showToast('Dare library cleared.');
+  };
   const openSetupBtn = document.getElementById('btn-open-setup');
   if (openSetupBtn) openSetupBtn.onclick = () => { state.viewingSetup = true; render(); };
   const closeSetupBtn = document.getElementById('btn-close-setup');
@@ -2011,6 +2107,77 @@ async function runCsvImport(rows) {
   // the summary we just wrote directly into the DOM. Categories/questions are
   // already reloaded, so the boundaries list will show fresh counts as soon
   // as the modal is closed.
+}
+
+function openImportDaresCsvModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Import dare library from CSV</h2>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, teaser, instructions, intensity</b>. category must match an existing heading exactly. intensity must be tease/risque/bold/wild. teaser is optional. Type (Apart/Together/Either/Reunion) isn't part of the library — whoever sends the dare picks that at the time.</p>
+        <input type="file" id="dares-csv-file" accept=".csv">
+        <div id="dares-import-progress" class="hint-text" style="margin-top:14px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('dares-csv-file').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_'),
+      complete: (results) => runDaresCsvImport(results.data)
+    });
+  };
+}
+
+async function runDaresCsvImport(rows) {
+  const progressEl = document.getElementById('dares-import-progress');
+  const knownCategories = new Set(state.categories.map(c => c.name.toLowerCase()));
+  let added = 0, skipped = 0;
+  const errors = [];
+
+  function normalize(s) {
+    return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const lineNum = i + 2;
+    const category = (row.category || '').trim();
+    const title = (row.title || '').trim();
+    const teaser = (row.teaser || '').trim() || null;
+    const instructions = (row.instructions || '').trim();
+    const intensity = normalize(row.intensity);
+
+    if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
+
+    if (!category || !title || !instructions) {
+      skipped++; errors.push(`Row ${lineNum}: missing category, title, or instructions — skipped.`); continue;
+    }
+    if (!knownCategories.has(category.toLowerCase())) {
+      skipped++; errors.push(`Row ${lineNum}: "${category}" doesn't match an existing heading — skipped.`); continue;
+    }
+    if (!VALID_INTENSITIES.includes(intensity)) {
+      skipped++; errors.push(`Row ${lineNum}: invalid intensity "${row.intensity || ''}" — skipped.`); continue;
+    }
+
+    const { error } = await sb.rpc('add_library_dare', {
+      p_category: category, p_title: title, p_teaser: teaser, p_instructions: instructions, p_intensity: intensity
+    });
+    if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
+    added++;
+  }
+
+  await loadDareLibrary();
+  if (progressEl) {
+    progressEl.innerHTML = `<b>${added} dare${added===1?'':'s'} added, ${skipped} skipped.</b>` +
+      (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
+  }
 }
 
 function openCompleteModal(dareId) {

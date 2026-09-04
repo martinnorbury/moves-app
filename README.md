@@ -11,8 +11,10 @@ version number in the app itself.
 
 1. Each of you creates an account, picks a colour theme, and pairs via a
    one-time invite code.
-2. Under **Boundaries**, you build your own set of headings (Positions,
-   Roleplay & Fantasy, Control & Surrender, and whatever else you add) and
+2. Under **Boundaries**, you build your own set of headings (Teasing &
+   Dirty Talk, Touch & Sensation, Positions & Core Acts, Dominance &
+   Surrender, Roleplay & Fantasy, Risk, Public & Exhibition, or whatever
+   else you add) and
    your own cards under each one — a title, a description, and optionally a
    private photo. Add them one at a time, or import many at once from a CSV.
 3. Each of you privately answers each card: Full Spark, Warming Up, Blushing
@@ -158,6 +160,7 @@ v1 scope. See `CHANGELOG.md` for what's next.
 index.html                      the entire website: markup, styling, config, and all logic
 supabase/schema.sql              current database setup — accurate reference copy, already applied
 boundary-cards-template.csv       starter template for bulk-importing your own cards
+dare-library-template.csv         starter template for bulk-importing dare library entries
 README.md                        this file (documentation only — not part of the website)
 CHANGELOG.md                      version history (the app's own version screen reads this live)
 ```
