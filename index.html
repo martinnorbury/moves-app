@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.3.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.4.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -842,6 +842,7 @@ function renderBoundariesTab(unanswered) {
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
+    ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-top:8px; width:100%">Attach images to cards</button>` : ''}
     ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
   `;
 }
@@ -877,7 +878,10 @@ function renderDeckView() {
             <button class="deck-answer-btn ${state.answers[q.id]===a?'selected':''}" data-answer-q="${q.id}" data-answer-v="${a}">${ANSWER_LABELS[a]}</button>
           `).join('')}
         </div>
-        <button class="link-btn" data-delete-card="${q.id}" style="margin-top:10px; color:var(--wine-bright)">Delete this card</button>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="link-btn" data-attach-image="${q.id}">${imgUrl ? 'Replace image' : 'Attach an image'}</button>
+          <button class="link-btn" data-delete-card="${q.id}" style="color:var(--wine-bright)">Delete this card</button>
+        </div>
       </div>
     </div>
     <div class="deck-nav">
@@ -1184,6 +1188,10 @@ function attachMainHandlers() {
     showToast('All cards deleted.');
   };
 
+  const bulkImagesBtn = document.getElementById('btn-bulk-images');
+  if (bulkImagesBtn) bulkImagesBtn.onclick = openBulkImageModal;
+  $app.querySelectorAll('[data-attach-image]').forEach(el => el.onclick = () => openSingleImageModal(el.dataset.attachImage));
+
   $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;
     state.answers[qId] = val;
@@ -1324,12 +1332,108 @@ function openAddCardModal() {
 const VALID_INTENSITIES = ['tease', 'risque', 'bold', 'wild'];
 const VALID_TYPES = ['apart', 'together', 'either', 'reunion'];
 
+function normalizeForMatch(s) {
+  return s.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+}
+
+function openBulkImageModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Attach images to cards</h2>
+        <p class="hint-text" style="margin-bottom:14px">Name each image file after its card's exact title — e.g. "Missionary Position.jpg" for the card titled "Missionary Position". Underscores, dashes and capitalization don't matter, but the words need to match. Select as many files as you like at once; each gets matched to its card automatically.</p>
+        <input type="file" id="bulk-image-files" accept="image/*" multiple>
+        <div id="bulk-image-progress" class="hint-text" style="margin-top:14px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('bulk-image-files').onchange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) runBulkImageImport(files);
+  };
+}
+
+async function runBulkImageImport(files) {
+  const progressEl = document.getElementById('bulk-image-progress');
+  let matched = 0;
+  const unmatched = [];
+
+  function stripExt(name) { return name.replace(/\.[^/.]+$/, ''); }
+
+  // Two lookups: by the explicit filename hint set via CSV import (checked
+  // first), and by card title (fallback), across every heading.
+  const byFilename = {};
+  const byTitle = {};
+  state.questions.forEach(q => {
+    if (q.pending_image_filename) byFilename[normalizeForMatch(stripExt(q.pending_image_filename))] = q;
+    byTitle[normalizeForMatch(q.title)] = q;
+  });
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (progressEl) progressEl.textContent = `Matching image ${i + 1} of ${files.length}…`;
+    const key = normalizeForMatch(stripExt(file.name));
+    const q = byFilename[key] || byTitle[key];
+    if (!q) { unmatched.push(file.name); continue; }
+
+    const ext = file.name.split('.').pop();
+    const path = `${state.coupleId}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await sb.storage.from('boundary-images').upload(path, file);
+    if (uploadError) { unmatched.push(`${file.name} (upload failed: ${uploadError.message})`); continue; }
+
+    const { error: updateError } = await sb.from('boundary_questions')
+      .update({ image_path: path, pending_image_filename: null }).eq('id', q.id);
+    if (updateError) { unmatched.push(`${file.name} (couldn't save: ${updateError.message})`); continue; }
+
+    matched++;
+  }
+
+  await loadQuestions();
+  if (progressEl) {
+    progressEl.innerHTML = `<b>${matched} image${matched===1?'':'s'} attached, ${unmatched.length} unmatched.</b>` +
+      (unmatched.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${unmatched.map(f => `<div>${esc(f)} — no matching filename or title found.</div>`).join('')}</div>` : '');
+  }
+}
+
+function openSingleImageModal(questionId) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Attach an image</h2>
+        <input type="file" id="single-image-file" accept="image/*">
+        <div id="single-image-error" class="error-text" style="margin-top:10px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('single-image-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const errEl = document.getElementById('single-image-error');
+    const ext = file.name.split('.').pop();
+    const path = `${state.coupleId}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await sb.storage.from('boundary-images').upload(path, file);
+    if (uploadError) { errEl.textContent = 'Upload failed: ' + uploadError.message; return; }
+    const { error: updateError } = await sb.from('boundary_questions').update({ image_path: path }).eq('id', questionId);
+    if (updateError) { errEl.textContent = updateError.message; return; }
+    closeModal();
+    await loadQuestions();
+    render();
+    showToast('Image attached.');
+  };
+}
+
 function openImportCsvModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Import cards from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). Headings that don't exist yet are created automatically. No images via CSV — add those individually afterwards if you want them.</p>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus an optional <b>image_filename</b> column. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). Headings that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
         <input type="file" id="csv-file" accept=".csv">
         <div id="import-progress" class="hint-text" style="margin-top:14px"></div>
         <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
@@ -1362,6 +1466,11 @@ async function runCsvImport(rows) {
     for (const k of keys) { if (row[k] !== undefined && row[k] !== '') return row[k]; }
     return '';
   }
+  // Strips accents (e.g. "Risqué" -> "risque") so values with accented
+  // characters still match, regardless of case.
+  function normalize(s) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -1369,8 +1478,11 @@ async function runCsvImport(rows) {
     const category = pick(row, 'category', 'heading', 'category_heading').trim();
     const title = pick(row, 'title', 'name', 'card_title').trim();
     const explanation = pick(row, 'explanation', 'description', 'details').trim() || null;
-    let intensity = pick(row, 'max_intensity', 'intensity').trim().toLowerCase();
-    let suitable = pick(row, 'suitable_for', 'type', 'dare_type').trim().toLowerCase();
+    const rawIntensity = pick(row, 'max_intensity', 'intensity');
+    const rawSuitable = pick(row, 'suitable_for', 'type', 'dare_type');
+    const imageFilename = pick(row, 'image_filename', 'image', 'filename').trim() || null;
+    let intensity = normalize(rawIntensity);
+    let suitable = normalize(rawSuitable);
 
     if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
 
@@ -1378,7 +1490,11 @@ async function runCsvImport(rows) {
       skipped++; errors.push(`Row ${lineNum}: missing category or title — skipped.`); continue;
     }
     if (!VALID_INTENSITIES.includes(intensity)) {
-      skipped++; errors.push(`Row ${lineNum}: invalid max_intensity "${row.max_intensity || ''}" — skipped.`); continue;
+      const looksShifted = rawIntensity.length > 25;
+      const hint = looksShifted
+        ? ` — this looks like description text, not an intensity level. Check row ${lineNum} in your source file for an un-quoted comma in the description that may have shifted the columns.`
+        : '';
+      skipped++; errors.push(`Row ${lineNum}: invalid max_intensity "${rawIntensity}"${hint} — skipped.`); continue;
     }
     if (!VALID_TYPES.includes(suitable)) suitable = 'either';
 
@@ -1388,11 +1504,14 @@ async function runCsvImport(rows) {
       knownCategories.add(category);
     }
 
-    const { error } = await sb.rpc('add_boundary_question', {
+    const { data: newId, error } = await sb.rpc('add_boundary_question', {
       p_category: category, p_title: title, p_explanation: explanation, p_image_path: null,
       p_max_intensity: intensity, p_suitable_for: suitable
     });
     if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
+    if (imageFilename && newId) {
+      await sb.from('boundary_questions').update({ pending_image_filename: imageFilename }).eq('id', newId);
+    }
     added++;
   }
 

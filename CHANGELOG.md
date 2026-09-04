@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.4.1 — CSV can specify which image file goes with each card
+
+- CSV import now accepts an optional `image_filename` column. If present,
+  "Attach images to cards" matches on that exact filename first, before
+  falling back to matching by card title — useful if your image files use
+  their own naming (like `img014.jpg`) rather than matching each card's
+  full title.
+
+## 1.4.0 — bulk image import
+
+- Added "Attach images to cards" on the Boundaries tab — select many image
+  files at once and each gets matched to its card automatically by
+  filename (e.g. "Missionary Position.jpg" matches the card titled
+  "Missionary Position"; underscores, dashes, and capitalization don't
+  matter). Files that don't match any card title are listed clearly rather
+  than silently dropped.
+- Added a simple "Attach an image" / "Replace image" option to individual
+  cards too, for anything that doesn't match automatically or needs fixing
+  one at a time.
+
+## 1.3.1 — CSV import handles accents, flags shifted columns
+
+- Fixed accented values (e.g. "Risqué") being rejected — values are now
+  normalized to strip accents before checking, not just lowercased.
+- When a row's max_intensity value is long, clearly-not-a-keyword text
+  (usually a sign that an un-quoted comma in an earlier column shifted
+  everything over), the error message now says so directly and points you
+  at the likely cause, instead of just "invalid max_intensity".
+
+## Database update — final heading names
+
+- Renamed the 6 headings for clarity: Teasing & Dirty Talk, Touch &
+  Sensation, Positions & Core Acts, Dominance & Surrender, Roleplay &
+  Fantasy, Risk, Public & Exhibition. Same 6 categories as before, same 54
+  cards, just clearer names. Database-only, no app update needed.
+
+## Database update — reorganized headings
+
+- Consolidated the original 13 headings into 6 clearer ones: Communication
+  & Teasing, Physical & Sensory Play, Sexual Positions & Acts, Power &
+  Control, Roleplay & Fantasy, Public/Risk & Novelty. Every existing card
+  was remapped to its new heading — nothing was lost. Database-only change,
+  no app update needed for this one.
+
 ## 1.3.0 — delete boundary cards
 
 - You can now delete boundary cards, which wasn't possible before (no
