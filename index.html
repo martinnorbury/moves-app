@@ -268,6 +268,23 @@
     display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
   }
   .gauge-stop.selected{border-color:var(--gold); background:var(--gold); transform:scale(1.08);}
+
+  .teaser-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:20px 0;}
+  .teaser-block{height:44px; border-radius:var(--radius-s); opacity:0.9;}
+  .teaser-block.cold_card{background:#3D6690;}
+  .teaser-block.just_for_you{background:#7FAAC7;}
+  .teaser-block.blushing_yes{background:#A8A196;}
+  .teaser-block.warming_up{background:#D9A65C;}
+  .teaser-block.full_spark{background:#C24C63;}
+  .teaser-legend{display:flex; flex-wrap:wrap; gap:12px; margin-bottom:20px;}
+  .teaser-legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);}
+  .teaser-legend-swatch{width:12px; height:12px; border-radius:3px; flex-shrink:0;}
+  .privacy-note{
+    background:var(--surface); border:1px solid var(--good); border-radius:var(--radius-m);
+    padding:14px 16px; margin-bottom:22px;
+  }
+  .privacy-note .title{font-weight:600; font-size:14px; color:var(--text); margin-bottom:4px;}
+  .privacy-note .body{font-size:13px; color:var(--text-dim);}
   .deck-nav{display:flex; justify-content:space-between; align-items:center; margin-top:14px;}
   .deck-nav button{background:none; border:none; color:var(--text-dim); font-size:14px; padding:8px;}
   .deck-nav button:disabled{opacity:0.3;}
@@ -291,7 +308,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.10.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.13.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -299,7 +316,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.13.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -339,7 +356,11 @@ let state = {
   deckFilter: '',         // search text filtering the list view
   wizardSkipped: new Set(),  // question ids skipped this session — a safety valve so the guided wizard never truly traps anyone
   headingAccess: [],          // per-heading tier unlock, from get_heading_access()
+  cardReport: [],              // per-card joint tiers, from get_card_report()
+  partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
+  viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
   viewedReport: false,         // shown once per login, right after the wizard finishes
+  viewingSetup: false,          // whether the Boundaries tab is showing the Setup area instead of the report
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -386,7 +407,8 @@ function resetState() {
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
   state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
-  state.headingAccess = []; state.viewedReport = false;
+  state.headingAccess = []; state.viewedReport = false; state.viewingSetup = false;
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false;
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
   applyTheme(null);
@@ -407,7 +429,7 @@ async function loadEverything() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
         ]);
         subscribeRealtime();
@@ -460,6 +482,14 @@ async function loadBoundary() {
 async function loadHeadingAccess() {
   const { data, error } = await sb.rpc('get_heading_access');
   state.headingAccess = error ? [] : (data || []);
+}
+async function loadCardReport() {
+  const { data, error } = await sb.rpc('get_card_report');
+  state.cardReport = error ? [] : (data || []);
+}
+async function loadPartnerTeaser() {
+  const { data, error } = await sb.rpc('get_partner_teaser');
+  state.partnerTeaser = error ? [] : (data || []);
 }
 async function loadDares() {
   const { data } = await sb.from('dares').select('*').order('created_at', { ascending: false });
@@ -545,6 +575,37 @@ function renderAnswerControl(q, currentAnswer, attrsFor) {
   `;
 }
 
+function renderPartnerTeaser() {
+  const partnerName = state.partner ? state.partner.display_name : 'Your partner';
+  const total = getWizardQuestions().length;
+  return `
+    <div class="screen" style="padding-top:22px">
+      <div class="auth-hero">
+        <h1>${esc(partnerName)} already started and is waiting for you</h1>
+        <p>Answer the same ${total} questions. Your answers merge into one shared report — nobody sees the other's individual answers, only the joint result.</p>
+      </div>
+      <div class="teaser-grid">
+        ${state.partnerTeaser.map(t => `<div class="teaser-block ${t.answer}"></div>`).join('')}
+      </div>
+      <div class="teaser-legend">
+        ${ANSWER_ORDER.map(a => `
+          <div class="teaser-legend-item"><span class="teaser-legend-swatch" style="background:${{full_spark:'#C24C63',warming_up:'#D9A65C',blushing_yes:'#A8A196',just_for_you:'#7FAAC7',cold_card:'#3D6690'}[a]}"></span>${ANSWER_LABELS[a]}</div>
+        `).join('')}
+      </div>
+      <p class="hint-text" style="margin-top:-10px; margin-bottom:20px">These are ${esc(partnerName)}'s answers, shuffled — which one belongs to which question stays hidden until you've answered too.</p>
+      <div class="privacy-note">
+        <div class="title">Your answers stay private</div>
+        <div class="body">${esc(partnerName)} only ever sees the joint result once you've both answered, never your individual answers.</div>
+      </div>
+      <button class="btn btn-gold" id="btn-teaser-start" style="width:100%">Let's start</button>
+    </div>
+  `;
+}
+function attachPartnerTeaserHandlers() {
+  const btn = document.getElementById('btn-teaser-start');
+  if (btn) btn.onclick = () => { state.viewedTeaser = true; render(); };
+}
+
 function renderWizard(q, remaining) {
   if (q.image_path && !state.imageUrls[q.image_path]) fetchSignedImageUrl(q.image_path);
   const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
@@ -575,7 +636,7 @@ function attachWizardHandlers(q) {
     state.answers[q.id] = val;
     render();
     await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: q.id, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
-    await loadBoundary(); await loadHeadingAccess();
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     render();
   });
   const skipBtn = document.getElementById('btn-wizard-skip');
@@ -631,6 +692,9 @@ function render() {
   if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
 
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
+  if (wizardQueue.length > 0 && state.partnerTeaser.length > 0 && !state.viewedTeaser) {
+    $app.innerHTML = renderPartnerTeaser(); attachPartnerTeaserHandlers(); return;
+  }
   if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
   if (!state.viewedReport) { $app.innerHTML = renderReport(); attachReportHandlers(); return; }
 
@@ -979,19 +1043,55 @@ function renderHeadingAccessList() {
   `).join('');
 }
 
+const TIER_LABELS = {
+  favorites: 'Favorites — full agreement',
+  strong_interest: 'Strong Interest',
+  worth_trying: 'Worth Trying',
+  if_both_up_for_it: "If You're Both Up For It"
+};
+const TIER_ORDER = ['favorites', 'strong_interest', 'worth_trying', 'if_both_up_for_it'];
+
+function renderCardReport() {
+  const offTableCount = state.cardReport.filter(c => c.tier === 'off_table').length;
+  const groups = TIER_ORDER.map(tier => ({
+    tier, items: state.cardReport.filter(c => c.tier === tier)
+  })).filter(g => g.items.length > 0);
+
+  if (!groups.length && !offTableCount) {
+    return `<div class="empty-state">Neither of you has answered a specific card yet — head into Setup to start on a heading.</div>`;
+  }
+
+  return `
+    ${groups.map(g => `
+      <div class="hint-text" style="margin:14px 0 6px; font-weight:600; color:var(--text)">${esc(TIER_LABELS[g.tier])}</div>
+      ${g.items.map(c => `
+        <div class="boundary-row">
+          <div class="cat">${esc(c.title)} <span class="hint-text">— ${esc(c.category)}</span></div>
+          <div class="lvl">${c.intensity_cap ? 'up to ' + INTENSITY_LABELS[c.intensity_cap] : ''}</div>
+        </div>
+      `).join('')}
+    `).join('')}
+    ${offTableCount ? `<p class="hint-text" style="margin-top:14px">${offTableCount} other card${offTableCount===1?'':'s'} you've both answered ${offTableCount===1?"isn't":"aren't"} currently on the table — not listed here, since who said no isn't shown either.</p>` : ''}
+  `;
+}
+
 function renderBoundariesTab(unanswered) {
-  if (state.openCategory) return renderDeckView();
+  if (state.viewingSetup) return renderSetupArea();
 
-  const countByCategory = {};
-  state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
-  const answeredByCategory = {};
-  state.questions.forEach(q => {
-    if (state.answers[q.id]) answeredByCategory[q.category] = (answeredByCategory[q.category] || 0) + 1;
-  });
-
+  const generalQuestions = getWizardQuestions();
   const mutualList = state.boundary.filter(b => b.permitted);
 
   return `
+    <div class="section-head" style="margin-top:0"><h2>Your answers</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Change any of these any time — you don't need to wait for Jacki, and changing yours never shows her which way you moved it, only the mutual result below.</p>
+    ${generalQuestions.map(q => `
+      <div style="margin-bottom:18px">
+        <div class="cat" style="margin-bottom:4px">${esc(q.category)}</div>
+        ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
+      </div>
+    `).join('')}
+
+    <div class="divider"></div>
     <div class="section-head"><h2>Your shared boundary</h2></div>
     ${mutualList.length ? mutualList.map(b => `
       <div class="boundary-row">
@@ -1002,12 +1102,33 @@ function renderBoundariesTab(unanswered) {
 
     <div class="divider"></div>
     <div class="section-head"><h2>Heading access</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Based on your answers to the 6 general questions — this decides which tiers (Discover, Explore, Unleash) are open in each heading. Not a permanent lock — it moves as your answers do.</p>
+    <p class="hint-text" style="margin-bottom:14px">Based on your answers to the 6 general questions above — this decides which tiers (Discover, Explore, Unleash) are open in each heading. Moves as your answers do.</p>
     ${renderHeadingAccessList()}
 
     <div class="divider"></div>
-    <div class="section-head"><h2>Headings</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards. Only you see your own answers — your partner only ever sees the mutual result above.</p>
+    <div class="section-head"><h2>Your card report</h2></div>
+    <p class="hint-text" style="margin-bottom:6px">For specific cards you've both answered — grouped by how well matched you are, most enthusiastic first.</p>
+    ${renderCardReport()}
+
+    <div class="divider"></div>
+    <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">Manage headings, cards & content →</button>
+  `;
+}
+
+function renderSetupArea() {
+  if (state.openCategory) return renderDeckView();
+
+  const countByCategory = {};
+  state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
+  const answeredByCategory = {};
+  state.questions.forEach(q => {
+    if (state.answers[q.id]) answeredByCategory[q.category] = (answeredByCategory[q.category] || 0) + 1;
+  });
+
+  return `
+    <button class="link-btn" id="btn-close-setup">‹ Back to your report</button>
+    <div class="section-head" style="margin-top:14px"><h2>Headings</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards, add new ones, or attach images. Only you see your own answers — your partner only ever sees the mutual result on your report.</p>
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -1389,6 +1510,10 @@ function attachMainHandlers() {
   if (newHeadingBtn) newHeadingBtn.onclick = openAddHeadingModal;
   const importCsvBtn = document.getElementById('btn-import-csv');
   if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
+  const openSetupBtn = document.getElementById('btn-open-setup');
+  if (openSetupBtn) openSetupBtn.onclick = () => { state.viewingSetup = true; render(); };
+  const closeSetupBtn = document.getElementById('btn-close-setup');
+  if (closeSetupBtn) closeSetupBtn.onclick = () => { state.viewingSetup = false; state.openCategory = null; render(); };
 
   $app.querySelectorAll('[data-delete-card]').forEach(el => el.onclick = async () => {
     if (!confirm('Delete this card? This also removes any answers either of you gave to it.')) return;
@@ -1396,7 +1521,7 @@ function attachMainHandlers() {
     if (error) { showToast(error.message); return; }
     if (state.deckIndex > 0) state.deckIndex -= 1;
     await loadQuestions();
-    await loadBoundary(); await loadHeadingAccess();
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     render();
     showToast('Card deleted.');
   });
@@ -1409,7 +1534,7 @@ function attachMainHandlers() {
     if (error) { showToast(error.message); return; }
     state.deckIndex = 0;
     await loadQuestions();
-    await loadBoundary(); await loadHeadingAccess();
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     render();
     showToast(`All cards in "${cat}" deleted.`);
   };
@@ -1421,7 +1546,7 @@ function attachMainHandlers() {
     if (error) { showToast(error.message); return; }
     state.openCategory = null; state.deckIndex = 0;
     await loadQuestions();
-    await loadBoundary(); await loadHeadingAccess();
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     render();
     showToast('All cards deleted.');
   };
@@ -1435,7 +1560,7 @@ function attachMainHandlers() {
     state.answers[qId] = val;
     render();
     await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
-    await loadBoundary(); await loadHeadingAccess();
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     // Auto-advance to the next card in the deck, if there is one
     if (state.openCategory) {
       const cards = state.questions.filter(x => x.category === state.openCategory);

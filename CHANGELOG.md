@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.13.0 — "your partner already started" teaser
+
+- If you log in and your partner has already answered some of the 6
+  general questions but you haven't, you now see a screen letting you
+  know, with a shuffled grid of colour blocks showing the flavour of
+  their answers — no link back to which colour belongs to which
+  question, so nothing is revealed before you've answered too. A legend
+  explains the colours, and it's explicit that your own answers stay just
+  as private going the other way.
+- Shown once per login, right before the wizard starts.
+
+## 1.12.0 — joint card report, grouped by how matched you are
+
+- Added "Your card report" to the Boundaries tab — every specific card
+  you've both answered, grouped into Favorites (full agreement, both Full
+  Spark) down through Strong Interest, Worth Trying, and If You're Both Up
+  For It, same weakest-answer-wins logic used everywhere else in the app.
+- Cards excluded by a Cold Card are counted but not listed by title —
+  showing exactly which ones sits too close to revealing whether it was a
+  mutual or one-sided no, which the app has never done anywhere else
+  either.
+- Empty for now since no specific cards have mutual answers yet — this
+  fills in as you both go answer cards under Setup.
+
+## 1.11.0 — Boundaries is now pure reporting; content moved to Setup
+
+- The Boundaries tab is now just a report: your 6 general answers (shown
+  as editable gauges, right there — change any of them any time, no need
+  to wait for Jacki), your shared boundary, and heading access. Nothing
+  about managing content lives here anymore.
+- Everything else — browsing a heading's specific cards, adding new cards
+  or headings, CSV import, attaching images, deleting cards — moved to a
+  new "Setup" area, reached via "Manage headings, cards & content" at the
+  bottom of the report. Same functionality as before, just out of the way
+  of the day-to-day reporting view.
+- Your own general answers are always visible and editable regardless of
+  whether your partner has answered yet — the report never hides or locks
+  your side waiting on theirs.
+
 ## 1.10.0 — a proper landing after the wizard, instead of a sparse Home tab
 
 - Fixed the status counter comparing against every card (~60) instead of
