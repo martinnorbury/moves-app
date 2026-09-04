@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.4.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.4.2)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1456,7 +1456,9 @@ function openImportCsvModal() {
 
 async function runCsvImport(rows) {
   const progressEl = document.getElementById('import-progress');
-  const knownCategories = new Set(state.categories.map(c => c.name));
+  // Case-insensitive lookup: normalized name -> the heading's real, correctly-cased name.
+  const categoryLookup = {};
+  state.categories.forEach(c => { categoryLookup[c.name.trim().toLowerCase()] = c.name; });
   let added = 0, skipped = 0;
   const errors = [];
 
@@ -1498,14 +1500,17 @@ async function runCsvImport(rows) {
     }
     if (!VALID_TYPES.includes(suitable)) suitable = 'either';
 
-    if (!knownCategories.has(category)) {
+    const categoryKey = category.toLowerCase();
+    let resolvedCategory = categoryLookup[categoryKey];
+    if (!resolvedCategory) {
       const { error: catErr } = await sb.rpc('add_boundary_category', { p_name: category });
       if (catErr) { skipped++; errors.push(`Row ${lineNum}: couldn't create heading "${category}" — skipped.`); continue; }
-      knownCategories.add(category);
+      resolvedCategory = category;
+      categoryLookup[categoryKey] = category;
     }
 
     const { data: newId, error } = await sb.rpc('add_boundary_question', {
-      p_category: category, p_title: title, p_explanation: explanation, p_image_path: null,
+      p_category: resolvedCategory, p_title: title, p_explanation: explanation, p_image_path: null,
       p_max_intensity: intensity, p_suitable_for: suitable
     });
     if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }

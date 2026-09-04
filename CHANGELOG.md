@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.2 — CSV category matching no longer case-sensitive
+
+- Fixed CSV import creating a duplicate, wrongly-cased heading whenever the
+  CSV's category text didn't exactly match an existing heading's
+  capitalization (e.g. "teasing & dirty talk" would create a second
+  heading instead of filing into the real "Teasing & Dirty Talk"). Category
+  matching is now case-insensitive, and cards always file under the
+  heading's real, correctly-cased name — the CSV's own casing no longer
+  matters.
+
 ## 1.4.1 — CSV can specify which image file goes with each card
 
 - CSV import now accepts an optional `image_filename` column. If present,
