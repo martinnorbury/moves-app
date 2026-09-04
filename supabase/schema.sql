@@ -69,7 +69,8 @@ create table boundary_questions (
   category text not null,
   title text not null,
   explanation text,
-  image_path text,
+  image_path text,               -- path in the private 'boundary-images' storage bucket, once attached
+  pending_image_filename text,   -- optional hint from CSV import: which image file to match to this card later
   max_intensity intensity_level not null default 'tease',
   suitable_for dare_type not null default 'either',
   active boolean not null default true,
@@ -642,21 +643,17 @@ create policy "boundary_images_delete" on storage.objects for delete
 
 -- ----------------------------------------------------------------------------
 -- SEED DATA: starter headings only — no demo cards.
+-- (Went through two rounds of renaming in practice — first consolidated
+-- from an original 13 down to 6, then renamed those 6 for clarity. Every
+-- existing card was remapped each time, never lost. See CHANGELOG.md.)
 -- ----------------------------------------------------------------------------
 insert into boundary_categories (name, sort_order) values
-  ('Flirting & Anticipation', 10),
-  ('Messages & Voice Notes', 20),
-  ('Compliments & Vulnerability', 30),
-  ('Clothing & Appearance', 40),
-  ('Sensory Experiences', 50),
-  ('Physical Affection', 60),
-  ('Positions', 70),
-  ('Roleplay & Fantasy', 80),
-  ('Control & Surrender', 90),
-  ('Toys & Accessories', 100),
-  ('Public-but-Discreet', 110),
-  ('Trying Something New', 120),
-  ('Reunion Challenges', 130)
+  ('Teasing & Dirty Talk', 10),
+  ('Touch & Sensation', 20),
+  ('Positions & Core Acts', 30),
+  ('Dominance & Surrender', 40),
+  ('Roleplay & Fantasy', 50),
+  ('Risk, Public & Exhibition', 60)
 on conflict do nothing;
 
 -- ============================================================================
