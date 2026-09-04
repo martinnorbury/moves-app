@@ -79,7 +79,14 @@
   input,select,textarea{font-family:var(--sans);}
   ::selection{background:var(--wine); color:var(--text);}
 
-  #app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column;}
+  #app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; transition:max-width 0.2s ease;}
+  body.admin-wide #app{max-width:900px;}
+
+  .admin-columns{display:grid; grid-template-columns:1fr 1fr; gap:28px;}
+  @media (max-width:680px){
+    .admin-columns{display:block;}
+    .admin-columns > div:first-child{margin-bottom:28px; padding-bottom:28px; border-bottom:1px solid var(--line);}
+  }
 
   /* ---------- top bar ---------- */
   .topbar{
@@ -324,7 +331,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.25.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.26.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -332,7 +339,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.25.1';
+const APP_VERSION = '1.26.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -700,6 +707,7 @@ function attachWizardHandlers(q) {
 }
 
 function render() {
+  document.body.classList.toggle('admin-wide', state.tab === 'admin');
   if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
   if (!state.profile) { $app.innerHTML = renderCreateProfile(); attachCreateProfileHandlers(); return; }
@@ -1206,6 +1214,15 @@ function renderDareLibraryList() {
 function renderSetupArea() {
   if (state.openCategory) return renderDeckView();
 
+  return `
+    <div class="admin-columns">
+      <div>${renderQuestionsColumn()}</div>
+      <div>${renderDaresColumn()}</div>
+    </div>
+  `;
+}
+
+function renderQuestionsColumn() {
   const countByCategory = {};
   state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
   const answeredByCategory = {};
@@ -1214,7 +1231,7 @@ function renderSetupArea() {
   });
 
   return `
-    <div class="section-head" style="margin-top:0"><h2>Headings</h2></div>
+    <div class="section-head" style="margin-top:0"><h2>Questions</h2></div>
     <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards, add new ones, or attach images.</p>
 
     ${state.categories.map(c => {
@@ -1237,9 +1254,12 @@ function renderSetupArea() {
     </div>
     ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-top:8px; width:100%">Attach images to cards</button>` : ''}
     ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+  `;
+}
 
-    <div class="divider"></div>
-    <div class="section-head"><h2>Dare library</h2></div>
+function renderDaresColumn() {
+  return `
+    <div class="section-head" style="margin-top:0"><h2>Dares</h2></div>
     <p class="hint-text" style="margin-bottom:14px">${state.dareLibrary.length} dare${state.dareLibrary.length===1?'':'s'} in the library. Suggested to whoever's sending a move, matched to a heading and capped to what it currently allows.</p>
     <div class="btn-row" style="margin-bottom:14px">
       <button class="btn btn-ghost" id="btn-add-dare">Add a dare</button>

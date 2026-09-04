@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.26.0 — Admin split into Questions and Dares side by side
+
+- Admin now shows two columns: Questions (headings and their cards) on
+  the left, Dares (the library) on the right — both grouped by the same
+  headings, same list/row format either side.
+- On a wider screen, the app's usual 520px width limit widens to 900px
+  just for the Admin tab, so the two columns have real room instead of
+  being squeezed. On a narrow phone screen, it drops back to a single
+  stacked column automatically — Questions first, then Dares — so it
+  still works fine there too.
+
 ## 1.25.1 — Browse headings & answer cards removed from Kinks
 
 - Removed the "Browse headings & answer cards" link from Kinks entirely,
