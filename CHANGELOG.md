@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.17.0 — 5 outcomes for 5 answer levels, unified wording
+
+- Fixed heading access silently collapsing two different combined scores
+  (2 and 1) into one "Getting Warmer" bucket — there are now 5 distinct
+  outcomes, one per possible combined answer, matching the 5-level
+  gauge properly: Perfect Match, Good Match, Getting Warmer, Worth A Try,
+  and Not on the Table.
+- Heading access and the card report now use the exact same tier names,
+  so the two features read as one consistent system rather than two
+  slightly different vocabularies for the same idea.
+
+## 1.16.0 — content management is now Martin-only
+
+- Added an admin flag, currently set on Martin's account only. Adding
+  headings, adding cards, importing CSVs, attaching images, and deleting
+  anything now requires it — enforced in the database itself (tested
+  directly: Jacki's account is rejected with a clear error if it tries
+  any of these, even bypassing the interface entirely), not just hidden
+  in the app.
+- Jacki's account no longer sees any of those buttons at all — but still
+  has full access to browse every heading and answer cards, since that's
+  essential to the matching actually working. Wording adjusts accordingly
+  ("Browse headings & answer cards" instead of "Manage headings, cards &
+  content").
+
+## 1.15.0 — one less screen in the way
+
+- Removed the one-time "Where you both stand / Continue to the app"
+  screen that used to appear right after the wizard finished — it showed
+  the same information the Boundaries tab now shows persistently, so it
+  was just an extra tap for nothing. Finishing the 6 general questions (or
+  the partner-started teaser, if that showed first) now drops you
+  straight into the normal app.
+
 ## 1.14.0 — icons, wording, a real bug fix, and one redundant section removed
 
 - Fixed a real bug: the report screen said "you don't need to wait for

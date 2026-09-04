@@ -308,7 +308,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.14.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.17.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -316,7 +316,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.17.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -359,7 +359,6 @@ let state = {
   cardReport: [],              // per-card joint tiers, from get_card_report()
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
-  viewedReport: false,         // shown once per login, right after the wizard finishes
   viewingSetup: false,          // whether the Boundaries tab is showing the Setup area instead of the report
   dares: [],
   scoreboard: [],
@@ -407,7 +406,7 @@ function resetState() {
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
   state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
-  state.headingAccess = []; state.viewedReport = false; state.viewingSetup = false;
+  state.headingAccess = []; state.viewingSetup = false;
   state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false;
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
@@ -643,46 +642,6 @@ function attachWizardHandlers(q) {
   if (skipBtn) skipBtn.onclick = () => { state.wizardSkipped.add(q.id); render(); };
 }
 
-function answerIcon(val) {
-  if (val === 'full_spark') return '❤️';
-  if (val === 'cold_card') return '❄️';
-  return '•';
-}
-
-function renderReport() {
-  const generalQuestions = getWizardQuestions();
-  const stillWaitingOnPartner = state.headingAccess.some(h => h.access === 'pending');
-
-  return `
-    <div class="screen" style="padding-top:22px">
-      <div class="auth-hero">
-        <h1>${stillWaitingOnPartner ? 'Your side is in' : 'Where you both stand'}</h1>
-        <p>${stillWaitingOnPartner
-          ? "Here's what you said. Once your partner's answered the same 6, this fills in properly."
-          : "You've both answered the general questions for every heading. Here's what that means."}</p>
-      </div>
-
-      <div class="section-head" style="margin-top:0"><h2>Your answers</h2></div>
-      ${generalQuestions.map(q => `
-        <div class="boundary-row">
-          <div class="cat">${esc(q.category)}</div>
-          <div class="lvl" style="font-size:16px">${answerIcon(state.answers[q.id])}</div>
-        </div>
-      `).join('')}
-
-      <div class="divider"></div>
-      <div class="section-head"><h2>Where this leaves you two</h2></div>
-      ${renderHeadingAccessList()}
-
-      <button class="btn btn-gold" id="btn-continue-to-app" style="margin-top:22px">Continue to the app</button>
-    </div>
-  `;
-}
-function attachReportHandlers() {
-  const btn = document.getElementById('btn-continue-to-app');
-  if (btn) btn.onclick = () => { state.viewedReport = true; render(); };
-}
-
 function render() {
   if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
@@ -696,7 +655,6 @@ function render() {
     $app.innerHTML = renderPartnerTeaser(); attachPartnerTeaserHandlers(); return;
   }
   if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
-  if (!state.viewedReport) { $app.innerHTML = renderReport(); attachReportHandlers(); return; }
 
   const unanswered = getWizardQuestions().filter(q => !state.answers[q.id]).length;
 
@@ -1018,26 +976,33 @@ function renderDaresTab() {
 /* ==========================================================================
    BOUNDARIES TAB
    ========================================================================== */
+const TIER_LABELS = {
+  favorites: 'Perfect Match',
+  strong_interest: 'Good Match',
+  worth_trying: 'Getting Warmer',
+  if_both_up_for_it: 'Worth A Try'
+};
+const TIER_ORDER = ['favorites', 'strong_interest', 'worth_trying', 'if_both_up_for_it'];
+
 const ACCESS_LABELS = {
   pending: 'Waiting on both of you to answer',
-  closed: 'Not on the table',
-  discover_only: 'Getting Warmer',
-  discover_explore: 'Good Match',
-  full: 'Perfect Match'
+  off_table: 'Not on the table',
+  ...TIER_LABELS
 };
 const ACCESS_CLASSES = {
   pending: '',
-  closed: 'intensity-wild',
-  discover_only: 'intensity-tease',
-  discover_explore: 'intensity-bold',
-  full: 'access-full'
+  off_table: 'intensity-wild',
+  favorites: 'access-full',
+  strong_interest: 'intensity-bold',
+  worth_trying: 'intensity-tease',
+  if_both_up_for_it: 'intensity-risque'
 };
 
 function renderOverallStanding() {
   if (!state.headingAccess.length) return '';
   const counts = {};
   state.headingAccess.forEach(h => { counts[h.access] = (counts[h.access] || 0) + 1; });
-  const order = ['full', 'discover_explore', 'discover_only', 'closed', 'pending'];
+  const order = ['favorites', 'strong_interest', 'worth_trying', 'if_both_up_for_it', 'off_table', 'pending'];
   const parts = order.filter(a => counts[a]).map(a => `${counts[a]} ${esc(ACCESS_LABELS[a])}`);
   return `
     <div class="status-strip" style="margin-bottom:18px">
@@ -1056,14 +1021,6 @@ function renderHeadingAccessList() {
     </div>
   `).join('');
 }
-
-const TIER_LABELS = {
-  favorites: 'Favorites — full agreement',
-  strong_interest: 'Strong Interest',
-  worth_trying: 'Worth Trying',
-  if_both_up_for_it: "If You're Both Up For It"
-};
-const TIER_ORDER = ['favorites', 'strong_interest', 'worth_trying', 'if_both_up_for_it'];
 
 function renderCardReport() {
   const offTableCount = state.cardReport.filter(c => c.tier === 'off_table').length;
@@ -1117,13 +1074,14 @@ function renderBoundariesTab(unanswered) {
     ${renderCardReport()}
 
     <div class="divider"></div>
-    <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">Manage headings, cards & content →</button>
+    <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">${state.profile && state.profile.is_admin ? 'Manage headings, cards & content →' : 'Browse headings & answer cards →'}</button>
   `;
 }
 
 function renderSetupArea() {
   if (state.openCategory) return renderDeckView();
 
+  const isAdmin = state.profile && state.profile.is_admin;
   const countByCategory = {};
   state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
   const answeredByCategory = {};
@@ -1134,7 +1092,9 @@ function renderSetupArea() {
   return `
     <button class="link-btn" id="btn-close-setup">‹ Back to your report</button>
     <div class="section-head" style="margin-top:14px"><h2>Headings</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards, add new ones, or attach images. Only you see your own answers — your partner only ever sees the mutual result on your report.</p>
+    <p class="hint-text" style="margin-bottom:14px">${isAdmin
+      ? 'Tap a heading to go through its cards, add new ones, or attach images. Only you see your own answers — your partner only ever sees the mutual result on your report.'
+      : 'Tap a heading to go through its cards and answer them. Only you see your own answers — your partner only ever sees the mutual result on your report.'}</p>
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -1150,12 +1110,14 @@ function renderSetupArea() {
       `;
     }).join('')}
 
+    ${isAdmin ? `
     <div class="btn-row" style="margin-top:14px">
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
     ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-top:8px; width:100%">Attach images to cards</button>` : ''}
     ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+    ` : ''}
   `;
 }
 
@@ -1170,10 +1132,11 @@ function renderDeckView() {
   `;
 
   if (cards.length === 0) {
+    const isAdmin = state.profile && state.profile.is_admin;
     return `
       <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
       <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
-      <button class="btn btn-gold" id="btn-add-card">Add the first card</button>
+      ${isAdmin ? `<button class="btn btn-gold" id="btn-add-card">Add the first card</button>` : ''}
     `;
   }
 
@@ -1205,13 +1168,14 @@ function renderDeckListView(cards, modeToggle) {
         </div>
       `;
     }).join('') : `<div class="empty-state">No cards match "${esc(state.deckFilter)}".</div>`}
-    <button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>
+    ${state.profile && state.profile.is_admin ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
   `;
 }
 
 function renderDeckCardView(cards, modeToggle) {
   const idx = Math.min(state.deckIndex, Math.max(0, cards.length - 1));
   const q = cards[idx];
+  const isAdmin = state.profile && state.profile.is_admin;
 
   if (q.image_path && !state.imageUrls[q.image_path]) {
     fetchSignedImageUrl(q.image_path);
@@ -1228,18 +1192,20 @@ function renderDeckCardView(cards, modeToggle) {
         <div class="deck-card-title">${esc(q.title)}${q.is_general ? ' <span class="pill" style="margin-left:6px">General</span>' : ''}</div>
         ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
+        ${isAdmin ? `
         <div class="btn-row" style="margin-top:10px">
           <button class="link-btn" data-attach-image="${q.id}">${imgUrl ? 'Replace image' : 'Attach an image'}</button>
           <button class="link-btn" data-delete-card="${q.id}" style="color:var(--wine-bright)">Delete this card</button>
         </div>
+        ` : ''}
       </div>
     </div>
     <div class="deck-nav">
       <button data-deck-prev="1" ${idx===0?'disabled':''}>‹ Previous</button>
-      <button id="btn-add-card">+ Add a card here</button>
+      ${isAdmin ? `<button id="btn-add-card">+ Add a card here</button>` : '<span></span>'}
       <button data-deck-next="1" ${idx===cards.length-1?'disabled':''}>Next ›</button>
     </div>
-    <button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>
+    ${isAdmin ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
   `;
 }
 
