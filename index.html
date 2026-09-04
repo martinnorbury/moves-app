@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.2.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.2.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1305,6 +1305,7 @@ function openImportCsvModal() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_'),
       complete: (results) => runCsvImport(results.data)
     });
   };
@@ -1316,14 +1317,21 @@ async function runCsvImport(rows) {
   let added = 0, skipped = 0;
   const errors = [];
 
+  // Accepts a small set of likely alternate header names, since imported
+  // files won't always use our exact column names or casing.
+  function pick(row, ...keys) {
+    for (const k of keys) { if (row[k] !== undefined && row[k] !== '') return row[k]; }
+    return '';
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const lineNum = i + 2; // account for header row, 1-indexed
-    const category = (row.category || '').trim();
-    const title = (row.title || '').trim();
-    const explanation = (row.explanation || '').trim() || null;
-    let intensity = (row.max_intensity || '').trim().toLowerCase();
-    let suitable = (row.suitable_for || '').trim().toLowerCase();
+    const category = pick(row, 'category', 'heading', 'category_heading').trim();
+    const title = pick(row, 'title', 'name', 'card_title').trim();
+    const explanation = pick(row, 'explanation', 'description', 'details').trim() || null;
+    let intensity = pick(row, 'max_intensity', 'intensity').trim().toLowerCase();
+    let suitable = pick(row, 'suitable_for', 'type', 'dare_type').trim().toLowerCase();
 
     if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
 

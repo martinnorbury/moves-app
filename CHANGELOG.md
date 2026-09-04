@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 — CSV import no longer case-sensitive
+
+- Fixed the CSV import skipping every row when the source file's column
+  headers weren't exactly lowercase (e.g. "Category" instead of
+  "category") — headers are now normalised automatically regardless of
+  case or spacing, and a few common alternate names (heading/category,
+  name/title, description/explanation, intensity/max_intensity,
+  type/suitable_for) are accepted too.
+
 ## 1.2.0 — bulk import from CSV
 
 - Added a CSV import to the Boundaries tab ("Import from CSV") for adding
