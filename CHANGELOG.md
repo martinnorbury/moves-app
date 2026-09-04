@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.2 — back to a single file
+
+- Merged `app.js` back into `index.html`, matching the same single-file
+  pattern as Lily's app. There's now exactly one file the website needs.
+  This removes the class of bug that caused 1.0.1 — nothing to keep in
+  sync between two files, nothing that can be uploaded out of order.
+
+## 1.0.1 — startup crash fix
+
+- Fixed a bug where the app hung permanently on "Opening…" for every user.
+  Cause: the app's own Supabase connection variable was named `supabase`,
+  which collided with the name the Supabase library itself uses internally,
+  causing the whole script to fail silently before it could run.
+- The version number now shows even while the app is still loading, and is
+  tappable from the top bar to see the full changelog and confirm you're on
+  the version you expect — no more guessing whether an update actually took
+  effect.
+
 ## 1.0.0 — first usable version
 
 - Private account creation and one-time-code couple pairing.

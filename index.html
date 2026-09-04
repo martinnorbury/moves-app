@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Moves</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Moves">
+<meta name="theme-color" content="#1B1714">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#1B1714;
+    --surface:#241D19;
+    --surface-raised:#2C231E;
+    --line:#3A2F28;
+    --wine:#8C3B4A;
+    --wine-bright:#B0505F;
+    --gold:#C9A961;
+    --text:#EFE7DC;
+    --text-dim:#9C8F83;
+    --text-faint:#6E6259;
+    --good:#7C9473;
+    --radius-s:6px;
+    --radius-m:10px;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  h1,h2,h3{font-family:var(--serif); font-weight:500; margin:0;}
+  a{color:inherit;}
+  button{font-family:var(--sans); cursor:pointer;}
+  input,select,textarea{font-family:var(--sans);}
+  ::selection{background:var(--wine); color:var(--text);}
+
+  #app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding:22px 20px 14px;
+  }
+  .topbar .wordmark{font-family:var(--serif); font-size:22px; letter-spacing:0.2px; color:var(--gold);}
+  .topbar .version{font-size:11px; color:var(--text-faint);}
+
+  /* ---------- generic layout ---------- */
+  .screen{padding:0 20px 100px; flex:1;}
+  .center-screen{flex:1; display:flex; flex-direction:column; justify-content:center; padding:20px;}
+  .stack{display:flex; flex-direction:column; gap:14px;}
+  .field label{display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px;}
+  .field input, .field textarea, .field select{
+    width:100%; background:var(--surface); border:1px solid var(--line); color:var(--text);
+    border-radius:var(--radius-s); padding:11px 12px; font-size:15px;
+  }
+  .field textarea{resize:vertical; min-height:70px;}
+  .field input:focus, .field textarea:focus, .field select:focus{
+    outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius:var(--radius-s); padding:12px 18px;
+    font-size:14.5px; font-weight:600; width:100%;
+  }
+  .btn-primary{background:var(--wine); color:#fff;}
+  .btn-primary:active{background:var(--wine-bright);}
+  .btn-ghost{background:transparent; color:var(--text-dim); border:1px solid var(--line);}
+  .btn-gold{background:var(--gold); color:#1B1714;}
+  .btn-row{display:flex; gap:10px;}
+  .btn-row .btn{width:auto; flex:1;}
+  .btn-small{padding:8px 12px; font-size:13px; width:auto;}
+  .btn:disabled{opacity:0.45;}
+  .link-btn{background:none; border:none; color:var(--text-dim); text-decoration:underline; font-size:13px; padding:6px 0;}
+
+  .error-text{color:var(--wine-bright); font-size:13px;}
+  .hint-text{color:var(--text-faint); font-size:12.5px;}
+
+  .divider{height:1px; background:var(--line); margin:22px 0;}
+
+  /* ---------- auth screen ---------- */
+  .auth-hero{margin-bottom:34px;}
+  .auth-hero h1{font-size:30px; color:var(--text); margin-bottom:6px;}
+  .auth-hero p{color:var(--text-dim); font-size:14px; max-width:34ch;}
+  .auth-tabs{display:flex; gap:22px; margin-bottom:20px; border-bottom:1px solid var(--line);}
+  .auth-tab{background:none; border:none; color:var(--text-faint); padding:8px 0; font-size:14px; font-weight:600; border-bottom:2px solid transparent;}
+  .auth-tab.active{color:var(--gold); border-bottom-color:var(--gold);}
+
+  /* ---------- pairing ---------- */
+  .code-display{
+    font-family:var(--serif); font-size:38px; letter-spacing:6px; color:var(--gold);
+    text-align:center; padding:26px 0; background:var(--surface); border-radius:var(--radius-m);
+    border:1px solid var(--line);
+  }
+
+  /* ---------- status banner (home) ---------- */
+  .status-strip{
+    padding:16px 20px; margin:0 -20px 22px; background:var(--surface);
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  .status-strip .status-label{font-size:11.5px; color:var(--text-faint); margin-bottom:3px;}
+  .status-strip .status-value{font-family:var(--serif); font-size:19px; color:var(--text);}
+  .status-strip .status-value.awaiting{color:var(--gold);}
+
+  /* ---------- scoreboard ---------- */
+  .scoreboard{display:flex; gap:12px; margin-bottom:18px;}
+  .score-card{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:16px;}
+  .score-card.leading{border-color:var(--gold);}
+  .score-card .name{font-size:12px; color:var(--text-dim); margin-bottom:4px;}
+  .score-card .points{font-family:var(--serif); font-size:32px; color:var(--text);}
+  .score-card .points span{font-size:14px; color:var(--text-faint);}
+
+  /* ---------- heat meter ---------- */
+  .heat-block{margin-bottom:22px;}
+  .heat-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+  .heat-head .label{font-size:12px; color:var(--text-dim);}
+  .heat-head .pct{font-family:var(--serif); font-size:16px; color:var(--gold);}
+  .heat-track{height:8px; background:var(--surface); border-radius:99px; overflow:hidden; border:1px solid var(--line);}
+  .heat-fill{height:100%; background:linear-gradient(90deg, var(--wine), var(--gold)); transition:width 0.5s ease;}
+  .heat-next{font-size:12px; color:var(--text-faint); margin-top:6px;}
+
+  /* ---------- section headers ---------- */
+  .section-head{display:flex; justify-content:space-between; align-items:center; margin:26px 0 12px;}
+  .section-head h2{font-size:15px; color:var(--text); font-weight:600; font-family:var(--sans);}
+  .section-head .see-all{font-size:12.5px; color:var(--text-faint); background:none; border:none;}
+
+  /* ---------- dare card ---------- */
+  .dare{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:16px; margin-bottom:10px; position:relative; overflow:hidden;
+  }
+  .dare.locked{border-left:3px solid var(--wine);}
+  .dare.unlocked{border-left:3px solid var(--gold);}
+  .dare-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
+  .dare-title{font-family:var(--serif); font-size:17px; color:var(--text);}
+  .dare-meta{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .pill{
+    font-size:11px; padding:3px 9px; border-radius:99px; border:1px solid var(--line); color:var(--text-dim);
+    white-space:nowrap;
+  }
+  .pill.intensity-tease{color:#B7C9A8; border-color:#3A4030;}
+  .pill.intensity-risque{color:#D7A96B; border-color:#453423;}
+  .pill.intensity-bold{color:#D7896B; border-color:#452B23;}
+  .pill.intensity-wild{color:var(--wine-bright); border-color:#4A2429;}
+  .dare-body{color:var(--text-dim); font-size:13.5px; margin-bottom:12px;}
+  .dare-instructions{color:var(--text); font-size:14px; margin-bottom:12px; line-height:1.55;}
+  .dare-points{font-size:12px; color:var(--gold);}
+
+  /* ---------- notification / toast ---------- */
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--surface-raised); border:1px solid var(--gold); color:var(--text);
+    padding:12px 18px; border-radius:var(--radius-s); font-size:13.5px; max-width:88%;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4); z-index:200;
+  }
+
+  /* ---------- bottom nav ---------- */
+  .tabbar{
+    position:fixed; bottom:0; left:0; right:0; background:var(--surface-raised);
+    border-top:1px solid var(--line); padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+    display:flex; max-width:520px; margin:0 auto;
+  }
+  .tab{
+    flex:1; background:none; border:none; color:var(--text-faint); font-size:11px;
+    display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0;
+  }
+  .tab.active{color:var(--gold);}
+  .tab .dot{width:6px; height:6px; border-radius:50%; background:var(--wine-bright); position:absolute; margin-left:14px; margin-top:-2px;}
+
+  .empty-state{color:var(--text-faint); font-size:13.5px; padding:24px 0; text-align:center;}
+
+  .qa-row{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:16px; margin-bottom:10px;}
+  .qa-cat{font-size:11px; color:var(--text-faint); margin-bottom:4px;}
+  .qa-title{font-size:14.5px; color:var(--text); margin-bottom:3px;}
+  .qa-explain{font-size:12.5px; color:var(--text-dim); margin-bottom:12px;}
+  .qa-options{display:flex; gap:6px; flex-wrap:wrap;}
+  .qa-opt{
+    background:var(--bg); border:1px solid var(--line); color:var(--text-dim);
+    padding:7px 11px; border-radius:99px; font-size:12.5px;
+  }
+  .qa-opt.selected{background:var(--gold); color:#1B1714; border-color:var(--gold); font-weight:600;}
+
+  .boundary-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line);}
+  .boundary-row:last-child{border-bottom:none;}
+  .boundary-row .cat{font-size:14px; color:var(--text);}
+  .boundary-row .lvl{font-size:12px; color:var(--text-faint);}
+  .boundary-row.excluded{opacity:0.4;}
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:300;
+    display:flex; align-items:flex-end;
+  }
+  .modal-sheet{
+    background:var(--surface-raised); width:100%; max-width:520px; margin:0 auto;
+    border-radius:16px 16px 0 0; padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal-sheet h2{font-size:19px; margin-bottom:16px;}
+
+  .loading{display:flex; align-items:center; justify-content:center; height:100vh; color:var(--text-faint); font-size:13px;}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.0.2)</span></div></div>
+
+<script>
+/* ======================================================================
+   CONFIG — replace with your new Supabase project's values
+   ====================================================================== */
+const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
+const APP_VERSION = '1.0.2';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+<script>
+/* ==========================================================================
+   THE GAME — v1.0 app logic
+   Vanilla JS, single-page, mobile-first. No build step, no framework.
+   ========================================================================== */
+
+const $app = document.getElementById('app');
+
+const ANSWER_LABELS = {
+  yes: 'Yes', maybe: 'Maybe', not_now: 'Not now', no: 'No', already_enjoy: 'Already enjoy'
+};
+const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
+const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
+const TYPE_LABELS = { apart: 'Apart', together: 'Together', either: 'Either', reunion: 'Reunion' };
+const HEAT_THRESHOLDS = [25, 50, 75, 100];
+
+let state = {
+  session: null,
+  profile: null,
+  coupleId: null,
+  partner: null,
+  tab: 'home',
+  questions: [],
+  answers: {},        // question_id -> answer
+  boundary: [],        // computed shared boundary rows
+  dares: [],
+  scoreboard: [],
+  heat: 0,
+  rewards: [],
+  notifications: [],
+  loading: true,
+  authMode: 'signin',
+  authError: '',
+  toast: null,
+};
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function showToast(msg) {
+  state.toast = msg;
+  render();
+  setTimeout(() => { state.toast = null; render(); }, 3200);
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' +
+         d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/* ==========================================================================
+   BOOTSTRAP
+   ========================================================================== */
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  state.session = session;
+  sb.auth.onAuthStateChange((_event, session) => {
+    state.session = session;
+    if (session) loadEverything(); else { resetState(); render(); }
+  });
+  if (session) await loadEverything(); else state.loading = false;
+  render();
+}
+
+function resetState() {
+  state.profile = null; state.coupleId = null; state.partner = null;
+  state.questions = []; state.answers = {}; state.boundary = [];
+  state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
+  state.notifications = []; state.tab = 'home';
+}
+
+async function loadEverything() {
+  state.loading = true; render();
+  try {
+    await loadProfile();
+    if (state.profile) {
+      await loadCouple();
+      if (state.coupleId) {
+        await Promise.all([
+          loadQuestions(), loadOwnAnswers(), loadBoundary(),
+          loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
+        ]);
+        subscribeRealtime();
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  state.loading = false;
+  render();
+}
+
+async function loadProfile() {
+  const { data } = await sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle();
+  state.profile = data || null;
+}
+
+async function loadCouple() {
+  const { data } = await sb.from('couple_members').select('couple_id').eq('user_id', state.session.user.id).maybeSingle();
+  state.coupleId = data ? data.couple_id : null;
+  if (state.coupleId) {
+    const { data: partner } = await sb.rpc('get_partner_profile');
+    state.partner = (partner && partner[0]) || null;
+  }
+}
+
+async function loadQuestions() {
+  const { data } = await sb.from('boundary_questions').select('*').eq('active', true).order('sort_order');
+  state.questions = data || [];
+}
+async function loadOwnAnswers() {
+  const { data } = await sb.from('boundary_answers').select('question_id, answer').eq('user_id', state.session.user.id);
+  state.answers = {};
+  (data || []).forEach(r => state.answers[r.question_id] = r.answer);
+}
+async function loadBoundary() {
+  const { data, error } = await sb.rpc('compute_shared_boundary');
+  state.boundary = error ? [] : (data || []);
+}
+async function loadDares() {
+  const { data } = await sb.from('dares').select('*').order('created_at', { ascending: false });
+  state.dares = data || [];
+}
+async function loadScoreboard() {
+  const { data } = await sb.rpc('get_scoreboard');
+  state.scoreboard = data || [];
+}
+async function loadHeat() {
+  const { data } = await sb.from('heat_meter').select('progress').eq('couple_id', state.coupleId).maybeSingle();
+  state.heat = data ? data.progress : 0;
+}
+async function loadRewards() {
+  const { data } = await sb.from('rewards').select('*').order('created_at', { ascending: false });
+  state.rewards = data || [];
+}
+async function loadNotifications() {
+  const { data } = await sb.from('notifications').select('*').eq('read', false).order('created_at', { ascending: false });
+  state.notifications = data || [];
+}
+
+let realtimeChannel = null;
+function subscribeRealtime() {
+  if (realtimeChannel) return;
+  realtimeChannel = sb.channel('couple-' + state.coupleId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
+      () => { loadDares(); loadScoreboard(); loadHeat(); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `couple_id=eq.${state.coupleId}` },
+      () => { loadNotifications(); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards', filter: `couple_id=eq.${state.coupleId}` },
+      () => { loadRewards(); render(); })
+    .subscribe();
+}
+
+/* ==========================================================================
+   RENDER ROOT
+   ========================================================================== */
+function render() {
+  if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
+  if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
+  if (!state.profile) { $app.innerHTML = renderCreateProfile(); attachCreateProfileHandlers(); return; }
+  if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
+
+  const unanswered = state.questions.length - Object.keys(state.answers).length;
+
+  let body = '';
+  if (state.tab === 'home') body = renderHome(unanswered);
+  else if (state.tab === 'dares') body = renderDaresTab();
+  else if (state.tab === 'boundaries') body = renderBoundariesTab(unanswered);
+  else if (state.tab === 'rewards') body = renderRewardsTab();
+  else if (state.tab === 'history') body = renderHistoryTab();
+
+  $app.innerHTML = `
+    <div class="topbar">
+      <div class="wordmark">Moves</div>
+      <div class="version" id="version-tap" style="text-decoration:underline; text-underline-offset:2px; cursor:pointer">v${APP_VERSION}</div>
+    </div>
+    <div class="screen">${body}</div>
+    ${renderTabbar()}
+    ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ''}
+    ${state.modal || ''}
+  `;
+  attachMainHandlers();
+}
+
+/* ==========================================================================
+   AUTH
+   ========================================================================== */
+function renderAuth() {
+  return `
+    <div class="center-screen">
+      <div class="auth-hero">
+        <h1>Moves</h1>
+        <p>A private, two-player game. Just for the two of you.</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab ${state.authMode==='signin'?'active':''}" data-authmode="signin">Sign in</button>
+        <button class="auth-tab ${state.authMode==='signup'?'active':''}" data-authmode="signup">Create account</button>
+      </div>
+      <form id="auth-form" class="stack">
+        ${state.authMode==='signup' ? `
+        <div class="field"><label>Your name</label><input type="text" id="auth-name" placeholder="How your partner will see you" required></div>` : ''}
+        <div class="field"><label>Email</label><input type="email" id="auth-email" required></div>
+        <div class="field"><label>Password</label><input type="password" id="auth-password" minlength="8" required></div>
+        ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
+        <button type="submit" class="btn btn-primary">${state.authMode==='signin' ? 'Sign in' : 'Create account'}</button>
+      </form>
+    </div>
+  `;
+}
+function attachAuthHandlers() {
+  $app.querySelectorAll('[data-authmode]').forEach(b => b.onclick = () => {
+    state.authMode = b.dataset.authmode; state.authError = ''; render();
+  });
+  const form = document.getElementById('auth-form');
+  if (form) form.onsubmit = async (e) => {
+    e.preventDefault();
+    state.authError = '';
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    try {
+      if (state.authMode === 'signup') {
+        const name = document.getElementById('auth-name').value.trim();
+        const { data, error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.user) {
+          await sb.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0] });
+        }
+        state.session = data.session;
+      } else {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        state.session = data.session;
+      }
+      await loadEverything();
+    } catch (err) {
+      state.authError = err.message || 'Something went wrong.';
+      render();
+    }
+  };
+}
+
+function renderCreateProfile() {
+  return `
+    <div class="center-screen">
+      <div class="auth-hero"><h1>Almost there</h1><p>What should your partner see you as?</p></div>
+      <form id="profile-form" class="stack">
+        <div class="field"><input type="text" id="profile-name" placeholder="Your name" required></div>
+        <button type="submit" class="btn btn-primary">Continue</button>
+      </form>
+    </div>
+  `;
+}
+function attachCreateProfileHandlers() {
+  document.getElementById('profile-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('profile-name').value.trim();
+    await sb.from('profiles').insert({ id: state.session.user.id, display_name: name });
+    await loadEverything();
+  };
+}
+
+/* ==========================================================================
+   PAIRING
+   ========================================================================== */
+function renderPairing() {
+  return `
+    <div class="center-screen">
+      <div class="auth-hero"><h1>Pair up</h1><p>Connect your accounts to start a private couple.</p></div>
+      <div class="stack">
+        <button class="btn btn-primary" id="btn-make-invite">Generate an invite code</button>
+        <div id="invite-code-area"></div>
+        <div class="divider"></div>
+        <div class="field"><label>Have a code from your partner?</label><input type="text" id="redeem-code" placeholder="e.g. A1B2C3" style="text-transform:uppercase"></div>
+        <button class="btn btn-ghost" id="btn-redeem">Join with code</button>
+        ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+function attachPairingHandlers() {
+  document.getElementById('btn-make-invite').onclick = async () => {
+    state.authError = '';
+    const { data, error } = await sb.rpc('create_couple_invite');
+    if (error) { state.authError = error.message; render(); return; }
+    document.getElementById('invite-code-area').innerHTML =
+      `<div class="code-display">${esc(data)}</div><p class="hint-text" style="margin-top:10px">Share this with your partner. It expires in 7 days.</p>`;
+  };
+  document.getElementById('btn-redeem').onclick = async () => {
+    state.authError = '';
+    const code = document.getElementById('redeem-code').value.trim();
+    if (!code) return;
+    const { error } = await sb.rpc('redeem_couple_invite', { p_code: code });
+    if (error) { state.authError = error.message; render(); return; }
+    await loadEverything();
+  };
+}
+
+/* ==========================================================================
+   HOME TAB
+   ========================================================================== */
+function renderHome(unanswered) {
+  const pendingForMe = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent');
+  const active = state.dares.filter(d => ['accepted','in_progress','countered'].includes(d.status));
+  const recent = state.dares.filter(d => ['completed','completed_proof','completed_face_to_face'].includes(d.status)).slice(0, 3);
+
+  let statusValue, statusClass = '';
+  if (unanswered > 0) { statusValue = `${unanswered} boundary question${unanswered===1?'':'s'} still to answer`; statusClass='awaiting'; }
+  else if (pendingForMe.length) { statusValue = `${pendingForMe.length} move${pendingForMe.length===1?'':'s'} waiting on you`; statusClass='awaiting'; }
+  else { statusValue = "You're all caught up"; }
+
+  const nextReward = state.rewards.find(r => !r.completed && r.heat_threshold && r.heat_threshold > state.heat);
+
+  return `
+    <div class="status-strip">
+      <div class="status-label">Status</div>
+      <div class="status-value ${statusClass}">${esc(statusValue)}</div>
+    </div>
+
+    ${renderScoreboard()}
+    ${renderHeatBlock(nextReward)}
+
+    <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:22px">Create a move</button>
+
+    <div class="section-head"><h2>New for you</h2></div>
+    ${pendingForMe.length ? pendingForMe.map(d => renderDareCard(d, true)).join('') : `<div class="empty-state">Nothing new right now.</div>`}
+
+    <div class="section-head"><h2>In play</h2></div>
+    ${active.length ? active.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">No active moves.</div>`}
+
+    <div class="section-head"><h2>Recent</h2><button class="see-all" data-tab="history">See all</button></div>
+    ${recent.length ? recent.map(d => renderDareCard(d, false, true)).join('') : `<div class="empty-state">Nothing completed yet.</div>`}
+  `;
+}
+
+function renderScoreboard() {
+  if (!state.scoreboard.length) return '';
+  const mine = state.scoreboard.find(s => s.user_id === state.session.user.id);
+  const theirs = state.scoreboard.find(s => s.user_id !== state.session.user.id);
+  const leadMine = mine && theirs && mine.score > theirs.score;
+  const leadTheirs = mine && theirs && theirs.score > mine.score;
+  return `
+    <div class="scoreboard">
+      <div class="score-card ${leadMine?'leading':''}"><div class="name">${esc(mine ? state.profile.display_name : '')}</div><div class="points">${mine ? mine.score : 0}</div></div>
+      <div class="score-card ${leadTheirs?'leading':''}"><div class="name">${esc(state.partner ? state.partner.display_name : 'Partner')}</div><div class="points">${theirs ? theirs.score : 0}</div></div>
+    </div>
+  `;
+}
+
+function renderHeatBlock(nextReward) {
+  return `
+    <div class="heat-block">
+      <div class="heat-head"><span class="label">Heat Meter</span><span class="pct">${state.heat}%</span></div>
+      <div class="heat-track"><div class="heat-fill" style="width:${state.heat}%"></div></div>
+      <div class="heat-next">${nextReward ? `Next: ${esc(nextReward.title)} at ${nextReward.heat_threshold}%` : (state.heat >= 100 ? 'Fully unlocked' : 'Keep playing to build anticipation')}</div>
+    </div>
+  `;
+}
+
+/* ==========================================================================
+   DARE CARD
+   ========================================================================== */
+function renderDareCard(d, actionable, compact) {
+  const isMine = d.creator_id === state.session.user.id;
+  const isRecipient = d.recipient_id === state.session.user.id;
+  const revealed = isMine || d.status !== 'sent'; // sender always sees own; recipient must accept/reveal first for "sent"
+  const canReveal = isRecipient && d.status === 'sent';
+
+  let body;
+  if (revealed && !canReveal) {
+    body = `<div class="dare-instructions">${esc(d.instructions)}</div>`;
+  } else {
+    body = `<div class="dare-body">${d.teaser ? esc(d.teaser) : 'Details hidden until you reveal it.'}</div>`;
+  }
+
+  let actions = '';
+  if (actionable && d.status === 'sent' && isRecipient) {
+    actions = `
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn btn-primary btn-small" data-dare-action="accept" data-dare-id="${d.id}">Accept</button>
+        <button class="btn btn-ghost btn-small" data-dare-action="decline" data-dare-id="${d.id}">Decline</button>
+        <button class="btn btn-ghost btn-small" data-dare-action="counter" data-dare-id="${d.id}">Counter</button>
+      </div>`;
+  } else if (['accepted','in_progress','countered'].includes(d.status) && isRecipient) {
+    actions = `<div class="btn-row" style="margin-top:4px">
+      <button class="btn btn-primary btn-small" data-dare-action="complete" data-dare-id="${d.id}">Mark complete</button>
+    </div>`;
+  } else if (d.status === 'countered' && isMine) {
+    actions = `<div class="hint-text" style="margin-top:6px">They countered — check the updated details above.</div>`;
+  }
+
+  return `
+    <div class="dare ${d.status==='sent' && !isMine ? 'locked' : 'unlocked'}">
+      <div class="dare-top">
+        <div class="dare-title">${esc(d.title)}</div>
+        ${d.points_awarded != null ? `<div class="dare-points">${d.points_awarded} pts</div>` : ''}
+      </div>
+      <div class="dare-meta">
+        <span class="pill">${TYPE_LABELS[d.dare_type]}</span>
+        <span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span>
+        <span class="pill">${d.status.replace(/_/g,' ')}</span>
+        ${d.deadline ? `<span class="pill">by ${fmtDate(d.deadline)}</span>` : ''}
+      </div>
+      ${compact ? '' : body}
+      ${actions}
+    </div>
+  `;
+}
+
+/* ==========================================================================
+   DARES TAB
+   ========================================================================== */
+function renderDaresTab() {
+  const sent = state.dares.filter(d => d.creator_id === state.session.user.id);
+  const received = state.dares.filter(d => d.recipient_id === state.session.user.id);
+  return `
+    <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:22px">Create a move</button>
+    <div class="section-head"><h2>Sent by you</h2></div>
+    ${sent.length ? sent.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">None yet.</div>`}
+    <div class="section-head"><h2>Sent to you</h2></div>
+    ${received.length ? received.map(d => renderDareCard(d, true)).join('') : `<div class="empty-state">None yet.</div>`}
+  `;
+}
+
+/* ==========================================================================
+   BOUNDARIES TAB
+   ========================================================================== */
+function renderBoundariesTab(unanswered) {
+  const grouped = {};
+  state.questions.forEach(q => { (grouped[q.category] = grouped[q.category] || []).push(q); });
+
+  const permittedMap = {};
+  state.boundary.forEach(b => permittedMap[b.question_id] = b);
+
+  let questionnaireHtml = Object.keys(grouped).map(cat => `
+    <div class="section-head"><h2>${esc(cat)}</h2></div>
+    ${grouped[cat].map(q => `
+      <div class="qa-row">
+        <div class="qa-cat">${TYPE_LABELS[q.suitable_for]}</div>
+        <div class="qa-title">${esc(q.title)}</div>
+        ${q.explanation ? `<div class="qa-explain">${esc(q.explanation)}</div>` : ''}
+        <div class="qa-options">
+          ${Object.keys(ANSWER_LABELS).map(a => `
+            <button class="qa-opt ${state.answers[q.id]===a?'selected':''}" data-answer-q="${q.id}" data-answer-v="${a}">${ANSWER_LABELS[a]}</button>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+  `).join('');
+
+  const mutualList = state.boundary.filter(b => b.permitted);
+
+  return `
+    ${unanswered > 0 ? `<div class="status-strip"><div class="status-label">Your private answers</div><div class="status-value awaiting">${unanswered} left to answer</div></div>` : ''}
+
+    <div class="section-head"><h2>Your shared boundary</h2></div>
+    ${mutualList.length ? mutualList.map(b => `
+      <div class="boundary-row">
+        <div class="cat">${esc(b.title)}</div>
+        <div class="lvl">up to ${b.intensity_cap ? INTENSITY_LABELS[b.intensity_cap] : '—'}</div>
+      </div>
+    `).join('') : `<div class="empty-state">Nothing mutual yet — keep answering to find out.</div>`}
+
+    <div class="divider"></div>
+    <div class="section-head"><h2>Your private answers</h2></div>
+    <p class="hint-text" style="margin-bottom:16px">Only you see these. Your partner only ever sees the mutual result above.</p>
+    ${questionnaireHtml}
+  `;
+}
+
+/* ==========================================================================
+   REWARDS TAB
+   ========================================================================== */
+function renderRewardsTab() {
+  return `
+    <button class="btn btn-gold" data-nav="create-reward" style="margin-bottom:22px">Add a reward</button>
+    ${state.rewards.length ? state.rewards.map(r => `
+      <div class="dare ${r.revealed ? 'unlocked' : 'locked'}">
+        <div class="dare-top">
+          <div class="dare-title">${r.revealed ? esc(r.title) : 'Locked reward'}</div>
+          ${r.completed ? `<span class="pill">claimed</span>` : ''}
+        </div>
+        <div class="dare-body">${r.revealed ? esc(r.details) : (r.teaser ? esc(r.teaser) : 'Keep playing to reveal this.')}</div>
+        <div class="hint-text">${esc(r.unlock_condition)}</div>
+        ${(!r.completed && r.revealed) ? `<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost btn-small" data-reward-complete="${r.id}">Mark claimed</button></div>` : ''}
+      </div>
+    `).join('') : `<div class="empty-state">No rewards set up yet.</div>`}
+  `;
+}
+
+/* ==========================================================================
+   HISTORY TAB
+   ========================================================================== */
+function renderHistoryTab() {
+  const done = state.dares.filter(d => !['sent'].includes(d.status));
+  return `
+    <div class="section-head"><h2>All activity</h2></div>
+    ${done.length ? done.map(d => renderDareCard(d, false, true)).join('') : `<div class="empty-state">Nothing yet.</div>`}
+  `;
+}
+
+/* ==========================================================================
+   TAB BAR
+   ========================================================================== */
+function renderTabbar() {
+  const pending = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent').length;
+  const tabs = [
+    ['home','Home'], ['dares','Moves'], ['boundaries','Boundaries'], ['rewards','Rewards'], ['history','History']
+  ];
+  return `<div class="tabbar">
+    ${tabs.map(([id,label]) => `
+      <button class="tab ${state.tab===id?'active':''}" data-tab="${id}" style="position:relative">
+        ${label}${id==='dares' && pending ? '<span class="dot"></span>' : ''}
+      </button>
+    `).join('')}
+  </div>`;
+}
+
+/* ==========================================================================
+   MODALS: create dare / create reward / counter
+   ========================================================================== */
+function openCreateDareModal() {
+  const eligible = state.boundary.filter(b => b.permitted);
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Create a move</h2>
+        ${eligible.length === 0 ? `<p class="hint-text">No shared boundary categories yet — answer more questions together first.</p>` : `
+        <form id="dare-form" class="stack">
+          <div class="field"><label>Category</label>
+            <select id="d-question">
+              ${eligible.map(b => `<option value="${b.question_id}" data-cap="${b.intensity_cap||''}">${esc(b.title)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Title</label><input type="text" id="d-title" required></div>
+          <div class="field"><label>Teaser (shown before they reveal it)</label><input type="text" id="d-teaser"></div>
+          <div class="field"><label>Full instructions</label><textarea id="d-instructions" required></textarea></div>
+          <div class="field"><label>Type</label>
+            <select id="d-type">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Intensity</label>
+            <select id="d-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}">${INTENSITY_LABELS[i]} — ${INTENSITY_POINTS[i]} pts</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Deadline (optional)</label><input type="datetime-local" id="d-deadline"></div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
+            <input type="checkbox" id="d-confirm" style="width:auto"> Requires my confirmation to count as complete
+          </label>
+          <div id="dare-form-error" class="error-text"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Send</button>
+          </div>
+        </form>`}
+        ${eligible.length === 0 ? `<button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>` : ''}
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  const form = document.getElementById('dare-form');
+  if (form) form.onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('dare-form-error');
+    const deadlineVal = document.getElementById('d-deadline').value;
+    const { error } = await sb.rpc('create_dare', {
+      p_question_id: document.getElementById('d-question').value,
+      p_title: document.getElementById('d-title').value.trim(),
+      p_instructions: document.getElementById('d-instructions').value.trim(),
+      p_teaser: document.getElementById('d-teaser').value.trim() || null,
+      p_dare_type: document.getElementById('d-type').value,
+      p_intensity: document.getElementById('d-intensity').value,
+      p_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
+      p_requires_confirmation: document.getElementById('d-confirm').checked,
+      p_reward_text: null,
+      p_reusable: false
+    });
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    await loadDares();
+    showToast('Move sent.');
+  };
+}
+
+function openCounterModal(dareId) {
+  const d = state.dares.find(x => x.id === dareId);
+  if (!d) return;
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Counter this move</h2>
+        <form id="counter-form" class="stack">
+          <div class="field"><label>Adjusted instructions</label><textarea id="c-instructions">${esc(d.instructions)}</textarea></div>
+          <div class="field"><label>Adjusted intensity</label>
+            <select id="c-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${i===d.intensity?'selected':''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Adjusted deadline</label><input type="datetime-local" id="c-deadline"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Send counter</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('counter-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const deadlineVal = document.getElementById('c-deadline').value;
+    const { error } = await sb.rpc('respond_to_dare', {
+      p_dare_id: dareId, p_action: 'counter',
+      p_new_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
+      p_new_intensity: document.getElementById('c-intensity').value,
+      p_new_instructions: document.getElementById('c-instructions').value.trim()
+    });
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadDares();
+    showToast('Counter sent.');
+  };
+}
+
+function openCreateRewardModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Add a reward</h2>
+        <form id="reward-form" class="stack">
+          <div class="field"><label>Title</label><input type="text" id="r-title" required></div>
+          <div class="field"><label>Teaser (shown while locked)</label><input type="text" id="r-teaser"></div>
+          <div class="field"><label>Full details (hidden until unlocked)</label><textarea id="r-details" required></textarea></div>
+          <div class="field"><label>Unlock condition (in words)</label><input type="text" id="r-condition" placeholder="e.g. Reach 75% on the Heat Meter" required></div>
+          <div class="field"><label>Heat Meter threshold to auto-reveal (optional)</label>
+            <select id="r-threshold"><option value="">None</option>${HEAT_THRESHOLDS.map(t => `<option value="${t}">${t}%</option>`).join('')}</select>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('reward-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const threshold = document.getElementById('r-threshold').value;
+    const { error } = await sb.from('rewards').insert({
+      couple_id: state.coupleId,
+      creator_id: state.session.user.id,
+      title: document.getElementById('r-title').value.trim(),
+      teaser: document.getElementById('r-teaser').value.trim() || null,
+      details: document.getElementById('r-details').value.trim(),
+      unlock_condition: document.getElementById('r-condition').value.trim(),
+      heat_threshold: threshold ? parseInt(threshold) : null,
+      revealed: false
+    });
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadRewards();
+    showToast('Reward saved.');
+  };
+}
+
+function openVersionModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Version ${esc(APP_VERSION)}</h2>
+        <p class="hint-text" style="margin-bottom:14px">This is what's actually live right now — if what you see here doesn't match what you expect, the page hasn't picked up the latest update yet. Try a hard refresh.</p>
+        <div id="changelog-body" class="hint-text">Loading changelog…</div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  fetch('./CHANGELOG.md?cachebust=' + Date.now())
+    .then(r => r.ok ? r.text() : Promise.reject())
+    .then(text => {
+      const el = document.getElementById('changelog-body');
+      if (el) el.innerHTML = `<pre style="white-space:pre-wrap; font-family:var(--sans); font-size:12.5px; color:var(--text-dim)">${esc(text)}</pre>`;
+    })
+    .catch(() => {
+      const el = document.getElementById('changelog-body');
+      if (el) el.textContent = "Couldn't load CHANGELOG.md — check it was uploaded alongside index.html.";
+    });
+}
+
+function closeModal() { state.modal = ''; render(); }
+
+/* ==========================================================================
+   MAIN EVENT DELEGATION
+   ========================================================================== */
+function attachMainHandlers() {
+  const vtap = document.getElementById('version-tap');
+  if (vtap) vtap.onclick = openVersionModal;
+  $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
+  $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
+  $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
+
+  $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
+    const qId = el.dataset.answerQ, val = el.dataset.answerV;
+    state.answers[qId] = val;
+    render();
+    await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
+    await loadBoundary();
+    render();
+  });
+
+  $app.querySelectorAll('[data-dare-action]').forEach(el => el.onclick = async () => {
+    const action = el.dataset.dareAction, id = el.dataset.dareId;
+    if (action === 'counter') { openCounterModal(id); return; }
+    if (action === 'complete') { openCompleteModal(id); return; }
+    const { error } = await sb.rpc('respond_to_dare', { p_dare_id: id, p_action: action });
+    if (error) { showToast(error.message); return; }
+    await loadDares();
+    showToast(action === 'accept' ? 'Accepted.' : 'Declined.');
+  });
+
+  $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async () => {
+    const id = el.dataset.rewardComplete;
+    await sb.from('rewards').update({ completed: true }).eq('id', id);
+    await loadRewards();
+    render();
+  });
+
+  const backdrop = document.getElementById('modal-backdrop');
+  if (backdrop) backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+}
+
+function openCompleteModal(dareId) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Mark this complete</h2>
+        <p class="hint-text" style="margin-bottom:16px">Points are calculated automatically from how quickly you completed it.</p>
+        <div class="stack">
+          <button class="btn btn-primary" data-complete-kind="no_proof" data-complete-id="${dareId}">Completed</button>
+          <button class="btn btn-ghost" data-complete-kind="proof_in_person" data-complete-id="${dareId}">Completed — proof shown in person</button>
+          <button class="btn btn-ghost" data-complete-kind="proof_sent_externally" data-complete-id="${dareId}">Completed — proof sent separately</button>
+          <button class="btn btn-ghost" data-complete-kind="confirmed_by_partner" data-complete-id="${dareId}">Completed — confirmed by partner</button>
+          <button class="link-btn" id="modal-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  $app.querySelectorAll('[data-complete-kind]').forEach(el => el.onclick = async () => {
+    const { error } = await sb.rpc('complete_dare', { p_dare_id: el.dataset.completeId, p_completion_kind: el.dataset.completeKind });
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await Promise.all([loadDares(), loadScoreboard(), loadHeat()]);
+    showToast('Nice work — points added.');
+  });
+}
+
+boot();
+
+</script>
+</body>
+</html>

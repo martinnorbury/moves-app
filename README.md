@@ -26,7 +26,8 @@ different repo, different Supabase project, no shared data or credentials.
 
 ## 2. Configure the app
 
-Open `index.html` and replace the two placeholder values near the bottom:
+Open `index.html` and replace the two placeholder values near the bottom
+(in the same `<script>` block as everything else — there's only one file):
 
 ```js
 const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
@@ -121,9 +122,17 @@ agreed v1 scope. See `CHANGELOG.md` for what's next.
 ## Files
 
 ```
-index.html            the entire app: markup, styling, and config
-app.js                 all application logic
-supabase/schema.sql    tables, RLS policies, and RPC functions
-README.md              this file
-CHANGELOG.md            version history
+index.html            the entire website: markup, styling, config, and all logic
+supabase/schema.sql    reference copy of the database setup (already applied — not part of the website)
+README.md              this file (documentation only — not part of the website)
+CHANGELOG.md            version history (documentation only, but the app reads this one live — see below)
 ```
+
+Only `index.html` actually needs to be live on the web for the app to work.
+`schema.sql` was a one-time script already run directly against your
+Supabase project — it doesn't need to be uploaded anywhere for the app to
+function, it's kept here purely as a record of what the database looks
+like. `CHANGELOG.md` is documentation too, but the app's own "tap the
+version number" screen fetches it live from wherever it's hosted, so it's
+worth keeping alongside `index.html` if you want that screen to show
+anything.
