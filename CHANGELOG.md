@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0 — list view for cards
+
+- Added a "List view" option inside each heading, alongside the original
+  one-at-a-time card view — a searchable, scrollable list showing every
+  card's title, intensity, and whether you've answered it yet. Tap any row
+  to jump straight to that card instead of clicking Next repeatedly.
+- The choice between list view and one-at-a-time persists as you move
+  between headings; the search box clears each time you open a different
+  heading.
+
 ## 1.4.2 — CSV category matching no longer case-sensitive
 
 - Fixed CSV import creating a duplicate, wrongly-cased heading whenever the

@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.4.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.5.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.5.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -319,6 +319,8 @@ let state = {
   imageUrls: {},        // image_path -> signed URL
   openCategory: null,    // category name currently open as a deck, or null for the list view
   deckIndex: 0,          // position within the open deck
+  deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
+  deckFilter: '',         // search text filtering the list view
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -849,16 +851,57 @@ function renderBoundariesTab(unanswered) {
 
 function renderDeckView() {
   const cards = state.questions.filter(q => q.category === state.openCategory);
-  const idx = Math.min(state.deckIndex, Math.max(0, cards.length - 1));
-  const q = cards[idx];
 
-  if (!q) {
+  const modeToggle = `
+    <div class="btn-row" style="margin:14px 0">
+      <button class="btn ${state.deckViewMode==='card'?'btn-primary':'btn-ghost'} btn-small" data-deck-mode="card">One at a time</button>
+      <button class="btn ${state.deckViewMode==='list'?'btn-primary':'btn-ghost'} btn-small" data-deck-mode="list">List view</button>
+    </div>
+  `;
+
+  if (cards.length === 0) {
     return `
       <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
       <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
       <button class="btn btn-gold" id="btn-add-card">Add the first card</button>
     `;
   }
+
+  if (state.deckViewMode === 'list') return renderDeckListView(cards, modeToggle);
+  return renderDeckCardView(cards, modeToggle);
+}
+
+function renderDeckListView(cards, modeToggle) {
+  const filterText = state.deckFilter.trim().toLowerCase();
+  const filtered = filterText ? cards.filter(q => q.title.toLowerCase().includes(filterText)) : cards;
+
+  return `
+    <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
+    ${modeToggle}
+    <div class="field" style="margin-bottom:14px"><input type="text" id="deck-search" placeholder="Search ${esc(state.openCategory)}…" value="${esc(state.deckFilter)}"></div>
+    ${filtered.length ? filtered.map((q, i) => {
+      const realIdx = cards.indexOf(q);
+      const answer = state.answers[q.id];
+      return `
+        <div class="category-row" data-open-card="${realIdx}" style="cursor:pointer">
+          <div>
+            <div class="cat-name" style="font-size:14.5px">${esc(q.title)}</div>
+            <div class="cat-count">
+              <span class="pill intensity-${q.max_intensity}" style="margin-right:6px">${INTENSITY_LABELS[q.max_intensity]}</span>
+              ${answer ? esc(ANSWER_LABELS[answer]) : 'Not answered yet'}
+            </div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+      `;
+    }).join('') : `<div class="empty-state">No cards match "${esc(state.deckFilter)}".</div>`}
+    <button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>
+  `;
+}
+
+function renderDeckCardView(cards, modeToggle) {
+  const idx = Math.min(state.deckIndex, Math.max(0, cards.length - 1));
+  const q = cards[idx];
 
   if (q.image_path && !state.imageUrls[q.image_path]) {
     fetchSignedImageUrl(q.image_path);
@@ -867,7 +910,8 @@ function renderDeckView() {
 
   return `
     <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
-    <div class="deck-progress" style="margin-top:14px">${esc(state.openCategory)} — card ${idx + 1} of ${cards.length}</div>
+    ${modeToggle}
+    <div class="deck-progress">${esc(state.openCategory)} — card ${idx + 1} of ${cards.length}</div>
     <div class="deck-card">
       ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
       <div class="deck-card-body">
@@ -1137,7 +1181,7 @@ function attachMainHandlers() {
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
 
   $app.querySelectorAll('[data-open-category]').forEach(el => el.onclick = () => {
-    state.openCategory = el.dataset.openCategory; state.deckIndex = 0; render();
+    state.openCategory = el.dataset.openCategory; state.deckIndex = 0; state.deckFilter = ''; render();
   });
   const closeDeck = document.querySelector('[data-close-deck]');
   if (closeDeck) closeDeck.onclick = () => { state.openCategory = null; render(); };
@@ -1145,6 +1189,21 @@ function attachMainHandlers() {
   if (deckPrev) deckPrev.onclick = () => { state.deckIndex = Math.max(0, state.deckIndex - 1); render(); };
   const deckNext = document.querySelector('[data-deck-next]');
   if (deckNext) deckNext.onclick = () => { state.deckIndex = state.deckIndex + 1; render(); };
+  $app.querySelectorAll('[data-deck-mode]').forEach(el => el.onclick = () => {
+    state.deckViewMode = el.dataset.deckMode; render();
+  });
+  const deckSearch = document.getElementById('deck-search');
+  if (deckSearch) {
+    deckSearch.oninput = () => { state.deckFilter = deckSearch.value; render(); };
+    // Restore cursor focus/position after the re-render triggered by typing
+    deckSearch.focus();
+    deckSearch.setSelectionRange(deckSearch.value.length, deckSearch.value.length);
+  }
+  $app.querySelectorAll('[data-open-card]').forEach(el => el.onclick = () => {
+    state.deckIndex = parseInt(el.dataset.openCard, 10);
+    state.deckViewMode = 'card';
+    render();
+  });
   const addCardBtn = document.getElementById('btn-add-card');
   if (addCardBtn) addCardBtn.onclick = openAddCardModal;
   const newHeadingBtn = document.getElementById('btn-new-heading');
