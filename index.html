@@ -331,7 +331,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.28.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.28.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -339,7 +339,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.28.0';
+const APP_VERSION = '1.28.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1258,8 +1258,7 @@ function renderQuestionsColumn() {
       `;
     }).join('')}
 
-    ${state.questions.length ? `<button class="link-btn" id="btn-bulk-images" style="margin-top:14px">Attach images to cards →</button>` : ''}
-    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:8px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
     `}
   `;
 }

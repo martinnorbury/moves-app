@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.28.1 — actually fixed the column mismatch this time
+
+- Removed "Attach images to cards" entirely from the top-level Questions
+  screen, rather than repositioning it — repositioning kept the
+  structural mismatch (one extra line on Questions) and risked text
+  wrapping making it worse on narrower screens. Both columns now end with
+  exactly one short link each, genuinely matching.
+- Per-card "Attach/Replace image" is untouched and still works from
+  inside any individual card. The bulk-match-by-filename shortcut isn't
+  reachable from a button right now — say if you want it back somewhere
+  and I'll find it a home that doesn't fight the layout.
+
 ## 1.28.0 — matching layout, intensity search, and editing cards properly
 
 - Questions and Dares now have exactly matching button rows — "Attach
