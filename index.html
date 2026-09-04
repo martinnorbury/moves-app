@@ -291,7 +291,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.9.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.10.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -299,7 +299,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.9.2';
+const APP_VERSION = '1.10.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -339,6 +339,7 @@ let state = {
   deckFilter: '',         // search text filtering the list view
   wizardSkipped: new Set(),  // question ids skipped this session — a safety valve so the guided wizard never truly traps anyone
   headingAccess: [],          // per-heading tier unlock, from get_heading_access()
+  viewedReport: false,         // shown once per login, right after the wizard finishes
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -385,6 +386,7 @@ function resetState() {
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
   state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
+  state.headingAccess = []; state.viewedReport = false;
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
   applyTheme(null);
@@ -580,6 +582,46 @@ function attachWizardHandlers(q) {
   if (skipBtn) skipBtn.onclick = () => { state.wizardSkipped.add(q.id); render(); };
 }
 
+function answerIcon(val) {
+  if (val === 'full_spark') return '❤️';
+  if (val === 'cold_card') return '❄️';
+  return '•';
+}
+
+function renderReport() {
+  const generalQuestions = getWizardQuestions();
+  const stillWaitingOnPartner = state.headingAccess.some(h => h.access === 'pending');
+
+  return `
+    <div class="screen" style="padding-top:22px">
+      <div class="auth-hero">
+        <h1>${stillWaitingOnPartner ? 'Your side is in' : 'Where you both stand'}</h1>
+        <p>${stillWaitingOnPartner
+          ? "Here's what you said. Once your partner's answered the same 6, this fills in properly."
+          : "You've both answered the general questions for every heading. Here's what that means."}</p>
+      </div>
+
+      <div class="section-head" style="margin-top:0"><h2>Your answers</h2></div>
+      ${generalQuestions.map(q => `
+        <div class="boundary-row">
+          <div class="cat">${esc(q.category)}</div>
+          <div class="lvl" style="font-size:16px">${answerIcon(state.answers[q.id])}</div>
+        </div>
+      `).join('')}
+
+      <div class="divider"></div>
+      <div class="section-head"><h2>Where this leaves you two</h2></div>
+      ${renderHeadingAccessList()}
+
+      <button class="btn btn-gold" id="btn-continue-to-app" style="margin-top:22px">Continue to the app</button>
+    </div>
+  `;
+}
+function attachReportHandlers() {
+  const btn = document.getElementById('btn-continue-to-app');
+  if (btn) btn.onclick = () => { state.viewedReport = true; render(); };
+}
+
 function render() {
   if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
@@ -590,8 +632,9 @@ function render() {
 
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
   if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
+  if (!state.viewedReport) { $app.innerHTML = renderReport(); attachReportHandlers(); return; }
 
-  const unanswered = state.questions.length - Object.keys(state.answers).length;
+  const unanswered = getWizardQuestions().filter(q => !state.answers[q.id]).length;
 
   let body = '';
   if (state.tab === 'home') body = renderHome(unanswered);

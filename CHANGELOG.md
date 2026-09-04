@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.10.0 — a proper landing after the wizard, instead of a sparse Home tab
+
+- Fixed the status counter comparing against every card (~60) instead of
+  just the 6 general ones — after finishing the wizard, it was showing
+  something like "58 boundary questions still to answer," which combined
+  with an empty Home tab (no dares yet) could easily read as broken.
+- Added a report screen shown once, right after the wizard finishes: your
+  own answers to the 6 general questions, then where each heading
+  currently stands (using the existing heading-access readout). If your
+  partner hasn't finished their own 6 yet, it says so plainly and shows
+  your side only — nothing pretends to be final before it is. A
+  "Continue to the app" button moves on from there.
+
 ## 1.9.2 — gauge flipped: cold left, heart right
 
 - Reversed the gauge so the snowflake sits on the left and the heart on
