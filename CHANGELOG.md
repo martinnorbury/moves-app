@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.7.0 — wizard only covers the 6 general questions
+
+- Fixed the after-login wizard, which was walking through all ~60 specific
+  cards instead of just the 6 general "where do you sit on this heading"
+  ones. Cards are now explicitly marked general-or-specific (a new
+  is_general flag) — the wizard only ever shows the general ones; specific
+  cards stay something you browse into a heading for, by choice.
+- Added an "is this the general question for this heading" checkbox to the
+  manual add-card form, and an equivalent is_general column to CSV import,
+  so this stays correct as you add more headings later.
+- Cards marked general show a small "General" badge when browsing a
+  heading, so it's clear which one that is.
+
 ## 1.6.0 — guided wizard for unanswered cards
 
 - After logging in, if you have any unanswered cards, the app now presents

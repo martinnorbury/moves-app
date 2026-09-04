@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.6.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.7.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -477,7 +477,7 @@ function subscribeRealtime() {
    ========================================================================== */
 function getOrderedQuestions() {
   // Walks headings in their display order, and within each heading, cards
-  // in their own order — this is the fixed sequence the wizard follows.
+  // in their own order.
   const ordered = [];
   state.categories.forEach(c => {
     state.questions
@@ -488,15 +488,22 @@ function getOrderedQuestions() {
   return ordered;
 }
 
+function getWizardQuestions() {
+  // The guided wizard only covers the one general "where do you sit on
+  // this heading" question per heading — not every specific card. Specific
+  // cards are answered later, by choice, when browsing a heading directly.
+  return getOrderedQuestions().filter(q => q.is_general);
+}
+
 function renderWizard(q, remaining) {
   if (q.image_path && !state.imageUrls[q.image_path]) fetchSignedImageUrl(q.image_path);
   const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
-  const totalAnswered = Object.keys(state.answers).length;
-  const totalCards = state.questions.length;
+  const totalGeneral = getWizardQuestions().length;
+  const answeredGeneral = totalGeneral - remaining;
 
   return `
     <div class="screen" style="padding-top:22px">
-      <div class="deck-progress">${totalAnswered} of ${totalCards} answered</div>
+      <div class="deck-progress">${answeredGeneral + 1} of ${totalGeneral} — a general sense of each heading</div>
       <div class="deck-card">
         ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
         <div class="deck-card-body">
@@ -537,7 +544,7 @@ function render() {
   if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
   if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
 
-  const wizardQueue = getOrderedQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
+  const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
   if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
 
   const unanswered = state.questions.length - Object.keys(state.answers).length;
@@ -974,7 +981,7 @@ function renderDeckCardView(cards, modeToggle) {
     <div class="deck-card">
       ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
       <div class="deck-card-body">
-        <div class="deck-card-title">${esc(q.title)}</div>
+        <div class="deck-card-title">${esc(q.title)}${q.is_general ? ' <span class="pill" style="margin-left:6px">General</span>' : ''}</div>
         ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
         <div class="deck-answers">
           ${Object.keys(ANSWER_LABELS).map(a => `
@@ -1399,6 +1406,9 @@ function openAddCardModal() {
           <div class="field"><label>Best suited for</label>
             <select id="card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
+            <input type="checkbox" id="card-is-general" style="width:auto"> This is the general "where do you sit" question for this heading (shown in the after-login wizard)
+          </label>
           <div id="card-form-error" class="error-text"></div>
           <div class="btn-row">
             <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
@@ -1438,7 +1448,8 @@ function openAddCardModal() {
       p_explanation: document.getElementById('card-explain').value.trim() || null,
       p_image_path: imagePath,
       p_max_intensity: document.getElementById('card-intensity').value,
-      p_suitable_for: document.getElementById('card-suitable').value
+      p_suitable_for: document.getElementById('card-suitable').value,
+      p_is_general: document.getElementById('card-is-general').checked
     });
     if (error) { errEl.textContent = error.message; return; }
     closeModal();
@@ -1551,7 +1562,7 @@ function openImportCsvModal() {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Import cards from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus an optional <b>image_filename</b> column. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). Headings that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus optional <b>image_filename</b> and <b>is_general</b> columns. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). is_general (true/false, one per heading) marks the broad "where do you sit on this" question shown in the after-login wizard, as opposed to specific cards. Headings that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
         <input type="file" id="csv-file" accept=".csv">
         <div id="import-progress" class="hint-text" style="margin-top:14px"></div>
         <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
@@ -1601,6 +1612,8 @@ async function runCsvImport(rows) {
     const rawIntensity = pick(row, 'max_intensity', 'intensity');
     const rawSuitable = pick(row, 'suitable_for', 'type', 'dare_type');
     const imageFilename = pick(row, 'image_filename', 'image', 'filename').trim() || null;
+    const rawIsGeneral = pick(row, 'is_general', 'general').trim().toLowerCase();
+    const isGeneral = ['true', 'yes', '1'].includes(rawIsGeneral);
     let intensity = normalize(rawIntensity);
     let suitable = normalize(rawSuitable);
 
@@ -1629,7 +1642,7 @@ async function runCsvImport(rows) {
 
     const { data: newId, error } = await sb.rpc('add_boundary_question', {
       p_category: resolvedCategory, p_title: title, p_explanation: explanation, p_image_path: null,
-      p_max_intensity: intensity, p_suitable_for: suitable
+      p_max_intensity: intensity, p_suitable_for: suitable, p_is_general: isGeneral
     });
     if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
     if (imageFilename && newId) {
