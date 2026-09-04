@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.0 — guided wizard for unanswered cards
+
+- After logging in, if you have any unanswered cards, the app now presents
+  them one at a time in a fixed order (heading by heading, in the order
+  they were added) instead of leaving you to find the Boundaries tab
+  yourself. Answer one and the next appears automatically — same pattern
+  as the existing "you need to pair first" screens, just for this.
+- Includes a "Skip for now, come back to this later" link so nobody's ever
+  genuinely stuck on a card they're not ready to answer — skipped cards
+  just don't block you for the rest of that session, and reappear next
+  time you open the app (still unanswered, same as any other unanswered
+  card).
+- Once every current card has an answer (or been skipped), you land in the
+  normal app as before. Adding more cards later — one at a time, via CSV,
+  however — naturally brings the wizard back for just the new ones.
+
 ## 1.5.0 — list view for cards
 
 - Added a "List view" option inside each heading, alongside the original

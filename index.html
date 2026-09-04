@@ -278,7 +278,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.5.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.6.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +286,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -321,6 +321,7 @@ let state = {
   deckIndex: 0,          // position within the open deck
   deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
   deckFilter: '',         // search text filtering the list view
+  wizardSkipped: new Set(),  // question ids skipped this session — a safety valve so the guided wizard never truly traps anyone
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -366,6 +367,7 @@ function resetState() {
   state.profile = null; state.coupleId = null; state.partner = null;
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
   state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
+  state.wizardSkipped = new Set();
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
   applyTheme(null);
@@ -473,6 +475,60 @@ function subscribeRealtime() {
 /* ==========================================================================
    RENDER ROOT
    ========================================================================== */
+function getOrderedQuestions() {
+  // Walks headings in their display order, and within each heading, cards
+  // in their own order — this is the fixed sequence the wizard follows.
+  const ordered = [];
+  state.categories.forEach(c => {
+    state.questions
+      .filter(q => q.category === c.name)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .forEach(q => ordered.push(q));
+  });
+  return ordered;
+}
+
+function renderWizard(q, remaining) {
+  if (q.image_path && !state.imageUrls[q.image_path]) fetchSignedImageUrl(q.image_path);
+  const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
+  const totalAnswered = Object.keys(state.answers).length;
+  const totalCards = state.questions.length;
+
+  return `
+    <div class="screen" style="padding-top:22px">
+      <div class="deck-progress">${totalAnswered} of ${totalCards} answered</div>
+      <div class="deck-card">
+        ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
+        <div class="deck-card-body">
+          <div class="hint-text" style="margin-bottom:6px">${esc(q.category)}</div>
+          <div class="deck-card-title">${esc(q.title)}</div>
+          ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
+          <div class="deck-answers">
+            ${Object.keys(ANSWER_LABELS).map(a => `
+              <button class="deck-answer-btn" data-wizard-answer="${a}">${ANSWER_LABELS[a]}</button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <button class="link-btn" id="btn-wizard-skip" style="margin-top:14px">Skip for now, come back to this later</button>
+      ${remaining > 1 ? `<p class="hint-text" style="margin-top:6px">${remaining - 1} more after this one.</p>` : ''}
+    </div>
+  `;
+}
+
+function attachWizardHandlers(q) {
+  $app.querySelectorAll('[data-wizard-answer]').forEach(el => el.onclick = async () => {
+    const val = el.dataset.wizardAnswer;
+    state.answers[q.id] = val;
+    render();
+    await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: q.id, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
+    await loadBoundary();
+    render();
+  });
+  const skipBtn = document.getElementById('btn-wizard-skip');
+  if (skipBtn) skipBtn.onclick = () => { state.wizardSkipped.add(q.id); render(); };
+}
+
 function render() {
   if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
@@ -480,6 +536,9 @@ function render() {
   if (!state.profile.gender) { $app.innerHTML = renderChooseTheme(); attachChooseThemeHandlers(); return; }
   if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
   if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
+
+  const wizardQueue = getOrderedQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
+  if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
 
   const unanswered = state.questions.length - Object.keys(state.answers).length;
 
