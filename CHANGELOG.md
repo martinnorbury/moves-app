@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.22.0 — a personal welcome, with your own photo
+
+- Home now opens with "Welcome back, [your name]" in large type, plus a
+  tappable avatar circle — tap it to add or change a photo. Shows your
+  initial in gold until you've set one.
+- Your photo is stored privately (its own storage bucket, only your own
+  account can ever read or write it) and isn't shown anywhere else in the
+  app or to your partner — purely a personal touch on your own Home
+  screen.
+
+## 1.21.0 — Admin is now a genuinely separate tab
+
+- Third time's the fix: admin tools weren't actually separated before,
+  just conditionally shown on a link inside the shared Kinks screen. Added
+  a real "Admin" tab in the bottom bar — visible only on your account,
+  invisible entirely on Jacki's, with its own direct entry point.
+- "Manage headings, cards & content" is gone from the Kinks screen
+  completely. What's left there ("Browse headings & answer cards") is
+  now always the plain browsing/answering experience, for both accounts,
+  with zero admin tools mixed in — even on your own account, if you
+  happen to reach a heading that way instead of through Admin.
+- Using vs. maintaining the app are now two separate paths through the
+  whole app, not just two states of one screen.
+
 ## 1.20.0 — general question hands off once you've answered enough, plus a full answer review
 
 - Heading averages now genuinely hand off from the general question to

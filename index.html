@@ -147,6 +147,22 @@
   .status-strip .status-value{font-family:var(--serif); font-size:19px; color:var(--text);}
   .status-strip .status-value.awaiting{color:var(--gold);}
 
+  /* ---------- welcome hero ---------- */
+  .welcome-hero{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+  .avatar-circle{
+    width:64px; height:64px; border-radius:50%; flex-shrink:0; position:relative;
+    background:var(--surface-raised); border:2px solid var(--gold);
+    display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer;
+  }
+  .avatar-circle img{width:100%; height:100%; object-fit:cover;}
+  .avatar-initial{font-family:var(--serif); font-size:26px; color:var(--gold);}
+  .avatar-hint{
+    position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.55);
+    color:#fff; font-size:8.5px; text-align:center; padding:2px 0;
+  }
+  .welcome-greeting{font-size:12.5px; color:var(--text-dim); margin-bottom:2px;}
+  .welcome-name{font-family:var(--serif); font-size:28px; color:var(--text); line-height:1.1;}
+
   /* ---------- scoreboard ---------- */
   .scoreboard{display:flex; gap:12px; margin-bottom:18px;}
   .score-card{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:16px;}
@@ -308,7 +324,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.20.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.22.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -316,7 +332,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.22.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -350,6 +366,7 @@ let state = {
   answers: {},        // question_id -> answer
   boundary: [],        // computed shared boundary rows
   imageUrls: {},        // image_path -> signed URL
+  avatarUrl: null,        // signed URL for this user's own avatar photo, once loaded
   openCategory: null,    // category name currently open as a deck, or null for the list view
   deckIndex: 0,          // position within the open deck
   deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
@@ -407,7 +424,7 @@ async function boot() {
 function resetState() {
   state.profile = null; state.coupleId = null; state.partner = null;
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
-  state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
+  state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = []; state.viewingSetup = false;
   state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set();
@@ -448,6 +465,11 @@ async function loadEverything() {
 async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle();
   state.profile = data || null;
+  state.avatarUrl = null;
+  if (state.profile && state.profile.avatar_path) {
+    const { data: signed } = await sb.storage.from('avatars').createSignedUrl(state.profile.avatar_path, 3600);
+    if (signed && signed.signedUrl) state.avatarUrl = signed.signedUrl;
+  }
 }
 
 async function loadCouple() {
@@ -668,6 +690,7 @@ function render() {
   else if (state.tab === 'boundaries') body = renderBoundariesTab(unanswered);
   else if (state.tab === 'rewards') body = renderRewardsTab();
   else if (state.tab === 'history') body = renderHistoryTab();
+  else if (state.tab === 'admin') body = renderSetupArea(true);
 
   $app.innerHTML = `
     <div class="topbar">
@@ -865,8 +888,20 @@ function renderHome(unanswered) {
   else { statusValue = "You're all caught up"; }
 
   const nextReward = state.rewards.find(r => !r.completed && r.heat_threshold && r.heat_threshold > state.heat);
+  const initial = state.profile && state.profile.display_name ? state.profile.display_name.charAt(0).toUpperCase() : '?';
 
   return `
+    <div class="welcome-hero">
+      <div class="avatar-circle" id="btn-change-avatar">
+        ${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : `<div class="avatar-initial">${esc(initial)}</div>`}
+        <div class="avatar-hint">${state.avatarUrl ? 'Change' : 'Add photo'}</div>
+      </div>
+      <div>
+        <div class="welcome-greeting">Welcome back,</div>
+        <div class="welcome-name">${esc(state.profile ? state.profile.display_name : '')}</div>
+      </div>
+    </div>
+
     <div class="status-strip">
       <div class="status-label">Status</div>
       <div class="status-value ${statusClass}">${esc(statusValue)}</div>
@@ -1102,7 +1137,7 @@ function renderAllAnswers() {
 }
 
 function renderBoundariesTab(unanswered) {
-  if (state.viewingSetup) return renderSetupArea();
+  if (state.viewingSetup) return renderSetupArea(false);
   if (state.viewingAllAnswers) return renderAllAnswers();
 
   const generalQuestions = getWizardQuestions();
@@ -1126,14 +1161,13 @@ function renderBoundariesTab(unanswered) {
 
     <div class="divider"></div>
     <button class="btn btn-ghost" id="btn-review-answers" style="width:100%; margin-bottom:8px">Review & edit all your answers →</button>
-    <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">${state.profile && state.profile.is_admin ? 'Manage headings, cards & content →' : 'Browse headings & answer cards →'}</button>
+    <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">Browse headings & answer cards →</button>
   `;
 }
 
-function renderSetupArea() {
-  if (state.openCategory) return renderDeckView();
+function renderSetupArea(adminMode) {
+  if (state.openCategory) return renderDeckView(adminMode);
 
-  const isAdmin = state.profile && state.profile.is_admin;
   const countByCategory = {};
   state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
   const answeredByCategory = {};
@@ -1142,10 +1176,10 @@ function renderSetupArea() {
   });
 
   return `
-    <button class="link-btn" id="btn-close-setup">‹ Back to your report</button>
+    ${adminMode ? '' : `<button class="link-btn" id="btn-close-setup">‹ Back to your report</button>`}
     <div class="section-head" style="margin-top:14px"><h2>Headings</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">${isAdmin
-      ? 'Tap a heading to go through its cards, add new ones, or attach images. Only you see your own answers — your partner only ever sees the mutual result on your report.'
+    <p class="hint-text" style="margin-bottom:14px">${adminMode
+      ? 'Tap a heading to go through its cards, add new ones, or attach images.'
       : 'Tap a heading to go through its cards and answer them. Only you see your own answers — your partner only ever sees the mutual result on your report.'}</p>
 
     ${state.categories.map(c => {
@@ -1162,7 +1196,7 @@ function renderSetupArea() {
       `;
     }).join('')}
 
-    ${isAdmin ? `
+    ${adminMode ? `
     <div class="btn-row" style="margin-top:14px">
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
@@ -1172,13 +1206,13 @@ function renderSetupArea() {
 
     <div class="divider"></div>
     <div class="section-head"><h2>Your card report</h2></div>
-    <p class="hint-text" style="margin-bottom:6px">Admin-only — for specific cards you've both answered, grouped by how well matched you are.</p>
+    <p class="hint-text" style="margin-bottom:6px">For specific cards you've both answered, grouped by how well matched you are.</p>
     ${renderCardReport()}
     ` : ''}
   `;
 }
 
-function renderDeckView() {
+function renderDeckView(adminMode) {
   const cards = state.questions.filter(q => q.category === state.openCategory);
 
   const modeToggle = `
@@ -1189,19 +1223,18 @@ function renderDeckView() {
   `;
 
   if (cards.length === 0) {
-    const isAdmin = state.profile && state.profile.is_admin;
     return `
       <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
       <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
-      ${isAdmin ? `<button class="btn btn-gold" id="btn-add-card">Add the first card</button>` : ''}
+      ${adminMode ? `<button class="btn btn-gold" id="btn-add-card">Add the first card</button>` : ''}
     `;
   }
 
-  if (state.deckViewMode === 'list') return renderDeckListView(cards, modeToggle);
-  return renderDeckCardView(cards, modeToggle);
+  if (state.deckViewMode === 'list') return renderDeckListView(cards, modeToggle, adminMode);
+  return renderDeckCardView(cards, modeToggle, adminMode);
 }
 
-function renderDeckListView(cards, modeToggle) {
+function renderDeckListView(cards, modeToggle, adminMode) {
   const filterText = state.deckFilter.trim().toLowerCase();
   const filtered = filterText ? cards.filter(q => q.title.toLowerCase().includes(filterText)) : cards;
 
@@ -1225,14 +1258,13 @@ function renderDeckListView(cards, modeToggle) {
         </div>
       `;
     }).join('') : `<div class="empty-state">No cards match "${esc(state.deckFilter)}".</div>`}
-    ${state.profile && state.profile.is_admin ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
+    ${adminMode ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
   `;
 }
 
-function renderDeckCardView(cards, modeToggle) {
+function renderDeckCardView(cards, modeToggle, adminMode) {
   const idx = Math.min(state.deckIndex, Math.max(0, cards.length - 1));
   const q = cards[idx];
-  const isAdmin = state.profile && state.profile.is_admin;
 
   if (q.image_path && !state.imageUrls[q.image_path]) {
     fetchSignedImageUrl(q.image_path);
@@ -1249,7 +1281,7 @@ function renderDeckCardView(cards, modeToggle) {
         <div class="deck-card-title">${esc(q.title)}${q.is_general ? ' <span class="pill" style="margin-left:6px">General</span>' : ''}</div>
         ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
-        ${isAdmin ? `
+        ${adminMode ? `
         <div class="btn-row" style="margin-top:10px">
           <button class="link-btn" data-attach-image="${q.id}">${imgUrl ? 'Replace image' : 'Attach an image'}</button>
           <button class="link-btn" data-delete-card="${q.id}" style="color:var(--wine-bright)">Delete this card</button>
@@ -1259,10 +1291,10 @@ function renderDeckCardView(cards, modeToggle) {
     </div>
     <div class="deck-nav">
       <button data-deck-prev="1" ${idx===0?'disabled':''}>‹ Previous</button>
-      ${isAdmin ? `<button id="btn-add-card">+ Add a card here</button>` : '<span></span>'}
+      ${adminMode ? `<button id="btn-add-card">+ Add a card here</button>` : '<span></span>'}
       <button data-deck-next="1" ${idx===cards.length-1?'disabled':''}>Next ›</button>
     </div>
-    ${isAdmin ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
+    ${adminMode ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
   `;
 }
 
@@ -1313,9 +1345,11 @@ function renderHistoryTab() {
    ========================================================================== */
 function renderTabbar() {
   const pending = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent').length;
+  const isAdmin = state.profile && state.profile.is_admin;
   const tabs = [
     ['boundaries','Kinks'], ['home','Home'], ['dares','Moves'], ['rewards','Rewards'], ['history','History']
   ];
+  if (isAdmin) tabs.push(['admin','Admin']);
   return `<div class="tabbar">
     ${tabs.map(([id,label]) => `
       <button class="tab ${state.tab===id?'active':''}" data-tab="${id}" style="position:relative">
@@ -1505,6 +1539,8 @@ function closeModal() { state.modal = ''; render(); }
 function attachMainHandlers() {
   const vtap = document.getElementById('version-tap');
   if (vtap) vtap.onclick = openVersionModal;
+  const avatarBtn = document.getElementById('btn-change-avatar');
+  if (avatarBtn) avatarBtn.onclick = openAvatarModal;
   $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
@@ -1807,6 +1843,37 @@ async function runBulkImageImport(files) {
     progressEl.innerHTML = `<b>${matched} image${matched===1?'':'s'} attached, ${unmatched.length} unmatched.</b>` +
       (unmatched.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${unmatched.map(f => `<div>${esc(f)} — no matching filename or title found.</div>`).join('')}</div>` : '');
   }
+}
+
+function openAvatarModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${state.avatarUrl ? 'Change your photo' : 'Add a photo'}</h2>
+        <p class="hint-text" style="margin-bottom:14px">Just for you — this doesn't change anything else about your account.</p>
+        <input type="file" id="avatar-file" accept="image/*">
+        <div id="avatar-error" class="error-text" style="margin-top:10px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('avatar-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const errEl = document.getElementById('avatar-error');
+    const ext = file.name.split('.').pop();
+    const path = `${state.session.user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await sb.storage.from('avatars').upload(path, file);
+    if (uploadError) { errEl.textContent = 'Upload failed: ' + uploadError.message; return; }
+    const { error: updateError } = await sb.from('profiles').update({ avatar_path: path }).eq('id', state.session.user.id);
+    if (updateError) { errEl.textContent = updateError.message; return; }
+    closeModal();
+    await loadProfile();
+    render();
+    showToast('Photo updated.');
+  };
 }
 
 function openSingleImageModal(questionId) {
