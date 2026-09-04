@@ -187,6 +187,7 @@
   .pill.intensity-risque{background:#FBEEDC; color:#8A5A1E; border-color:#F0D9B0;}
   .pill.intensity-bold{background:#FBE6DC; color:#9A4A22; border-color:#F0C3AC;}
   .pill.intensity-wild{background:#FBE3E6; color:#9A2F3D; border-color:#F0BEC5;}
+  .pill.access-full{background:#FBF1DC; color:#8A6A1E; border-color:#F0DFB0; font-weight:600;}
   .dare-body{color:var(--text-dim); font-size:13.5px; margin-bottom:12px;}
   .dare-instructions{color:var(--text); font-size:14px; margin-bottom:12px; line-height:1.55;}
   .dare-points{font-size:12px; color:var(--gold);}
@@ -255,6 +256,21 @@
     padding:13px 14px; border-radius:var(--radius-s); font-size:14px; text-align:left;
   }
   .deck-answer-btn.selected{background:var(--wine); border-color:var(--wine); color:#fff; font-weight:600;}
+
+  .answer-gauge{position:relative; padding:6px 0 4px; margin-top:6px;}
+  .gauge-track{
+    position:absolute; top:26px; left:22px; right:22px; height:3px; border-radius:2px;
+    background:linear-gradient(90deg, #C24C63, #D9A65C, #A8A196, #7FAAC7, #3D6690);
+  }
+  .gauge-row{display:flex; justify-content:space-between; position:relative; z-index:1;}
+  .gauge-stop{
+    width:44px; height:44px; border-radius:50%; background:var(--surface); border:2px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
+  }
+  .gauge-stop.selected{border-color:var(--gold); background:var(--gold); transform:scale(1.08);}
+  .gauge-labels{display:flex; justify-content:space-between; margin-top:8px;}
+  .gauge-label-item{flex:1; text-align:center; font-size:10.5px; color:var(--text-faint); padding:0 2px; line-height:1.3;}
+  .gauge-label-item.selected{color:var(--text); font-weight:600;}
   .deck-nav{display:flex; justify-content:space-between; align-items:center; margin-top:14px;}
   .deck-nav button{background:none; border:none; color:var(--text-dim); font-size:14px; padding:8px;}
   .deck-nav button:disabled{opacity:0.3;}
@@ -278,7 +294,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.7.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.9.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -286,7 +302,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.9.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -301,6 +317,8 @@ const $app = document.getElementById('app');
 const ANSWER_LABELS = {
   full_spark: 'Full Spark', warming_up: 'Warming Up', blushing_yes: 'Blushing Yes', just_for_you: 'Just For You', cold_card: 'Cold Card'
 };
+const ANSWER_ORDER = ['full_spark', 'warming_up', 'blushing_yes', 'just_for_you', 'cold_card'];
+const GAUGE_ICONS = { full_spark: '❤️', warming_up: '', blushing_yes: '', just_for_you: '', cold_card: '❄️' };
 const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
 const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
 const TYPE_LABELS = { apart: 'Apart', together: 'Together', either: 'Either', reunion: 'Reunion' };
@@ -322,6 +340,7 @@ let state = {
   deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
   deckFilter: '',         // search text filtering the list view
   wizardSkipped: new Set(),  // question ids skipped this session — a safety valve so the guided wizard never truly traps anyone
+  headingAccess: [],          // per-heading tier unlock, from get_heading_access()
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -388,7 +407,7 @@ async function loadEverything() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
         ]);
         subscribeRealtime();
@@ -437,6 +456,10 @@ async function loadOwnAnswers() {
 async function loadBoundary() {
   const { data, error } = await sb.rpc('compute_shared_boundary');
   state.boundary = error ? [] : (data || []);
+}
+async function loadHeadingAccess() {
+  const { data, error } = await sb.rpc('get_heading_access');
+  state.headingAccess = error ? [] : (data || []);
 }
 async function loadDares() {
   const { data } = await sb.from('dares').select('*').order('created_at', { ascending: false });
@@ -495,6 +518,36 @@ function getWizardQuestions() {
   return getOrderedQuestions().filter(q => q.is_general);
 }
 
+// Renders the heart-to-freezing gauge used for general "where do you sit"
+// questions, or the plain button list used for specific cards. `attrs` is
+// the data-* attribute string each stop gets, so the caller's existing
+// click handler (wizard or deck view) keeps working unchanged — only the
+// visual markup differs.
+function renderAnswerControl(q, currentAnswer, attrsFor) {
+  if (!q.is_general) {
+    return `
+      <div class="deck-answers">
+        ${ANSWER_ORDER.map(a => `
+          <button class="deck-answer-btn ${currentAnswer===a?'selected':''}" ${attrsFor(a)}>${ANSWER_LABELS[a]}</button>
+        `).join('')}
+      </div>
+    `;
+  }
+  return `
+    <div class="answer-gauge">
+      <div class="gauge-track"></div>
+      <div class="gauge-row">
+        ${ANSWER_ORDER.map(a => `
+          <button class="gauge-stop ${currentAnswer===a?'selected':''}" ${attrsFor(a)}>${GAUGE_ICONS[a]}</button>
+        `).join('')}
+      </div>
+      <div class="gauge-labels">
+        ${ANSWER_ORDER.map(a => `<div class="gauge-label-item ${currentAnswer===a?'selected':''}">${ANSWER_LABELS[a]}</div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderWizard(q, remaining) {
   if (q.image_path && !state.imageUrls[q.image_path]) fetchSignedImageUrl(q.image_path);
   const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
@@ -510,11 +563,7 @@ function renderWizard(q, remaining) {
           <div class="hint-text" style="margin-bottom:6px">${esc(q.category)}</div>
           <div class="deck-card-title">${esc(q.title)}</div>
           ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
-          <div class="deck-answers">
-            ${Object.keys(ANSWER_LABELS).map(a => `
-              <button class="deck-answer-btn" data-wizard-answer="${a}">${ANSWER_LABELS[a]}</button>
-            `).join('')}
-          </div>
+          ${renderAnswerControl(q, null, (a) => `data-wizard-answer="${a}"`)}
         </div>
       </div>
       <button class="link-btn" id="btn-wizard-skip" style="margin-top:14px">Skip for now, come back to this later</button>
@@ -529,7 +578,7 @@ function attachWizardHandlers(q) {
     state.answers[q.id] = val;
     render();
     await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: q.id, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
-    await loadBoundary();
+    await loadBoundary(); await loadHeadingAccess();
     render();
   });
   const skipBtn = document.getElementById('btn-wizard-skip');
@@ -867,6 +916,31 @@ function renderDaresTab() {
 /* ==========================================================================
    BOUNDARIES TAB
    ========================================================================== */
+const ACCESS_LABELS = {
+  pending: 'Waiting on both of you to answer',
+  closed: 'Closed — a Cold Card here',
+  discover_only: 'Discover open',
+  discover_explore: 'Discover & Explore open',
+  full: 'Fully open — Discover, Explore & Unleash'
+};
+const ACCESS_CLASSES = {
+  pending: '',
+  closed: 'intensity-wild',
+  discover_only: 'intensity-tease',
+  discover_explore: 'intensity-bold',
+  full: 'access-full'
+};
+
+function renderHeadingAccessList() {
+  if (!state.headingAccess.length) return `<div class="empty-state">Answer the 6 general questions to see this.</div>`;
+  return state.headingAccess.map(h => `
+    <div class="boundary-row">
+      <div class="cat">${esc(h.category)}</div>
+      <span class="pill ${ACCESS_CLASSES[h.access]}">${esc(ACCESS_LABELS[h.access])}</span>
+    </div>
+  `).join('');
+}
+
 function renderBoundariesTab(unanswered) {
   if (state.openCategory) return renderDeckView();
 
@@ -887,6 +961,11 @@ function renderBoundariesTab(unanswered) {
         <div class="lvl">up to ${b.intensity_cap ? INTENSITY_LABELS[b.intensity_cap] : '—'}</div>
       </div>
     `).join('') : `<div class="empty-state">Nothing mutual yet — keep answering to find out.</div>`}
+
+    <div class="divider"></div>
+    <div class="section-head"><h2>Heading access</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Based on your answers to the 6 general questions — this decides which tiers (Discover, Explore, Unleash) are open in each heading. Not a permanent lock — it moves as your answers do.</p>
+    ${renderHeadingAccessList()}
 
     <div class="divider"></div>
     <div class="section-head"><h2>Headings</h2></div>
@@ -983,11 +1062,7 @@ function renderDeckCardView(cards, modeToggle) {
       <div class="deck-card-body">
         <div class="deck-card-title">${esc(q.title)}${q.is_general ? ' <span class="pill" style="margin-left:6px">General</span>' : ''}</div>
         ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
-        <div class="deck-answers">
-          ${Object.keys(ANSWER_LABELS).map(a => `
-            <button class="deck-answer-btn ${state.answers[q.id]===a?'selected':''}" data-answer-q="${q.id}" data-answer-v="${a}">${ANSWER_LABELS[a]}</button>
-          `).join('')}
-        </div>
+        ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
         <div class="btn-row" style="margin-top:10px">
           <button class="link-btn" data-attach-image="${q.id}">${imgUrl ? 'Replace image' : 'Attach an image'}</button>
           <button class="link-btn" data-delete-card="${q.id}" style="color:var(--wine-bright)">Delete this card</button>
@@ -1283,7 +1358,7 @@ function attachMainHandlers() {
     if (error) { showToast(error.message); return; }
     if (state.deckIndex > 0) state.deckIndex -= 1;
     await loadQuestions();
-    await loadBoundary();
+    await loadBoundary(); await loadHeadingAccess();
     render();
     showToast('Card deleted.');
   });
@@ -1296,7 +1371,7 @@ function attachMainHandlers() {
     if (error) { showToast(error.message); return; }
     state.deckIndex = 0;
     await loadQuestions();
-    await loadBoundary();
+    await loadBoundary(); await loadHeadingAccess();
     render();
     showToast(`All cards in "${cat}" deleted.`);
   };
@@ -1308,7 +1383,7 @@ function attachMainHandlers() {
     if (error) { showToast(error.message); return; }
     state.openCategory = null; state.deckIndex = 0;
     await loadQuestions();
-    await loadBoundary();
+    await loadBoundary(); await loadHeadingAccess();
     render();
     showToast('All cards deleted.');
   };
@@ -1322,7 +1397,7 @@ function attachMainHandlers() {
     state.answers[qId] = val;
     render();
     await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
-    await loadBoundary();
+    await loadBoundary(); await loadHeadingAccess();
     // Auto-advance to the next card in the deck, if there is one
     if (state.openCategory) {
       const cards = state.questions.filter(x => x.category === state.openCategory);

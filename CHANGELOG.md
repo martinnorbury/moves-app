@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.9.0 — heading access algorithm (readout only, not enforced yet)
+
+- Added the logic you described: each heading's combined general-question
+  answer now determines which tiers (Discover/Explore/Unleash) are
+  eligible — a Cold Card from either side closes the heading entirely;
+  otherwise the less enthusiastic answer decides how far it opens (both
+  Full Spark = everything; one step down = Discover & Explore; anything
+  more moderate = Discover only).
+- New "Heading access" section on the Boundaries tab shows exactly where
+  this places each heading right now, so you can verify the algorithm
+  before anything is built on top of it.
+- Deliberately not enforced anywhere yet — specific cards are still
+  browsable and dares still creatable regardless of this result. That's
+  the intentional next step once the logic itself is confirmed correct.
+
+## 1.8.0 — heart-to-freezing gauge for general questions
+
+- The 6 general "where do you sit on this heading" questions now show a
+  visual gauge instead of a stacked list of buttons — a heart at the warm
+  end, a snowflake at the cold end, three plain stops in between. Same
+  five underlying answers as everywhere else (Full Spark through Cold
+  Card), just a better fit visually for a broad temperature check than
+  for judging one specific act.
+- Specific cards (Missionary Position and the rest) are unchanged — still
+  the button list, which reads better for a discrete yes/no-ish choice.
+
 ## 1.7.0 — wizard only covers the 6 general questions
 
 - Fixed the after-login wizard, which was walking through all ~60 specific
