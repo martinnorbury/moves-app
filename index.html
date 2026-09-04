@@ -324,7 +324,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.25.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.25.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -332,7 +332,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.25.0';
+const APP_VERSION = '1.25.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -378,7 +378,6 @@ let state = {
   dareLibrary: [],              // admin-written dare templates, browsable by both partners
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
-  viewingSetup: false,          // whether the Boundaries tab is showing the Setup area instead of the report
   viewingAllAnswers: false,      // whether the full answer-review screen is open
   allAnswersFilter: '',
   dares: [],
@@ -427,7 +426,7 @@ function resetState() {
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
-  state.headingAccess = []; state.viewingSetup = false;
+  state.headingAccess = [];
   state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set();
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -727,7 +726,7 @@ function render() {
   else if (state.tab === 'boundaries') body = renderBoundariesTab(unanswered);
   else if (state.tab === 'rewards') body = renderRewardsTab();
   else if (state.tab === 'history') body = renderHistoryTab();
-  else if (state.tab === 'admin') body = renderSetupArea(true);
+  else if (state.tab === 'admin') body = renderSetupArea();
 
   $app.innerHTML = `
     <div class="topbar">
@@ -1159,7 +1158,6 @@ function renderAllAnswers() {
 }
 
 function renderBoundariesTab(unanswered) {
-  if (state.viewingSetup) return renderSetupArea(false);
   if (state.viewingAllAnswers) return renderAllAnswers();
 
   const generalQuestions = getWizardQuestions();
@@ -1183,7 +1181,7 @@ function renderBoundariesTab(unanswered) {
 
     <div class="divider"></div>
     <button class="btn btn-ghost" id="btn-review-answers" style="width:100%; margin-bottom:8px">Review & edit all your answers →</button>
-    <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">Browse headings & answer cards →</button>
+
   `;
 }
 
@@ -1205,8 +1203,8 @@ function renderDareLibraryList() {
   `).join('');
 }
 
-function renderSetupArea(adminMode) {
-  if (state.openCategory) return renderDeckView(adminMode);
+function renderSetupArea() {
+  if (state.openCategory) return renderDeckView();
 
   const countByCategory = {};
   state.questions.forEach(q => { countByCategory[q.category] = (countByCategory[q.category] || 0) + 1; });
@@ -1216,11 +1214,8 @@ function renderSetupArea(adminMode) {
   });
 
   return `
-    ${adminMode ? '' : `<button class="link-btn" id="btn-close-setup">‹ Back to your report</button>`}
-    <div class="section-head" style="margin-top:14px"><h2>Headings</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">${adminMode
-      ? 'Tap a heading to go through its cards, add new ones, or attach images.'
-      : 'Tap a heading to go through its cards and answer them. Only you see your own answers — your partner only ever sees the mutual result on your report.'}</p>
+    <div class="section-head" style="margin-top:0"><h2>Headings</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards, add new ones, or attach images.</p>
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -1236,7 +1231,6 @@ function renderSetupArea(adminMode) {
       `;
     }).join('')}
 
-    ${adminMode ? `
     <div class="btn-row" style="margin-top:14px">
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
@@ -1253,11 +1247,10 @@ function renderSetupArea(adminMode) {
     </div>
     ${renderDareLibraryList()}
     ${state.dareLibrary.length ? `<button class="link-btn" id="btn-delete-all-dares" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.dareLibrary.length} library dares</button>` : ''}
-    ` : ''}
   `;
 }
 
-function renderDeckView(adminMode) {
+function renderDeckView() {
   const cards = state.questions.filter(q => q.category === state.openCategory);
 
   const modeToggle = `
@@ -1271,15 +1264,15 @@ function renderDeckView(adminMode) {
     return `
       <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
       <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
-      ${adminMode ? `<button class="btn btn-gold" id="btn-add-card">Add the first card</button>` : ''}
+      <button class="btn btn-gold" id="btn-add-card">Add the first card</button>
     `;
   }
 
-  if (state.deckViewMode === 'list') return renderDeckListView(cards, modeToggle, adminMode);
-  return renderDeckCardView(cards, modeToggle, adminMode);
+  if (state.deckViewMode === 'list') return renderDeckListView(cards, modeToggle);
+  return renderDeckCardView(cards, modeToggle);
 }
 
-function renderDeckListView(cards, modeToggle, adminMode) {
+function renderDeckListView(cards, modeToggle) {
   const filterText = state.deckFilter.trim().toLowerCase();
   const filtered = filterText ? cards.filter(q => q.title.toLowerCase().includes(filterText)) : cards;
 
@@ -1303,11 +1296,11 @@ function renderDeckListView(cards, modeToggle, adminMode) {
         </div>
       `;
     }).join('') : `<div class="empty-state">No cards match "${esc(state.deckFilter)}".</div>`}
-    ${adminMode ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
+    <button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>
   `;
 }
 
-function renderDeckCardView(cards, modeToggle, adminMode) {
+function renderDeckCardView(cards, modeToggle) {
   const idx = Math.min(state.deckIndex, Math.max(0, cards.length - 1));
   const q = cards[idx];
 
@@ -1326,20 +1319,19 @@ function renderDeckCardView(cards, modeToggle, adminMode) {
         <div class="deck-card-title">${esc(q.title)}${q.is_general ? ' <span class="pill" style="margin-left:6px">General</span>' : ''}</div>
         ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
-        ${adminMode ? `
         <div class="btn-row" style="margin-top:10px">
           <button class="link-btn" data-attach-image="${q.id}">${imgUrl ? 'Replace image' : 'Attach an image'}</button>
           <button class="link-btn" data-delete-card="${q.id}" style="color:var(--wine-bright)">Delete this card</button>
         </div>
-        ` : ''}
       </div>
     </div>
     <div class="deck-nav">
       <button data-deck-prev="1" ${idx===0?'disabled':''}>‹ Previous</button>
-      ${adminMode ? `<button id="btn-add-card">+ Add a card here</button>` : '<span></span>'}
+      <button id="btn-add-card">+ Add a card here</button>
       <button data-deck-next="1" ${idx===cards.length-1?'disabled':''}>Next ›</button>
     </div>
-    ${adminMode ? `<button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>` : ''}
+    <button class="link-btn" data-delete-all-heading="${esc(state.openCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${cards.length} cards in "${esc(state.openCategory)}"</button>
+
   `;
 }
 
@@ -1699,10 +1691,6 @@ function attachMainHandlers() {
     render();
     showToast('Dare library cleared.');
   };
-  const openSetupBtn = document.getElementById('btn-open-setup');
-  if (openSetupBtn) openSetupBtn.onclick = () => { state.viewingSetup = true; render(); };
-  const closeSetupBtn = document.getElementById('btn-close-setup');
-  if (closeSetupBtn) closeSetupBtn.onclick = () => { state.viewingSetup = false; state.openCategory = null; render(); };
   const reviewAnswersBtn = document.getElementById('btn-review-answers');
   if (reviewAnswersBtn) reviewAnswersBtn.onclick = () => { state.viewingAllAnswers = true; render(); };
   const closeAllAnswersBtn = document.getElementById('btn-close-all-answers');

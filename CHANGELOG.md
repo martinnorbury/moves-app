@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.25.1 — Browse headings & answer cards removed from Kinks
+
+- Removed the "Browse headings & answer cards" link from Kinks entirely,
+  as asked. It's no longer reachable from anywhere except the Admin tab.
+- Since that was the only path into the non-admin version of Setup, the
+  whole dual-mode system behind it — the adminMode parameter threaded
+  through Setup, the deck view, and the card view, plus the now-unused
+  viewingSetup state and its back button — was dead code once that link
+  was gone. Removed all of it rather than leave it unused.
+
 ## 1.25.0 — full admin control over the dare library
 
 - The dare library now has the same admin capabilities headings and
