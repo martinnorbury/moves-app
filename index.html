@@ -260,7 +260,7 @@
   .answer-gauge{position:relative; padding:6px 0 4px; margin-top:6px;}
   .gauge-track{
     position:absolute; top:26px; left:22px; right:22px; height:3px; border-radius:2px;
-    background:linear-gradient(90deg, #C24C63, #D9A65C, #A8A196, #7FAAC7, #3D6690);
+    background:linear-gradient(90deg, #3D6690, #7FAAC7, #A8A196, #D9A65C, #C24C63);
   }
   .gauge-row{display:flex; justify-content:space-between; position:relative; z-index:1;}
   .gauge-stop{
@@ -268,9 +268,6 @@
     display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
   }
   .gauge-stop.selected{border-color:var(--gold); background:var(--gold); transform:scale(1.08);}
-  .gauge-labels{display:flex; justify-content:space-between; margin-top:8px;}
-  .gauge-label-item{flex:1; text-align:center; font-size:10.5px; color:var(--text-faint); padding:0 2px; line-height:1.3;}
-  .gauge-label-item.selected{color:var(--text); font-weight:600;}
   .deck-nav{display:flex; justify-content:space-between; align-items:center; margin-top:14px;}
   .deck-nav button{background:none; border:none; color:var(--text-dim); font-size:14px; padding:8px;}
   .deck-nav button:disabled{opacity:0.3;}
@@ -294,7 +291,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.9.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.9.2)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -302,7 +299,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.2';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -318,6 +315,7 @@ const ANSWER_LABELS = {
   full_spark: 'Full Spark', warming_up: 'Warming Up', blushing_yes: 'Blushing Yes', just_for_you: 'Just For You', cold_card: 'Cold Card'
 };
 const ANSWER_ORDER = ['full_spark', 'warming_up', 'blushing_yes', 'just_for_you', 'cold_card'];
+const GAUGE_ORDER = ['cold_card', 'just_for_you', 'blushing_yes', 'warming_up', 'full_spark'];
 const GAUGE_ICONS = { full_spark: '❤️', warming_up: '', blushing_yes: '', just_for_you: '', cold_card: '❄️' };
 const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
 const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
@@ -537,12 +535,9 @@ function renderAnswerControl(q, currentAnswer, attrsFor) {
     <div class="answer-gauge">
       <div class="gauge-track"></div>
       <div class="gauge-row">
-        ${ANSWER_ORDER.map(a => `
+        ${GAUGE_ORDER.map(a => `
           <button class="gauge-stop ${currentAnswer===a?'selected':''}" ${attrsFor(a)}>${GAUGE_ICONS[a]}</button>
         `).join('')}
-      </div>
-      <div class="gauge-labels">
-        ${ANSWER_ORDER.map(a => `<div class="gauge-label-item ${currentAnswer===a?'selected':''}">${ANSWER_LABELS[a]}</div>`).join('')}
       </div>
     </div>
   `;

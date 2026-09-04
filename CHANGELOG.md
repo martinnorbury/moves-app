@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.2 — gauge flipped: cold left, heart right
+
+- Reversed the gauge so the snowflake sits on the left and the heart on
+  the right, with the colour track flipped to match. Purely visual —
+  which answer maps to which underlying value hasn't changed.
+
+## 1.9.1 — gauge without the text labels
+
+- Removed the "Full Spark / Warming Up / etc." text underneath the gauge
+  on general questions — that wording fits judging a specific act, not a
+  broad temperature check, so the gauge now stands alone: just the heart,
+  the three plain stops, and the snowflake. The underlying answer values
+  are unchanged, only the on-screen labels are gone.
+
 ## 1.9.0 — heading access algorithm (readout only, not enforced yet)
 
 - Added the logic you described: each heading's combined general-question
