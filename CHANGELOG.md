@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.29.0 — quality bonus, turn nudge, post-completion question
+
+- Added a bonus-only quality reaction: after a move is completed, whoever
+  sent it (not the person who did it) can react Meh/Good/Loved it. Good
+  adds a 10% bonus, Loved it 25% — on top of the guaranteed intensity+speed
+  points, never reducing them. Tested directly: 10 base points at the
+  fastest multiplier (20 total) plus a Loved it reaction correctly landed
+  at 25 total, and a second reaction attempt was rejected as expected.
+- Added a soft turn nudge on Home — after either of you completes a move,
+  it says whose turn it "is" to send the next one, but never blocks
+  either of you from sending anytime regardless.
+- Added the post-completion follow-up: mark a move complete, and if
+  there's an unanswered card left in that same heading, you're prompted
+  with it right there — answer it or skip, feeding straight back into
+  that heading's running average.
+- Caught and fixed a genuine syntax error (a missing closing brace) before
+  shipping this time, per the earlier reminder to actually check.
+
 ## 1.28.1 — actually fixed the column mismatch this time
 
 - Removed "Attach images to cards" entirely from the top-level Questions

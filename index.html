@@ -331,7 +331,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.28.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.29.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -339,7 +339,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.28.1';
+const APP_VERSION = '1.29.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -925,6 +925,16 @@ function attachAwaitingPartnerHandlers() {
 /* ==========================================================================
    HOME TAB
    ========================================================================== */
+function computeTurnMessage() {
+  const completed = state.dares.filter(d => d.status === 'completed' && d.completed_at);
+  if (!completed.length) return null;
+  const mostRecent = completed.reduce((a, b) => new Date(a.completed_at) > new Date(b.completed_at) ? a : b);
+  const turnUserId = mostRecent.recipient_id; // whoever just completed a move is nudged to send the next one
+  if (turnUserId === state.session.user.id) return "It's your turn to send a move, whenever you're ready.";
+  const partnerName = state.partner ? state.partner.display_name : 'Your partner';
+  return `It's ${partnerName}'s turn to send a move — you can still send one anytime too.`;
+}
+
 function renderHome(unanswered) {
   const pendingForMe = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent');
   const active = state.dares.filter(d => ['accepted','in_progress','countered'].includes(d.status));
@@ -937,6 +947,7 @@ function renderHome(unanswered) {
 
   const nextReward = state.rewards.find(r => !r.completed && r.heat_threshold && r.heat_threshold > state.heat);
   const initial = state.profile && state.profile.display_name ? state.profile.display_name.charAt(0).toUpperCase() : '?';
+  const turnMessage = computeTurnMessage();
 
   return `
     <div class="welcome-hero">
@@ -953,6 +964,7 @@ function renderHome(unanswered) {
     <div class="status-strip">
       <div class="status-label">Status</div>
       <div class="status-value ${statusClass}">${esc(statusValue)}</div>
+      ${turnMessage ? `<div class="hint-text" style="margin-top:4px">${esc(turnMessage)}</div>` : ''}
     </div>
 
     ${renderScoreboard()}
@@ -1025,13 +1037,23 @@ function renderDareCard(d, actionable, compact) {
     </div>`;
   } else if (d.status === 'countered' && isMine) {
     actions = `<div class="hint-text" style="margin-top:6px">They countered — check the updated details above.</div>`;
+  } else if (d.status === 'completed' && isMine && !d.quality_reaction) {
+    actions = `
+      <div class="hint-text" style="margin-top:6px; margin-bottom:6px">How was it?</div>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn btn-ghost btn-small" data-quality-reaction="meh" data-dare-id="${d.id}">Meh</button>
+        <button class="btn btn-ghost btn-small" data-quality-reaction="good" data-dare-id="${d.id}">Good</button>
+        <button class="btn btn-ghost btn-small" data-quality-reaction="loved_it" data-dare-id="${d.id}">Loved it</button>
+      </div>`;
   }
+
+  const totalPoints = d.points_awarded != null ? d.points_awarded + (d.quality_bonus_points || 0) : null;
 
   return `
     <div class="dare ${d.status==='sent' && !isMine ? 'locked' : 'unlocked'}">
       <div class="dare-top">
         <div class="dare-title">${esc(d.title)}</div>
-        ${d.points_awarded != null ? `<div class="dare-points">${d.points_awarded} pts</div>` : ''}
+        ${totalPoints != null ? `<div class="dare-points">${totalPoints} pts${d.quality_bonus_points ? ` <span class="hint-text">(+${d.quality_bonus_points} bonus)</span>` : ''}</div>` : ''}
       </div>
       <div class="dare-meta">
         <span class="pill">${TYPE_LABELS[d.dare_type]}</span>
@@ -1895,6 +1917,14 @@ function attachMainHandlers() {
     showToast(action === 'accept' ? 'Accepted.' : 'Declined.');
   });
 
+  $app.querySelectorAll('[data-quality-reaction]').forEach(el => el.onclick = async () => {
+    const { error } = await sb.rpc('react_to_dare_quality', { p_dare_id: el.dataset.dareId, p_reaction: el.dataset.qualityReaction });
+    if (error) { showToast(error.message); return; }
+    await Promise.all([loadDares(), loadScoreboard()]);
+    render();
+    showToast('Reaction saved.');
+  });
+
   $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async () => {
     const id = el.dataset.rewardComplete;
     await sb.from('rewards').update({ completed: true }).eq('id', id);
@@ -2454,11 +2484,43 @@ function openCompleteModal(dareId) {
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
   $app.querySelectorAll('[data-complete-kind]').forEach(el => el.onclick = async () => {
+    const completedDare = state.dares.find(d => d.id === el.dataset.completeId);
+    const category = completedDare ? completedDare.category : null;
     const { error } = await sb.rpc('complete_dare', { p_dare_id: el.dataset.completeId, p_completion_kind: el.dataset.completeKind });
     if (error) { showToast(error.message); return; }
-    closeModal();
     await Promise.all([loadDares(), loadScoreboard(), loadHeat()]);
-    showToast('Nice work — points added.');
+    const followUp = category ? state.questions.find(q => q.category === category && !state.answers[q.id]) : null;
+    if (followUp) {
+      openFollowUpQuestionModal(followUp);
+    } else {
+      closeModal();
+      showToast('Nice work — points added.');
+    }
+  });
+}
+
+function openFollowUpQuestionModal(q) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Nice work — points added</h2>
+        <p class="hint-text" style="margin-bottom:14px">Since you just completed one from ${esc(q.category)}, here's another question from that heading, if you're up for it.</p>
+        <div class="deck-card-title" style="margin-bottom:8px">${esc(q.title)}</div>
+        ${q.explanation ? `<div class="deck-card-explain" style="margin-bottom:12px">${esc(q.explanation)}</div>` : ''}
+        ${renderAnswerControl(q, null, (a) => `data-followup-answer="${a}" data-followup-id="${q.id}"`)}
+        <button class="link-btn" id="modal-cancel" style="margin-top:16px">Skip for now</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  $app.querySelectorAll('[data-followup-answer]').forEach(el => el.onclick = async () => {
+    const qId = el.dataset.followupId, val = el.dataset.followupAnswer;
+    state.answers[qId] = val;
+    await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
+    closeModal();
+    showToast('Answer saved.');
   });
 }
 
