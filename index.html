@@ -331,7 +331,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.26.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.27.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -339,7 +339,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.26.0';
+const APP_VERSION = '1.27.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -375,6 +375,10 @@ let state = {
   imageUrls: {},        // image_path -> signed URL
   avatarUrl: null,        // signed URL for this user's own avatar photo, once loaded
   openCategory: null,    // category name currently open as a deck, or null for the list view
+  openDareCategory: null,  // heading currently drilled into on the Dares side of Admin
+  questionsSearch: '',      // Admin: search across every card's title
+  daresSearch: '',           // Admin: search across every dare's title
+  lastFocusedSearch: null,   // which of the two Admin search boxes to restore focus to after re-render
   deckIndex: 0,          // position within the open deck
   deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
   deckFilter: '',         // search text filtering the list view
@@ -431,7 +435,7 @@ async function boot() {
 function resetState() {
   state.profile = null; state.coupleId = null; state.partner = null;
   state.categories = []; state.questions = []; state.answers = {}; state.boundary = [];
-  state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.deckIndex = 0;
+  state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
   state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set();
@@ -1193,26 +1197,9 @@ function renderBoundariesTab(unanswered) {
   `;
 }
 
-function renderDareLibraryList() {
-  if (!state.dareLibrary.length) return `<div class="empty-state">No library dares yet.</div>`;
-  const byCategory = {};
-  state.dareLibrary.forEach(d => { (byCategory[d.category] = byCategory[d.category] || []).push(d); });
-  return Object.keys(byCategory).map(cat => `
-    <div class="hint-text" style="margin:14px 0 4px; font-weight:600; color:var(--text)">${esc(cat)}</div>
-    ${byCategory[cat].map(d => `
-      <div class="category-row" data-edit-dare="${d.id}" style="cursor:pointer">
-        <div>
-          <div class="cat-name" style="font-size:14.5px">${esc(d.title)}</div>
-          <div class="cat-count"><span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span></div>
-        </div>
-        <div class="cat-arrow">›</div>
-      </div>
-    `).join('')}
-  `).join('');
-}
-
 function renderSetupArea() {
   if (state.openCategory) return renderDeckView();
+  if (state.openDareCategory) return renderDareHeadingView();
 
   return `
     <div class="admin-columns">
@@ -1230,9 +1217,31 @@ function renderQuestionsColumn() {
     if (state.answers[q.id]) answeredByCategory[q.category] = (answeredByCategory[q.category] || 0) + 1;
   });
 
+  const searchText = state.questionsSearch.trim().toLowerCase();
+  const searchResults = searchText ? state.questions.filter(q => q.title.toLowerCase().includes(searchText)) : null;
+
   return `
     <div class="section-head" style="margin-top:0"><h2>Questions</h2></div>
+    <div class="field" style="margin-bottom:14px"><input type="text" id="questions-search" placeholder="Search every card by title…" value="${esc(state.questionsSearch)}"></div>
+
+    ${searchResults ? `
+      ${searchResults.length ? searchResults.map(q => `
+        <div class="category-row" data-jump-to-question="${q.id}" style="cursor:pointer">
+          <div>
+            <div class="cat-name" style="font-size:14.5px">${esc(q.title)}</div>
+            <div class="cat-count">${esc(q.category)}</div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+      `).join('') : `<div class="empty-state">No cards match "${esc(state.questionsSearch)}".</div>`}
+    ` : `
     <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards, add new ones, or attach images.</p>
+
+    <div class="btn-row" style="margin-bottom:14px">
+      <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
+      <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
+    </div>
+    ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-bottom:14px; width:100%">Attach images to cards</button>` : ''}
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -1248,25 +1257,75 @@ function renderQuestionsColumn() {
       `;
     }).join('')}
 
-    <div class="btn-row" style="margin-top:14px">
-      <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
-      <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
-    </div>
-    ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-top:8px; width:100%">Attach images to cards</button>` : ''}
     ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+    `}
   `;
 }
 
 function renderDaresColumn() {
+  const countByCategory = {};
+  state.dareLibrary.forEach(d => { countByCategory[d.category] = (countByCategory[d.category] || 0) + 1; });
+
+  const searchText = state.daresSearch.trim().toLowerCase();
+  const searchResults = searchText ? state.dareLibrary.filter(d => d.title.toLowerCase().includes(searchText)) : null;
+
   return `
     <div class="section-head" style="margin-top:0"><h2>Dares</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">${state.dareLibrary.length} dare${state.dareLibrary.length===1?'':'s'} in the library. Suggested to whoever's sending a move, matched to a heading and capped to what it currently allows.</p>
+    <div class="field" style="margin-bottom:14px"><input type="text" id="dares-search" placeholder="Search every dare by title…" value="${esc(state.daresSearch)}"></div>
+
+    ${searchResults ? `
+      ${searchResults.length ? searchResults.map(d => `
+        <div class="category-row" data-edit-dare="${d.id}" style="cursor:pointer">
+          <div>
+            <div class="cat-name" style="font-size:14.5px">${esc(d.title)}</div>
+            <div class="cat-count">${esc(d.category)} · <span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span></div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+      `).join('') : `<div class="empty-state">No dares match "${esc(state.daresSearch)}".</div>`}
+    ` : `
+    <p class="hint-text" style="margin-bottom:14px">Tap a heading to see its dares, add new ones, or edit them.</p>
+
     <div class="btn-row" style="margin-bottom:14px">
       <button class="btn btn-ghost" id="btn-add-dare">Add a dare</button>
       <button class="btn btn-ghost" id="btn-import-dares-csv">Import from CSV</button>
     </div>
-    ${renderDareLibraryList()}
+
+    ${state.categories.map(c => {
+      const total = countByCategory[c.name] || 0;
+      return `
+        <div class="category-row" data-open-dare-category="${esc(c.name)}">
+          <div>
+            <div class="cat-name">${esc(c.name)}</div>
+            <div class="cat-count">${total} dare${total===1?'':'s'}${total ? '' : ' · none yet'}</div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+      `;
+    }).join('')}
+
     ${state.dareLibrary.length ? `<button class="link-btn" id="btn-delete-all-dares" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.dareLibrary.length} library dares</button>` : ''}
+    `}
+  `;
+}
+
+function renderDareHeadingView() {
+  const dares = state.dareLibrary.filter(d => d.category === state.openDareCategory);
+
+  return `
+    <button class="link-btn" data-close-dare-category="1">‹ Back to headings</button>
+    <div class="section-head" style="margin-top:14px"><h2>${esc(state.openDareCategory)}</h2></div>
+    ${dares.length ? dares.map(d => `
+      <div class="category-row" data-edit-dare="${d.id}" style="cursor:pointer">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${esc(d.title)}</div>
+          <div class="cat-count"><span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span></div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    `).join('') : `<div class="empty-state">No dares here yet.</div>`}
+    <button class="btn btn-gold" id="btn-add-dare" style="margin-top:14px; width:100%">Add a dare here</button>
+    ${dares.length ? `<button class="link-btn" data-delete-all-dares-heading="${esc(state.openDareCategory)}" style="margin-top:14px; color:var(--wine-bright)">Delete all ${dares.length} dares in "${esc(state.openDareCategory)}"</button>` : ''}
   `;
 }
 
@@ -1696,12 +1755,49 @@ function attachMainHandlers() {
   if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
   const importDaresCsvBtn = document.getElementById('btn-import-dares-csv');
   if (importDaresCsvBtn) importDaresCsvBtn.onclick = openImportDaresCsvModal;
+  const questionsSearchInput = document.getElementById('questions-search');
+  if (questionsSearchInput) {
+    questionsSearchInput.oninput = () => { state.questionsSearch = questionsSearchInput.value; state.lastFocusedSearch = 'questions-search'; render(); };
+  }
+  const daresSearchInput = document.getElementById('dares-search');
+  if (daresSearchInput) {
+    daresSearchInput.oninput = () => { state.daresSearch = daresSearchInput.value; state.lastFocusedSearch = 'dares-search'; render(); };
+  }
+  if (state.lastFocusedSearch) {
+    const toFocus = document.getElementById(state.lastFocusedSearch);
+    if (toFocus) { toFocus.focus(); toFocus.setSelectionRange(toFocus.value.length, toFocus.value.length); }
+  }
+  $app.querySelectorAll('[data-jump-to-question]').forEach(el => el.onclick = () => {
+    const q = state.questions.find(x => x.id === el.dataset.jumpToQuestion);
+    if (!q) return;
+    const cards = state.questions.filter(x => x.category === q.category);
+    state.openCategory = q.category;
+    state.deckIndex = cards.indexOf(q);
+    state.deckViewMode = 'card';
+    state.questionsSearch = '';
+    render();
+  });
   const addDareBtn = document.getElementById('btn-add-dare');
-  if (addDareBtn) addDareBtn.onclick = () => openLibraryDareModal(null);
+  if (addDareBtn) addDareBtn.onclick = () => openLibraryDareModal(null, state.openDareCategory);
   $app.querySelectorAll('[data-edit-dare]').forEach(el => el.onclick = () => {
     const dare = state.dareLibrary.find(d => d.id === el.dataset.editDare);
     if (dare) openLibraryDareModal(dare);
   });
+  $app.querySelectorAll('[data-open-dare-category]').forEach(el => el.onclick = () => {
+    state.openDareCategory = el.dataset.openDareCategory; render();
+  });
+  const closeDareCategoryBtn = document.querySelector('[data-close-dare-category]');
+  if (closeDareCategoryBtn) closeDareCategoryBtn.onclick = () => { state.openDareCategory = null; render(); };
+  const deleteAllDaresHeadingBtn = document.querySelector('[data-delete-all-dares-heading]');
+  if (deleteAllDaresHeadingBtn) deleteAllDaresHeadingBtn.onclick = async () => {
+    const cat = deleteAllDaresHeadingBtn.dataset.deleteAllDaresHeading;
+    if (!confirm(`Delete every dare in "${cat}"? This can't be undone.`)) return;
+    const { error } = await sb.from('dare_library').delete().eq('category', cat);
+    if (error) { showToast(error.message); return; }
+    await loadDareLibrary();
+    render();
+    showToast(`All dares in "${cat}" deleted.`);
+  };
   const deleteAllDaresBtn = document.getElementById('btn-delete-all-dares');
   if (deleteAllDaresBtn) deleteAllDaresBtn.onclick = async () => {
     if (!confirm(`Delete all ${state.dareLibrary.length} library dares? This can't be undone.`)) return;
@@ -2145,7 +2241,7 @@ async function runCsvImport(rows) {
   // as the modal is closed.
 }
 
-function openLibraryDareModal(existing) {
+function openLibraryDareModal(existing, defaultCategory) {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
@@ -2153,7 +2249,7 @@ function openLibraryDareModal(existing) {
         <form id="library-dare-form" class="stack">
           <div class="field"><label>Heading</label>
             <select id="ld-category">
-              ${state.categories.map(c => `<option value="${esc(c.name)}" ${existing && existing.category===c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+              ${state.categories.map(c => `<option value="${esc(c.name)}" ${(existing ? existing.category : defaultCategory) === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
             </select>
           </div>
           <div class="field"><label>Title</label><input type="text" id="ld-title" value="${existing ? esc(existing.title) : ''}" required></div>

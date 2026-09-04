@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.27.0 — search box above both Questions and Dares
+
+- Added a search box at the top of each Admin column, searching by title
+  across every card or dare regardless of which heading it's under —
+  results show inline with their heading, tap to jump straight in
+  (directly to the card for Questions, straight to the edit form for
+  Dares) rather than needing to know which heading to look under first.
+- Fixed a focus bug caught before it shipped: since both search boxes sit
+  on screen at once, typing in one was at risk of yanking focus to the
+  other after every keystroke. Only the box actually being typed in keeps
+  focus now.
+
+## 1.26.1 — Questions and Dares now behave identically
+
+- Fixed two inconsistencies: Add/Import buttons were at the bottom on
+  Questions but the top on Dares — both now sit at the top. Questions
+  required tapping a heading to see its cards; Dares dumped every dare
+  into one long flat list instead. Dares now works exactly the same way
+  as Questions — heading list first, tap to drill into that heading's
+  dares, with the same delete-all-in-this-heading option once you're in.
+
 ## 1.26.0 — Admin split into Questions and Dares side by side
 
 - Admin now shows two columns: Questions (headings and their cards) on
