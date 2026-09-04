@@ -331,7 +331,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.27.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.28.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -339,7 +339,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.27.0';
+const APP_VERSION = '1.28.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1218,7 +1218,9 @@ function renderQuestionsColumn() {
   });
 
   const searchText = state.questionsSearch.trim().toLowerCase();
-  const searchResults = searchText ? state.questions.filter(q => q.title.toLowerCase().includes(searchText)) : null;
+  const searchResults = searchText ? state.questions.filter(q =>
+    q.title.toLowerCase().includes(searchText) || INTENSITY_LABELS[q.max_intensity].toLowerCase().includes(searchText) || q.max_intensity.includes(searchText)
+  ) : null;
 
   return `
     <div class="section-head" style="margin-top:0"><h2>Questions</h2></div>
@@ -1229,7 +1231,7 @@ function renderQuestionsColumn() {
         <div class="category-row" data-jump-to-question="${q.id}" style="cursor:pointer">
           <div>
             <div class="cat-name" style="font-size:14.5px">${esc(q.title)}</div>
-            <div class="cat-count">${esc(q.category)}</div>
+            <div class="cat-count">${esc(q.category)} · <span class="pill intensity-${q.max_intensity}">${INTENSITY_LABELS[q.max_intensity]}</span></div>
           </div>
           <div class="cat-arrow">›</div>
         </div>
@@ -1241,7 +1243,6 @@ function renderQuestionsColumn() {
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
-    ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-bottom:14px; width:100%">Attach images to cards</button>` : ''}
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -1257,7 +1258,8 @@ function renderQuestionsColumn() {
       `;
     }).join('')}
 
-    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+    ${state.questions.length ? `<button class="link-btn" id="btn-bulk-images" style="margin-top:14px">Attach images to cards →</button>` : ''}
+    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:8px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
     `}
   `;
 }
@@ -1267,7 +1269,9 @@ function renderDaresColumn() {
   state.dareLibrary.forEach(d => { countByCategory[d.category] = (countByCategory[d.category] || 0) + 1; });
 
   const searchText = state.daresSearch.trim().toLowerCase();
-  const searchResults = searchText ? state.dareLibrary.filter(d => d.title.toLowerCase().includes(searchText)) : null;
+  const searchResults = searchText ? state.dareLibrary.filter(d =>
+    d.title.toLowerCase().includes(searchText) || INTENSITY_LABELS[d.intensity].toLowerCase().includes(searchText) || d.intensity.includes(searchText)
+  ) : null;
 
   return `
     <div class="section-head" style="margin-top:0"><h2>Dares</h2></div>
@@ -1399,6 +1403,7 @@ function renderDeckCardView(cards, modeToggle) {
         ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
         <div class="btn-row" style="margin-top:10px">
+          <button class="link-btn" data-edit-card="${q.id}">Edit card</button>
           <button class="link-btn" data-attach-image="${q.id}">${imgUrl ? 'Replace image' : 'Attach an image'}</button>
           <button class="link-btn" data-delete-card="${q.id}" style="color:var(--wine-bright)">Delete this card</button>
         </div>
@@ -1862,6 +1867,10 @@ function attachMainHandlers() {
   const bulkImagesBtn = document.getElementById('btn-bulk-images');
   if (bulkImagesBtn) bulkImagesBtn.onclick = openBulkImageModal;
   $app.querySelectorAll('[data-attach-image]').forEach(el => el.onclick = () => openSingleImageModal(el.dataset.attachImage));
+  $app.querySelectorAll('[data-edit-card]').forEach(el => el.onclick = () => {
+    const q = state.questions.find(x => x.id === el.dataset.editCard);
+    if (q) openEditCardModal(q);
+  });
 
   $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;
@@ -1924,6 +1933,59 @@ function openAddHeadingModal() {
     closeModal();
     await loadCategories();
     render();
+  };
+}
+
+function openEditCardModal(q) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Edit card</h2>
+        <form id="edit-card-form" class="stack">
+          <div class="field"><label>Heading</label>
+            <select id="edit-card-category">
+              ${state.categories.map(c => `<option value="${esc(c.name)}" ${c.name===q.category?'selected':''}>${esc(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Title</label><input type="text" id="edit-card-title" value="${esc(q.title)}" required></div>
+          <div class="field"><label>Description</label><textarea id="edit-card-explain">${q.explanation ? esc(q.explanation) : ''}</textarea></div>
+          <div class="field"><label>Suggested top intensity</label>
+            <select id="edit-card-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${i===q.max_intensity?'selected':''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Best suited for</label>
+            <select id="edit-card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}" ${t===q.suitable_for?'selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
+            <input type="checkbox" id="edit-card-is-general" style="width:auto" ${q.is_general ? 'checked' : ''}> This is the general "where do you sit" question for this heading
+          </label>
+          <div id="edit-card-form-error" class="error-text"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('edit-card-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('edit-card-form-error');
+    const { error } = await sb.rpc('update_boundary_question', {
+      p_id: q.id,
+      p_category: document.getElementById('edit-card-category').value,
+      p_title: document.getElementById('edit-card-title').value.trim(),
+      p_explanation: document.getElementById('edit-card-explain').value.trim() || null,
+      p_max_intensity: document.getElementById('edit-card-intensity').value,
+      p_suitable_for: document.getElementById('edit-card-suitable').value,
+      p_is_general: document.getElementById('edit-card-is-general').checked
+    });
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    await loadQuestions();
+    render();
+    showToast('Card updated.');
   };
 }
 

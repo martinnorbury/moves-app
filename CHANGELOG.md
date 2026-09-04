@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.28.0 — matching layout, intensity search, and editing cards properly
+
+- Questions and Dares now have exactly matching button rows — "Attach
+  images to cards" moved from a prominent top-level button down to a
+  secondary link (same tier as "Delete all"), so both columns line up.
+  The feature itself is untouched, just relocated.
+- Search on both sides now matches intensity too (Tease/Risqué/Bold/Wild),
+  not just title — search results show the matching intensity pill so
+  it's clear why something showed up.
+- Added actual card editing — never existed before, despite looking like
+  it should have. "Edit card" now sits next to Attach image/Delete on
+  every card, letting you change its heading, title, description,
+  intensity, type, and general-question flag, all in one form.
+
 ## 1.27.0 — search box above both Questions and Dares
 
 - Added a search box at the top of each Admin column, searching by title
