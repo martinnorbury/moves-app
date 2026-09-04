@@ -53,9 +53,9 @@ function fmtDate(iso) {
    BOOTSTRAP
    ========================================================================== */
 async function boot() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sb.auth.getSession();
   state.session = session;
-  supabase.auth.onAuthStateChange((_event, session) => {
+  sb.auth.onAuthStateChange((_event, session) => {
     state.session = session;
     if (session) loadEverything(); else { resetState(); render(); }
   });
@@ -92,57 +92,57 @@ async function loadEverything() {
 }
 
 async function loadProfile() {
-  const { data } = await supabase.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle();
+  const { data } = await sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle();
   state.profile = data || null;
 }
 
 async function loadCouple() {
-  const { data } = await supabase.from('couple_members').select('couple_id').eq('user_id', state.session.user.id).maybeSingle();
+  const { data } = await sb.from('couple_members').select('couple_id').eq('user_id', state.session.user.id).maybeSingle();
   state.coupleId = data ? data.couple_id : null;
   if (state.coupleId) {
-    const { data: partner } = await supabase.rpc('get_partner_profile');
+    const { data: partner } = await sb.rpc('get_partner_profile');
     state.partner = (partner && partner[0]) || null;
   }
 }
 
 async function loadQuestions() {
-  const { data } = await supabase.from('boundary_questions').select('*').eq('active', true).order('sort_order');
+  const { data } = await sb.from('boundary_questions').select('*').eq('active', true).order('sort_order');
   state.questions = data || [];
 }
 async function loadOwnAnswers() {
-  const { data } = await supabase.from('boundary_answers').select('question_id, answer').eq('user_id', state.session.user.id);
+  const { data } = await sb.from('boundary_answers').select('question_id, answer').eq('user_id', state.session.user.id);
   state.answers = {};
   (data || []).forEach(r => state.answers[r.question_id] = r.answer);
 }
 async function loadBoundary() {
-  const { data, error } = await supabase.rpc('compute_shared_boundary');
+  const { data, error } = await sb.rpc('compute_shared_boundary');
   state.boundary = error ? [] : (data || []);
 }
 async function loadDares() {
-  const { data } = await supabase.from('dares').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('dares').select('*').order('created_at', { ascending: false });
   state.dares = data || [];
 }
 async function loadScoreboard() {
-  const { data } = await supabase.rpc('get_scoreboard');
+  const { data } = await sb.rpc('get_scoreboard');
   state.scoreboard = data || [];
 }
 async function loadHeat() {
-  const { data } = await supabase.from('heat_meter').select('progress').eq('couple_id', state.coupleId).maybeSingle();
+  const { data } = await sb.from('heat_meter').select('progress').eq('couple_id', state.coupleId).maybeSingle();
   state.heat = data ? data.progress : 0;
 }
 async function loadRewards() {
-  const { data } = await supabase.from('rewards').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('rewards').select('*').order('created_at', { ascending: false });
   state.rewards = data || [];
 }
 async function loadNotifications() {
-  const { data } = await supabase.from('notifications').select('*').eq('read', false).order('created_at', { ascending: false });
+  const { data } = await sb.from('notifications').select('*').eq('read', false).order('created_at', { ascending: false });
   state.notifications = data || [];
 }
 
 let realtimeChannel = null;
 function subscribeRealtime() {
   if (realtimeChannel) return;
-  realtimeChannel = supabase.channel('couple-' + state.coupleId)
+  realtimeChannel = sb.channel('couple-' + state.coupleId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
       () => { loadDares(); loadScoreboard(); loadHeat(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `couple_id=eq.${state.coupleId}` },
@@ -221,14 +221,14 @@ function attachAuthHandlers() {
     try {
       if (state.authMode === 'signup') {
         const name = document.getElementById('auth-name').value.trim();
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await sb.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
-          await supabase.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0] });
+          await sb.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0] });
         }
         state.session = data.session;
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
         state.session = data.session;
       }
@@ -255,7 +255,7 @@ function attachCreateProfileHandlers() {
   document.getElementById('profile-form').onsubmit = async (e) => {
     e.preventDefault();
     const name = document.getElementById('profile-name').value.trim();
-    await supabase.from('profiles').insert({ id: state.session.user.id, display_name: name });
+    await sb.from('profiles').insert({ id: state.session.user.id, display_name: name });
     await loadEverything();
   };
 }
@@ -281,7 +281,7 @@ function renderPairing() {
 function attachPairingHandlers() {
   document.getElementById('btn-make-invite').onclick = async () => {
     state.authError = '';
-    const { data, error } = await supabase.rpc('create_couple_invite');
+    const { data, error } = await sb.rpc('create_couple_invite');
     if (error) { state.authError = error.message; render(); return; }
     document.getElementById('invite-code-area').innerHTML =
       `<div class="code-display">${esc(data)}</div><p class="hint-text" style="margin-top:10px">Share this with your partner. It expires in 7 days.</p>`;
@@ -290,7 +290,7 @@ function attachPairingHandlers() {
     state.authError = '';
     const code = document.getElementById('redeem-code').value.trim();
     if (!code) return;
-    const { error } = await supabase.rpc('redeem_couple_invite', { p_code: code });
+    const { error } = await sb.rpc('redeem_couple_invite', { p_code: code });
     if (error) { state.authError = error.message; render(); return; }
     await loadEverything();
   };
@@ -562,7 +562,7 @@ function openCreateDareModal() {
     e.preventDefault();
     const errEl = document.getElementById('dare-form-error');
     const deadlineVal = document.getElementById('d-deadline').value;
-    const { error } = await supabase.rpc('create_dare', {
+    const { error } = await sb.rpc('create_dare', {
       p_question_id: document.getElementById('d-question').value,
       p_title: document.getElementById('d-title').value.trim(),
       p_instructions: document.getElementById('d-instructions').value.trim(),
@@ -607,7 +607,7 @@ function openCounterModal(dareId) {
   document.getElementById('counter-form').onsubmit = async (e) => {
     e.preventDefault();
     const deadlineVal = document.getElementById('c-deadline').value;
-    const { error } = await supabase.rpc('respond_to_dare', {
+    const { error } = await sb.rpc('respond_to_dare', {
       p_dare_id: dareId, p_action: 'counter',
       p_new_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
       p_new_intensity: document.getElementById('c-intensity').value,
@@ -646,7 +646,7 @@ function openCreateRewardModal() {
   document.getElementById('reward-form').onsubmit = async (e) => {
     e.preventDefault();
     const threshold = document.getElementById('r-threshold').value;
-    const { error } = await supabase.from('rewards').insert({
+    const { error } = await sb.from('rewards').insert({
       couple_id: state.coupleId,
       creator_id: state.session.user.id,
       title: document.getElementById('r-title').value.trim(),
@@ -677,7 +677,7 @@ function attachMainHandlers() {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;
     state.answers[qId] = val;
     render();
-    await supabase.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
+    await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
     await loadBoundary();
     render();
   });
@@ -686,7 +686,7 @@ function attachMainHandlers() {
     const action = el.dataset.dareAction, id = el.dataset.dareId;
     if (action === 'counter') { openCounterModal(id); return; }
     if (action === 'complete') { openCompleteModal(id); return; }
-    const { error } = await supabase.rpc('respond_to_dare', { p_dare_id: id, p_action: action });
+    const { error } = await sb.rpc('respond_to_dare', { p_dare_id: id, p_action: action });
     if (error) { showToast(error.message); return; }
     await loadDares();
     showToast(action === 'accept' ? 'Accepted.' : 'Declined.');
@@ -694,7 +694,7 @@ function attachMainHandlers() {
 
   $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async () => {
     const id = el.dataset.rewardComplete;
-    await supabase.from('rewards').update({ completed: true }).eq('id', id);
+    await sb.from('rewards').update({ completed: true }).eq('id', id);
     await loadRewards();
     render();
   });
@@ -722,7 +722,7 @@ function openCompleteModal(dareId) {
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
   $app.querySelectorAll('[data-complete-kind]').forEach(el => el.onclick = async () => {
-    const { error } = await supabase.rpc('complete_dare', { p_dare_id: el.dataset.completeId, p_completion_kind: el.dataset.completeKind });
+    const { error } = await sb.rpc('complete_dare', { p_dare_id: el.dataset.completeId, p_completion_kind: el.dataset.completeKind });
     if (error) { showToast(error.message); return; }
     closeModal();
     await Promise.all([loadDares(), loadScoreboard(), loadHeat()]);
