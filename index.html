@@ -308,7 +308,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.19.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.20.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -316,7 +316,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.19.1';
+const APP_VERSION = '1.20.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -361,6 +361,8 @@ let state = {
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
   viewingSetup: false,          // whether the Boundaries tab is showing the Setup area instead of the report
+  viewingAllAnswers: false,      // whether the full answer-review screen is open
+  allAnswersFilter: '',
   dares: [],
   scoreboard: [],
   heat: 0,
@@ -409,6 +411,7 @@ function resetState() {
   state.wizardSkipped = new Set();
   state.headingAccess = []; state.viewingSetup = false;
   state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set();
+  state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
   applyTheme(null);
@@ -1070,8 +1073,37 @@ function renderCardReport() {
   `;
 }
 
+function renderAllAnswers() {
+  const answered = getOrderedQuestions().filter(q => state.answers[q.id]);
+  const filterText = state.allAnswersFilter.trim().toLowerCase();
+  const filtered = filterText
+    ? answered.filter(q => q.title.toLowerCase().includes(filterText) || q.category.toLowerCase().includes(filterText))
+    : answered;
+
+  let lastCategory = null;
+
+  return `
+    <button class="link-btn" id="btn-close-all-answers">‹ Back to your report</button>
+    <div class="section-head" style="margin-top:14px"><h2>All your answers (${answered.length})</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Every question you've personally answered, across every heading. Change any of them right here.</p>
+    <div class="field" style="margin-bottom:14px"><input type="text" id="all-answers-search" placeholder="Search by title or heading…" value="${esc(state.allAnswersFilter)}"></div>
+    ${filtered.length ? filtered.map(q => {
+      const headerHtml = q.category !== lastCategory ? `<div class="hint-text" style="margin:16px 0 6px; font-weight:600; color:var(--text)">${esc(q.category)}</div>` : '';
+      lastCategory = q.category;
+      return `
+        ${headerHtml}
+        <div style="margin-bottom:14px">
+          <div class="cat" style="margin-bottom:4px; font-size:13.5px">${esc(q.title)}${q.is_general ? ' <span class="pill" style="margin-left:6px">General</span>' : ''}</div>
+          ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
+        </div>
+      `;
+    }).join('') : `<div class="empty-state">No answers match "${esc(state.allAnswersFilter)}".</div>`}
+  `;
+}
+
 function renderBoundariesTab(unanswered) {
   if (state.viewingSetup) return renderSetupArea();
+  if (state.viewingAllAnswers) return renderAllAnswers();
 
   const generalQuestions = getWizardQuestions();
   const partnerName = state.partner ? state.partner.display_name : 'your partner';
@@ -1093,6 +1125,7 @@ function renderBoundariesTab(unanswered) {
     ${renderHeadingAccessList()}
 
     <div class="divider"></div>
+    <button class="btn btn-ghost" id="btn-review-answers" style="width:100%; margin-bottom:8px">Review & edit all your answers →</button>
     <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">${state.profile && state.profile.is_admin ? 'Manage headings, cards & content →' : 'Browse headings & answer cards →'}</button>
   `;
 }
@@ -1510,6 +1543,16 @@ function attachMainHandlers() {
   if (openSetupBtn) openSetupBtn.onclick = () => { state.viewingSetup = true; render(); };
   const closeSetupBtn = document.getElementById('btn-close-setup');
   if (closeSetupBtn) closeSetupBtn.onclick = () => { state.viewingSetup = false; state.openCategory = null; render(); };
+  const reviewAnswersBtn = document.getElementById('btn-review-answers');
+  if (reviewAnswersBtn) reviewAnswersBtn.onclick = () => { state.viewingAllAnswers = true; render(); };
+  const closeAllAnswersBtn = document.getElementById('btn-close-all-answers');
+  if (closeAllAnswersBtn) closeAllAnswersBtn.onclick = () => { state.viewingAllAnswers = false; render(); };
+  const allAnswersSearch = document.getElementById('all-answers-search');
+  if (allAnswersSearch) {
+    allAnswersSearch.oninput = () => { state.allAnswersFilter = allAnswersSearch.value; render(); };
+    allAnswersSearch.focus();
+    allAnswersSearch.setSelectionRange(allAnswersSearch.value.length, allAnswersSearch.value.length);
+  }
   $app.querySelectorAll('[data-toggle-heading]').forEach(el => el.onclick = () => {
     const cat = el.dataset.toggleHeading;
     if (state.expandedHeadings.has(cat)) state.expandedHeadings.delete(cat); else state.expandedHeadings.add(cat);

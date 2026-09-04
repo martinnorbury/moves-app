@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.20.0 — general question hands off once you've answered enough, plus a full answer review
+
+- Heading averages now genuinely hand off from the general question to
+  specific cards: once 3 or more specific cards in a heading have been
+  answered by both of you, the general question stops counting toward
+  that heading's average entirely — only the specific cards drive it from
+  there. Below 3, the general question still counts, since there's
+  nothing else to go on yet.
+- Added "Review & edit all your answers" — every question you've
+  personally answered, across every heading, in one searchable list with
+  your current answer right there and changeable on the spot. No more
+  hunting through Setup → heading → card to check or change something.
+  Available to both accounts, since it's your own answers, not a content
+  management tool.
+
 ## 1.19.1 — each question shows its own colour-coded match, same wording as headings
 
 - Replaced grouped tier headers with a per-question pill — the same
