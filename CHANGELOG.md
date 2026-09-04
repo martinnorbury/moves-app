@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.19.1 — each question shows its own colour-coded match, same wording as headings
+
+- Replaced grouped tier headers with a per-question pill — the same
+  colour-coded badge used on headings (Perfect Match / Good Match /
+  Getting Warmer / Worth A Try), now shown right on each individual
+  question's own row, sorted best-match first. One consistent system
+  instead of two.
+- Dropped the "up to Tease"-style intensity text on these rows — same
+  confusing wording flagged and removed elsewhere, just resurfacing here.
+  Applied to both the shared per-heading expansion and the admin card
+  report, so they read the same way.
+
+## 1.19.0 — renamed to Kinks, moved first, expandable per-heading detail
+
+- Renamed the "Compass" tab to "Kinks" and moved it to the front of the
+  tab bar.
+- Each heading in the list is now expandable — tap it to see every
+  question you've both answered there (general and specific), grouped by
+  match tier, same as the admin card report but scoped to just that one
+  heading and visible to both of you. Cards excluded by a Cold Card are
+  still only counted, never named, same privacy rule as everywhere else.
+- Worth knowing: this does show individual specific-card results on the
+  shared tab, which is the same underlying data as the admin-only card
+  report, just organized by heading instead of tier. If that turns out to
+  be more than intended, it's a quick change to restrict.
+
+## 1.18.0 — heading access is now a running average, tab renamed to Compass
+
+- Heading access no longer looks only at the general question — it's now
+  a running average across every question you've both answered in that
+  heading (general plus specific cards). Each individual card keeps its
+  own untouched score; this only changes the heading-level summary. As
+  planned: the more that's been answered, the less any single new answer
+  shifts the average — except a genuine Cold Card, which always closes
+  the whole heading regardless of everything else answered there.
+- Each heading now shows how many questions its average is based on, so
+  it's visible why a heading is positioned where it is, and why it'll
+  move less as more gets answered.
+- Renamed the "Boundaries" tab to "Compass" — same screen, same content,
+  just a name that fits an ongoing reference screen better than a
+  one-time setup step.
+
+## 1.17.1 — Your card report actually moved to admin-only now
+
+- Corrected a misread of an earlier request: "Your card report" was still
+  showing on the shared Boundaries screen for both accounts. It's now
+  removed from there entirely and lives only inside the admin-only part
+  of Setup — Jacki's account never sees it, regardless of which screen
+  she's on.
+
 ## 1.17.0 — 5 outcomes for 5 answer levels, unified wording
 
 - Fixed heading access silently collapsing two different combined scores

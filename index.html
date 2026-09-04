@@ -308,7 +308,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.17.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.19.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -316,7 +316,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.19.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -355,6 +355,7 @@ let state = {
   deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
   deckFilter: '',         // search text filtering the list view
   wizardSkipped: new Set(),  // question ids skipped this session — a safety valve so the guided wizard never truly traps anyone
+  expandedHeadings: new Set(),  // which headings are expanded in the Kinks tab accordion
   headingAccess: [],          // per-heading tier unlock, from get_heading_access()
   cardReport: [],              // per-card joint tiers, from get_card_report()
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
@@ -407,7 +408,7 @@ function resetState() {
   state.imageUrls = {}; state.openCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = []; state.viewingSetup = false;
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false;
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set();
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
   applyTheme(null);
@@ -1014,34 +1015,57 @@ function renderOverallStanding() {
 
 function renderHeadingAccessList() {
   if (!state.headingAccess.length) return `<div class="empty-state">Answer the 6 general questions to see this.</div>`;
-  return state.headingAccess.map(h => `
-    <div class="boundary-row">
-      <div class="cat">${esc(h.category)}</div>
+  return state.headingAccess.map(h => {
+    const expanded = state.expandedHeadings.has(h.category);
+    return `
+    <div class="boundary-row" data-toggle-heading="${esc(h.category)}" style="cursor:pointer">
+      <div class="cat">${esc(h.category)}<div class="hint-text">${h.answered_count} question${h.answered_count===1?'':'s'} counted</div></div>
       <span class="pill ${ACCESS_CLASSES[h.access]}">${esc(ACCESS_LABELS[h.access])}</span>
+      <span class="hint-text" style="margin-left:8px">${expanded ? '▲' : '▼'}</span>
     </div>
-  `).join('');
+    ${expanded ? renderHeadingExpansion(h.category) : ''}
+  `;
+  }).join('');
+}
+
+function renderScoredCardRow(c, showCategory) {
+  return `
+    <div class="boundary-row">
+      <div class="cat" style="font-size:13.5px">${esc(c.title)}${showCategory ? ` <span class="hint-text">— ${esc(c.category)}</span>` : ''}</div>
+      <span class="pill ${ACCESS_CLASSES[c.tier]}">${esc(TIER_LABELS[c.tier])}</span>
+    </div>
+  `;
+}
+
+function renderHeadingExpansion(category) {
+  const items = state.cardReport.filter(c => c.category === category);
+  const offTableCount = items.filter(c => c.tier === 'off_table').length;
+  const shown = items.filter(c => c.tier !== 'off_table')
+    .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
+
+  if (!items.length) {
+    return `<div class="empty-state" style="padding:10px 0">Nothing answered by both of you in this heading yet.</div>`;
+  }
+
+  return `
+    <div style="padding:4px 0 10px 0">
+      ${shown.map(c => renderScoredCardRow(c, false)).join('')}
+      ${offTableCount ? `<p class="hint-text" style="margin-top:8px">${offTableCount} other question${offTableCount===1?'':'s'} answered here ${offTableCount===1?"isn't":"aren't"} on the table — not listed, since who said no isn't shown either.</p>` : ''}
+    </div>
+  `;
 }
 
 function renderCardReport() {
   const offTableCount = state.cardReport.filter(c => c.tier === 'off_table').length;
-  const groups = TIER_ORDER.map(tier => ({
-    tier, items: state.cardReport.filter(c => c.tier === tier)
-  })).filter(g => g.items.length > 0);
+  const shown = state.cardReport.filter(c => c.tier !== 'off_table')
+    .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
 
-  if (!groups.length && !offTableCount) {
+  if (!shown.length && !offTableCount) {
     return `<div class="empty-state">Neither of you has answered a specific card yet — head into Setup to start on a heading.</div>`;
   }
 
   return `
-    ${groups.map(g => `
-      <div class="hint-text" style="margin:14px 0 6px; font-weight:600; color:var(--text)">${esc(TIER_LABELS[g.tier])}</div>
-      ${g.items.map(c => `
-        <div class="boundary-row">
-          <div class="cat">${esc(c.title)} <span class="hint-text">— ${esc(c.category)}</span></div>
-          <div class="lvl">${c.intensity_cap ? 'up to ' + INTENSITY_LABELS[c.intensity_cap] : ''}</div>
-        </div>
-      `).join('')}
-    `).join('')}
+    ${shown.map(c => renderScoredCardRow(c, true)).join('')}
     ${offTableCount ? `<p class="hint-text" style="margin-top:14px">${offTableCount} other card${offTableCount===1?'':'s'} you've both answered ${offTableCount===1?"isn't":"aren't"} currently on the table — not listed here, since who said no isn't shown either.</p>` : ''}
   `;
 }
@@ -1064,14 +1088,9 @@ function renderBoundariesTab(unanswered) {
 
     <div class="divider"></div>
     <div class="section-head"><h2>Heading access</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Based on your answers to the 6 general questions above — moves as your answers do. As you add more cards, a stronger match here can open up more, and a weaker one can close things off.</p>
+    <p class="hint-text" style="margin-bottom:14px">A running average across every question you've both answered in that heading — the general one plus any specific cards. Each card keeps its own score regardless; this is just the heading-level picture. The more you've both answered, the less any single new answer shifts it — except a genuine Cold Card answer, which always closes the whole heading, average or not.</p>
     ${renderOverallStanding()}
     ${renderHeadingAccessList()}
-
-    <div class="divider"></div>
-    <div class="section-head"><h2>Your card report</h2></div>
-    <p class="hint-text" style="margin-bottom:6px">For specific cards you've both answered — grouped by how well matched you are, most enthusiastic first.</p>
-    ${renderCardReport()}
 
     <div class="divider"></div>
     <button class="btn btn-ghost" id="btn-open-setup" style="width:100%">${state.profile && state.profile.is_admin ? 'Manage headings, cards & content →' : 'Browse headings & answer cards →'}</button>
@@ -1117,6 +1136,11 @@ function renderSetupArea() {
     </div>
     ${state.questions.length ? `<button class="btn btn-ghost" id="btn-bulk-images" style="margin-top:8px; width:100%">Attach images to cards</button>` : ''}
     ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+
+    <div class="divider"></div>
+    <div class="section-head"><h2>Your card report</h2></div>
+    <p class="hint-text" style="margin-bottom:6px">Admin-only — for specific cards you've both answered, grouped by how well matched you are.</p>
+    ${renderCardReport()}
     ` : ''}
   `;
 }
@@ -1257,7 +1281,7 @@ function renderHistoryTab() {
 function renderTabbar() {
   const pending = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent').length;
   const tabs = [
-    ['home','Home'], ['dares','Moves'], ['boundaries','Boundaries'], ['rewards','Rewards'], ['history','History']
+    ['boundaries','Kinks'], ['home','Home'], ['dares','Moves'], ['rewards','Rewards'], ['history','History']
   ];
   return `<div class="tabbar">
     ${tabs.map(([id,label]) => `
@@ -1486,6 +1510,11 @@ function attachMainHandlers() {
   if (openSetupBtn) openSetupBtn.onclick = () => { state.viewingSetup = true; render(); };
   const closeSetupBtn = document.getElementById('btn-close-setup');
   if (closeSetupBtn) closeSetupBtn.onclick = () => { state.viewingSetup = false; state.openCategory = null; render(); };
+  $app.querySelectorAll('[data-toggle-heading]').forEach(el => el.onclick = () => {
+    const cat = el.dataset.toggleHeading;
+    if (state.expandedHeadings.has(cat)) state.expandedHeadings.delete(cat); else state.expandedHeadings.add(cat);
+    render();
+  });
 
   $app.querySelectorAll('[data-delete-card]').forEach(el => el.onclick = async () => {
     if (!confirm('Delete this card? This also removes any answers either of you gave to it.')) return;
