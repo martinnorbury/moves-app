@@ -215,7 +215,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.0.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.0.3)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -223,7 +223,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -329,9 +329,15 @@ async function loadProfile() {
 async function loadCouple() {
   const { data } = await sb.from('couple_members').select('couple_id').eq('user_id', state.session.user.id).maybeSingle();
   state.coupleId = data ? data.couple_id : null;
+  state.partner = null;
+  state.pendingInviteCode = null;
   if (state.coupleId) {
     const { data: partner } = await sb.rpc('get_partner_profile');
     state.partner = (partner && partner[0]) || null;
+    if (!state.partner) {
+      const { data: code } = await sb.rpc('get_active_invite_code');
+      state.pendingInviteCode = code || null;
+    }
   }
 }
 
@@ -390,6 +396,7 @@ function render() {
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
   if (!state.profile) { $app.innerHTML = renderCreateProfile(); attachCreateProfileHandlers(); return; }
   if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
+  if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
 
   const unanswered = state.questions.length - Object.keys(state.answers).length;
 
@@ -511,10 +518,9 @@ function renderPairing() {
 function attachPairingHandlers() {
   document.getElementById('btn-make-invite').onclick = async () => {
     state.authError = '';
-    const { data, error } = await sb.rpc('create_couple_invite');
+    const { error } = await sb.rpc('create_couple_invite');
     if (error) { state.authError = error.message; render(); return; }
-    document.getElementById('invite-code-area').innerHTML =
-      `<div class="code-display">${esc(data)}</div><p class="hint-text" style="margin-top:10px">Share this with your partner. It expires in 7 days.</p>`;
+    await loadEverything();
   };
   document.getElementById('btn-redeem').onclick = async () => {
     state.authError = '';
@@ -524,6 +530,31 @@ function attachPairingHandlers() {
     if (error) { state.authError = error.message; render(); return; }
     await loadEverything();
   };
+}
+
+function renderAwaitingPartner() {
+  return `
+    <div class="center-screen">
+      <div class="auth-hero"><h1>Waiting on your partner</h1><p>Share this code with them — it stays here until they join.</p></div>
+      ${state.pendingInviteCode
+        ? `<div class="code-display">${esc(state.pendingInviteCode)}</div>`
+        : `<p class="hint-text" style="margin-bottom:16px">No active code found — it may have expired.</p>`
+      }
+      <button class="btn btn-ghost" id="btn-new-code" style="margin-top:16px">Generate a new code</button>
+      <button class="btn btn-ghost" id="btn-refresh-status" style="margin-top:10px">Check again</button>
+      ${state.authError ? `<div class="error-text" style="margin-top:10px">${esc(state.authError)}</div>` : ''}
+    </div>
+  `;
+}
+function attachAwaitingPartnerHandlers() {
+  document.getElementById('btn-new-code').onclick = async () => {
+    state.authError = '';
+    const { data, error } = await sb.rpc('create_additional_invite');
+    if (error) { state.authError = error.message; render(); return; }
+    state.pendingInviteCode = data;
+    render();
+  };
+  document.getElementById('btn-refresh-status').onclick = async () => { await loadEverything(); };
 }
 
 /* ==========================================================================

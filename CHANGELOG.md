@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.3 — invite code no longer disappears
+
+- Fixed `gen_random_bytes` errors when generating an invite code — a
+  security-hardening change had accidentally cut off the database function
+  from a schema it depended on.
+- The app now shows a proper "waiting on your partner" screen with your
+  invite code any time you're paired to a couple but your partner hasn't
+  joined yet, instead of only showing the code once, immediately after
+  generating it. Refreshing the page (or coming back later) no longer loses
+  it. You can also generate a fresh code from that screen if the original
+  one expires.
+
 ## 1.0.2 — back to a single file
 
 - Merged `app.js` back into `index.html`, matching the same single-file
