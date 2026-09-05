@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.30.0 — evidence photos, sign-off, and the admin alignment fixed for real
+
+- Evidence photos can now be attached in-app when marking a move
+  complete — optional, private, locked to that specific dare (its own
+  storage bucket, RLS restricted to your couple only). Worth repeating:
+  this is private from other people, not end-to-end encrypted the way
+  Signal is — a deliberate trade-off you made with that understood.
+- "Requires my confirmation to count as complete" — captured since the
+  very first version but never actually wired up — now does something:
+  the sender gets a "Sign off as complete" button once the recipient
+  marks it done. Points are unaffected either way; this is purely a
+  closure step, never a gate.
+- Fixed the Admin column misalignment properly this time — the actual
+  cause was the Questions heading text being longer than the Dares one
+  and wrapping to a second line. Both now read almost character-for-
+  character the same length, so they wrap identically regardless of
+  screen width.
+
 ## 1.29.0 — quality bonus, turn nudge, post-completion question
 
 - Added a bonus-only quality reaction: after a move is completed, whoever

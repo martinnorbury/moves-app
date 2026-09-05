@@ -331,7 +331,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.29.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.30.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -339,7 +339,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.29.0';
+const APP_VERSION = '1.30.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -387,6 +387,7 @@ let state = {
   headingAccess: [],          // per-heading tier unlock, from get_heading_access()
   cardReport: [],              // per-card joint tiers, from get_card_report()
   dareLibrary: [],              // admin-written dare templates, browsable by both partners
+  dareEvidence: [],              // evidence photo records, keyed by dare_id
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
   viewingAllAnswers: false,      // whether the full answer-review screen is open
@@ -438,7 +439,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set();
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.dareEvidence = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
@@ -460,7 +461,7 @@ async function loadEverything() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
         ]);
         subscribeRealtime();
@@ -526,6 +527,10 @@ async function loadCardReport() {
 async function loadDareLibrary() {
   const { data, error } = await sb.from('dare_library').select('*').eq('active', true).order('sort_order');
   state.dareLibrary = error ? [] : (data || []);
+}
+async function loadDareEvidence() {
+  const { data, error } = await sb.from('dare_evidence').select('*');
+  state.dareEvidence = error ? [] : (data || []);
 }
 async function loadPartnerTeaser() {
   const { data, error } = await sb.rpc('get_partner_teaser');
@@ -1037,17 +1042,27 @@ function renderDareCard(d, actionable, compact) {
     </div>`;
   } else if (d.status === 'countered' && isMine) {
     actions = `<div class="hint-text" style="margin-top:6px">They countered — check the updated details above.</div>`;
-  } else if (d.status === 'completed' && isMine && !d.quality_reaction) {
-    actions = `
-      <div class="hint-text" style="margin-top:6px; margin-bottom:6px">How was it?</div>
-      <div class="btn-row" style="margin-top:4px">
-        <button class="btn btn-ghost btn-small" data-quality-reaction="meh" data-dare-id="${d.id}">Meh</button>
-        <button class="btn btn-ghost btn-small" data-quality-reaction="good" data-dare-id="${d.id}">Good</button>
-        <button class="btn btn-ghost btn-small" data-quality-reaction="loved_it" data-dare-id="${d.id}">Loved it</button>
-      </div>`;
+  } else if (d.status === 'completed' && isMine) {
+    let pieces = '';
+    if (!d.quality_reaction) {
+      pieces += `
+        <div class="hint-text" style="margin-top:6px; margin-bottom:6px">How was it?</div>
+        <div class="btn-row" style="margin-top:4px">
+          <button class="btn btn-ghost btn-small" data-quality-reaction="meh" data-dare-id="${d.id}">Meh</button>
+          <button class="btn btn-ghost btn-small" data-quality-reaction="good" data-dare-id="${d.id}">Good</button>
+          <button class="btn btn-ghost btn-small" data-quality-reaction="loved_it" data-dare-id="${d.id}">Loved it</button>
+        </div>`;
+    }
+    if (d.requires_confirmation && !d.signed_off_at) {
+      pieces += `<button class="btn btn-gold btn-small" data-sign-off="${d.id}" style="margin-top:8px">Sign off as complete</button>`;
+    } else if (d.requires_confirmation && d.signed_off_at) {
+      pieces += `<div class="hint-text" style="margin-top:8px; color:var(--good)">✓ Signed off</div>`;
+    }
+    actions = pieces;
   }
 
   const totalPoints = d.points_awarded != null ? d.points_awarded + (d.quality_bonus_points || 0) : null;
+  const evidenceCount = state.dareEvidence.filter(e => e.dare_id === d.id).length;
 
   return `
     <div class="dare ${d.status==='sent' && !isMine ? 'locked' : 'unlocked'}">
@@ -1062,6 +1077,7 @@ function renderDareCard(d, actionable, compact) {
         ${d.deadline ? `<span class="pill">by ${fmtDate(d.deadline)}</span>` : ''}
       </div>
       ${compact ? '' : body}
+      ${evidenceCount ? `<button class="link-btn" data-view-evidence="${d.id}">View evidence (${evidenceCount})</button>` : ''}
       ${actions}
     </div>
   `;
@@ -1259,7 +1275,7 @@ function renderQuestionsColumn() {
         </div>
       `).join('') : `<div class="empty-state">No cards match "${esc(state.questionsSearch)}".</div>`}
     ` : `
-    <p class="hint-text" style="margin-bottom:14px">Tap a heading to go through its cards, add new ones, or attach images.</p>
+    <p class="hint-text" style="margin-bottom:14px">Tap a heading to see its cards, add new ones, or edit them.</p>
 
     <div class="btn-row" style="margin-bottom:14px">
       <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
@@ -1925,6 +1941,16 @@ function attachMainHandlers() {
     showToast('Reaction saved.');
   });
 
+  $app.querySelectorAll('[data-sign-off]').forEach(el => el.onclick = async () => {
+    const { error } = await sb.rpc('sign_off_dare', { p_dare_id: el.dataset.signOff });
+    if (error) { showToast(error.message); return; }
+    await loadDares();
+    render();
+    showToast('Signed off.');
+  });
+
+  $app.querySelectorAll('[data-view-evidence]').forEach(el => el.onclick = () => openEvidenceModal(el.dataset.viewEvidence));
+
   $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async () => {
     const id = el.dataset.rewardComplete;
     await sb.from('rewards').update({ completed: true }).eq('id', id);
@@ -2471,6 +2497,10 @@ function openCompleteModal(dareId) {
       <div class="modal-sheet">
         <h2>Mark this complete</h2>
         <p class="hint-text" style="margin-bottom:16px">Points are calculated automatically from how quickly you completed it.</p>
+        <div class="field" style="margin-bottom:16px">
+          <label>Evidence photo (optional)</label>
+          <input type="file" id="evidence-file" accept="image/*">
+        </div>
         <div class="stack">
           <button class="btn btn-primary" data-complete-kind="no_proof" data-complete-id="${dareId}">Completed</button>
           <button class="btn btn-ghost" data-complete-kind="proof_in_person" data-complete-id="${dareId}">Completed — proof shown in person</button>
@@ -2486,9 +2516,18 @@ function openCompleteModal(dareId) {
   $app.querySelectorAll('[data-complete-kind]').forEach(el => el.onclick = async () => {
     const completedDare = state.dares.find(d => d.id === el.dataset.completeId);
     const category = completedDare ? completedDare.category : null;
+    const evidenceFile = document.getElementById('evidence-file').files[0];
     const { error } = await sb.rpc('complete_dare', { p_dare_id: el.dataset.completeId, p_completion_kind: el.dataset.completeKind });
     if (error) { showToast(error.message); return; }
-    await Promise.all([loadDares(), loadScoreboard(), loadHeat()]);
+    if (evidenceFile) {
+      const ext = evidenceFile.name.split('.').pop();
+      const path = `${state.coupleId}/${el.dataset.completeId}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await sb.storage.from('dare-evidence').upload(path, evidenceFile);
+      if (!uploadError) {
+        await sb.from('dare_evidence').insert({ dare_id: el.dataset.completeId, couple_id: state.coupleId, uploaded_by: state.session.user.id, path });
+      }
+    }
+    await Promise.all([loadDares(), loadScoreboard(), loadHeat(), loadDareEvidence()]);
     const followUp = category ? state.questions.find(q => q.category === category && !state.answers[q.id]) : null;
     if (followUp) {
       openFollowUpQuestionModal(followUp);
@@ -2497,6 +2536,31 @@ function openCompleteModal(dareId) {
       showToast('Nice work — points added.');
     }
   });
+}
+
+async function openEvidenceModal(dareId) {
+  const items = state.dareEvidence.filter(e => e.dare_id === dareId);
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Evidence</h2>
+        <div id="evidence-images" class="hint-text">Loading…</div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+
+  const urls = await Promise.all(items.map(async (e) => {
+    const { data } = await sb.storage.from('dare-evidence').createSignedUrl(e.path, 3600);
+    return data ? data.signedUrl : null;
+  }));
+  const box = document.getElementById('evidence-images');
+  if (box) {
+    box.innerHTML = urls.filter(Boolean).map(u => `<img src="${esc(u)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:10px;">`).join('')
+      || 'Could not load evidence.';
+  }
 }
 
 function openFollowUpQuestionModal(q) {
