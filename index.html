@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.40.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.41.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.40.0';
+const APP_VERSION = '1.41.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -3144,35 +3144,82 @@ function openForfeitPickerModal(settlement) {
     const max = TIER_MAX_INTENSITY[access.access];
     return VALID_INTENSITIES.indexOf(f.intensity) <= VALID_INTENSITIES.indexOf(max);
   });
+  const everyday = eligible.filter(f => !f.is_intimate);
+  const risque = eligible.filter(f => f.is_intimate);
   const winnerName = state.partner ? state.partner.display_name : 'They';
 
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>This week goes to ${esc(winnerName)}</h2>
-        <p class="hint-text" style="margin-bottom:14px">${settlement.loser_points} to ${settlement.winner_points} — pick your own forfeit. Nobody's choosing this for you.</p>
-        ${eligible.length ? eligible.map(f => `
-          <div class="category-row" data-pick-forfeit="${f.id}" style="cursor:pointer">
-            <div>
-              <div class="cat-name" style="font-size:14.5px">${esc(f.title)}</div>
-              <div class="cat-count">${f.is_intimate ? `${esc(f.category)} · <span class="pill intensity-${f.intensity}">${INTENSITY_LABELS[f.intensity]}</span>` : 'Non-intimate'}</div>
-            </div>
-            <div class="cat-arrow">›</div>
+        <p class="hint-text" style="margin-bottom:18px">${settlement.loser_points} to ${settlement.winner_points} — pick your own forfeit. Nobody's choosing this for you. First: which pool are you drawing from?</p>
+        <div class="category-row" data-choose-pool="everyday" style="cursor:pointer">
+          <div>
+            <div class="cat-name">Everyday</div>
+            <div class="cat-count">${everyday.length} forfeit${everyday.length===1?'':'s'} · nothing intimate</div>
           </div>
-        `).join('') : `<div class="empty-state">No forfeits available right now — ask whoever manages content to add some.</div>`}
+          <div class="cat-arrow">›</div>
+        </div>
+        <div class="category-row" data-choose-pool="risque" style="cursor:pointer">
+          <div>
+            <div class="cat-name">Risqué</div>
+            <div class="cat-count">${risque.length} forfeit${risque.length===1?'':'s'} · intimate, capped to what's currently open</div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
         <button class="link-btn" id="modal-cancel" style="margin-top:16px">Decide later</button>
       </div>
     </div>
   `;
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
-  $app.querySelectorAll('[data-pick-forfeit]').forEach(el => el.onclick = async () => {
-    const { error } = await sb.rpc('pick_forfeit', { p_settlement_id: settlement.id, p_forfeit_id: el.dataset.pickForfeit });
-    if (error) { showToast(error.message); return; }
-    await loadCurrentSettlement();
-    closeModal();
-    showToast('Forfeit picked.');
+  $app.querySelectorAll('[data-choose-pool]').forEach(el => el.onclick = () => {
+    const pool = el.dataset.choosePool === 'everyday' ? everyday : risque;
+    openForfeitPoolModal(settlement, pool, el.dataset.choosePool);
   });
+}
+
+function openForfeitPoolModal(settlement, pool, poolName) {
+  const winnerName = state.partner ? state.partner.display_name : 'They';
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${poolName === 'everyday' ? 'Everyday' : 'Risqué'} pool</h2>
+        ${pool.length ? `
+          <button class="btn btn-gold" id="btn-surprise-forfeit" style="width:100%; margin-bottom:14px">🎲 Surprise me — draw one at random</button>
+          <p class="hint-text" style="margin-bottom:10px">Or browse and pick one yourself:</p>
+          ${pool.map(f => `
+            <div class="category-row" data-pick-forfeit="${f.id}" style="cursor:pointer">
+              <div>
+                <div class="cat-name" style="font-size:14.5px">${esc(f.title)}</div>
+                <div class="cat-count">${f.is_intimate ? `${esc(f.category)} · <span class="pill intensity-${f.intensity}">${INTENSITY_LABELS[f.intensity]}</span>` : 'Non-intimate'}</div>
+              </div>
+              <div class="cat-arrow">›</div>
+            </div>
+          `).join('')}
+        ` : `<div class="empty-state">Nothing in this pool right now.</div>`}
+        <button class="link-btn" id="btn-back-to-pools" style="margin-top:16px">‹ Back to pools</button>
+        <button class="link-btn" id="modal-cancel" style="margin-top:8px">Decide later</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('btn-back-to-pools').onclick = () => openForfeitPickerModal(settlement);
+  const surpriseBtn = document.getElementById('btn-surprise-forfeit');
+  if (surpriseBtn) surpriseBtn.onclick = () => {
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    confirmForfeitPick(settlement, picked.id);
+  };
+  $app.querySelectorAll('[data-pick-forfeit]').forEach(el => el.onclick = () => confirmForfeitPick(settlement, el.dataset.pickForfeit));
+}
+
+async function confirmForfeitPick(settlement, forfeitId) {
+  const { error } = await sb.rpc('pick_forfeit', { p_settlement_id: settlement.id, p_forfeit_id: forfeitId });
+  if (error) { showToast(error.message); return; }
+  await loadCurrentSettlement();
+  closeModal();
+  showToast('Forfeit picked.');
 }
 
 function openFollowUpQuestionModal(q) {

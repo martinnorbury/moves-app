@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.41.0 — forfeit picker now has an actual "which pool" moment
+
+- Picking a forfeit was one flat mixed list before, so there was no real
+  jeopardy to it. Now it's two steps: first choose **Everyday** or
+  **Risqué** (with counts shown for each, nothing else), then either
+  browse titles within that pool or hit "🎲 Surprise me" to draw one at
+  random instead of cherry-picking. The pool choice is the real moment of
+  jeopardy; the random-draw option adds a second layer if you want it.
+- Intimate forfeits are still filtered to what's currently open before
+  they ever show up in the Risqué pool — nothing changes about the
+  underlying safety rule, just how the choice is presented.
+
 ## 1.40.0 — full dark redesign, all three themes
 
 - Replaced the light pastel palette (cream/pale pink/pale blue) with
