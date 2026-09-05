@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.42.0 — the three flagged gaps, all fixed
+
+- Notifications rewritten as a proper queue instead of only checking for
+  one message type: "accepted" now shows a toast, "reaction received"
+  shows a toast with the bonus amount, and completion still gets the full
+  celebration. Added a generic fallback too — any future notification
+  type that isn't explicitly handled now shows as a plain toast instead
+  of silently vanishing, which is exactly the class of bug this was.
+  Cleared out 9 stale unread notifications from earlier testing first, so
+  this shows up clean going forward rather than dumping old test noise.
+- Added 4 starter rewards at 25/50/75/100% Heat Meter, so there's
+  actually something to unlock now — this was a fully working feature
+  that just had nothing in it.
+- Added weekly results to the History tab — every settled week is now
+  visible (who won, the score, the forfeit and whether it's done), not
+  just the single most recent one on Playroom.
+
 ## 1.41.0 — forfeit picker now has an actual "which pool" moment
 
 - Picking a forfeit was one flat mixed list before, so there was no real

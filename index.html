@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.41.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.42.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.41.0';
+const APP_VERSION = '1.42.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -433,6 +433,7 @@ let state = {
   dareEvidence: [],              // evidence photo records, keyed by dare_id
   weeklyScore: [],                 // this week's live scores, resets naturally each week
   currentSettlement: null,         // most recent settled week, if any
+  settlementHistory: [],            // every settled week, most recent first
   forfeitLibrary: [],               // admin-written forfeit templates
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
@@ -598,7 +599,7 @@ async function loadEverything() {
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
         await sb.rpc('settle_past_weeks');
-        await loadCurrentSettlement();
+        await Promise.all([loadCurrentSettlement(), loadSettlementHistory()]);
         subscribeRealtime();
       }
     }
@@ -611,23 +612,50 @@ async function loadEverything() {
 }
 
 async function checkForCompletionReveal() {
-  const unread = state.notifications.filter(n => !n.read && n.dare_id && n.message === 'Your move was completed.');
+  const unread = state.notifications.filter(n => !n.read);
   if (!unread.length) { await runEngagementChecks(); return; }
-  await loadDares(); // guard against a race where this fires before the dare's own points have synced
+
   const notif = unread[0];
-  const dare = state.dares.find(d => d.id === notif.dare_id);
-  if (!dare) { await sb.from('notifications').update({ read: true }).eq('id', notif.id); await runEngagementChecks(); return; }
   await sb.from('notifications').update({ read: true }).eq('id', notif.id);
   state.notifications = state.notifications.filter(n => n.id !== notif.id);
-  const heatGain = Math.max(1, Math.round((dare.points_awarded || 0) / 10));
-  celebrateCompletion({
-    title: dare.title,
-    byName: state.partner ? state.partner.display_name : 'Your partner',
-    points: dare.points_awarded,
-    bonusPoints: dare.quality_bonus_points,
-    heatGain,
-    onContinue: runEngagementChecks
-  });
+
+  if (notif.message === 'Your move was completed.' && notif.dare_id) {
+    await loadDares(); // guard against a race where this fires before the dare's own points have synced
+    const dare = state.dares.find(d => d.id === notif.dare_id);
+    if (dare) {
+      const heatGain = Math.max(1, Math.round((dare.points_awarded || 0) / 10));
+      celebrateCompletion({
+        title: dare.title,
+        byName: state.partner ? state.partner.display_name : 'Your partner',
+        points: dare.points_awarded,
+        bonusPoints: dare.quality_bonus_points,
+        heatGain,
+        onContinue: checkForCompletionReveal // process the rest of the queue once this is dismissed
+      });
+      return;
+    }
+  } else if (notif.message === 'Your move was accepted.' && notif.dare_id) {
+    await loadDares();
+    const dare = state.dares.find(d => d.id === notif.dare_id);
+    showToast(`🎉 ${state.partner ? state.partner.display_name : 'Your partner'} accepted "${dare ? dare.title : 'your move'}"!`);
+  } else if (notif.message === 'Your move got a reaction.' && notif.dare_id) {
+    await loadDares();
+    const dare = state.dares.find(d => d.id === notif.dare_id);
+    if (dare && dare.quality_reaction) {
+      const reactionLabel = { meh: 'Meh', good: 'Good', loved_it: 'Loved it' }[dare.quality_reaction] || dare.quality_reaction;
+      showToast(`${state.partner ? state.partner.display_name : 'Your partner'} reacted "${reactionLabel}" to "${dare.title}"${dare.quality_bonus_points ? ` (+${dare.quality_bonus_points} bonus)` : ''}`);
+    }
+  } else if (notif.message !== 'You have a new move waiting.') {
+    // Already covered live by the Playroom hero banner, so skip it silently.
+    // Anything else unrecognized still gets shown rather than silently
+    // dropped — this is what the earlier bug was: a message type nobody
+    // wrote a case for just vanished. A plain toast is a safe fallback.
+    showToast(notif.message);
+  }
+
+  // A batch of notifications shouldn't flash past each other unseen.
+  await new Promise(r => setTimeout(r, 2600));
+  await checkForCompletionReveal();
 }
 
 // One step at a time: pending comparisons first, then a forfeit that
@@ -742,6 +770,10 @@ async function loadForfeitLibrary() {
 async function loadCurrentSettlement() {
   const { data, error } = await sb.from('weekly_settlements').select('*').order('week_start', { ascending: false }).limit(1).maybeSingle();
   state.currentSettlement = error ? null : data;
+}
+async function loadSettlementHistory() {
+  const { data, error } = await sb.from('weekly_settlements').select('*').order('week_start', { ascending: false });
+  state.settlementHistory = error ? [] : (data || []);
 }
 async function loadPartnerTeaser() {
   const { data, error } = await sb.rpc('get_partner_teaser');
@@ -1794,11 +1826,36 @@ function renderRewardsTab() {
 function renderHistoryTab() {
   const done = state.dares.filter(d => !['sent'].includes(d.status));
   return `
+    <div class="section-head" style="margin-top:0"><h2>Weekly results</h2></div>
+    ${renderSettlementHistory()}
+    <div class="divider"></div>
     <div class="section-head"><h2>All activity</h2></div>
     ${done.length ? done.map(d => renderDareCard(d, false, true)).join('') : `<div class="empty-state">Nothing yet.</div>`}
   `;
 }
 
+function renderSettlementHistory() {
+  const settled = state.settlementHistory.filter(s => s.winner_id); // exclude ties, nothing to show for those
+  if (!settled.length) return `<div class="empty-state" style="margin-bottom:14px">No weeks settled yet.</div>`;
+  return settled.map(s => {
+    const winnerName = s.winner_id === state.session.user.id ? 'You' : (state.partner ? state.partner.display_name : 'They');
+    const loserName = s.loser_id === state.session.user.id ? 'You' : (state.partner ? state.partner.display_name : 'They');
+    const weekLabel = new Date(s.week_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' – ' +
+                       new Date(s.week_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    let forfeitLine;
+    if (!s.forfeit_id) forfeitLine = `${loserName} hasn't picked a forfeit yet.`;
+    else if (!s.forfeit_completed_at) forfeitLine = `Forfeit: ${esc(s.forfeit_title)} — not yet done.`;
+    else forfeitLine = `Forfeit: ${esc(s.forfeit_title)} — done.`;
+    return `
+      <div class="category-row" style="cursor:default">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${weekLabel} — ${esc(winnerName)} won (${s.winner_points} to ${s.loser_points})</div>
+          <div class="cat-count">${forfeitLine}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 /* ==========================================================================
    TAB BAR
    ========================================================================== */
