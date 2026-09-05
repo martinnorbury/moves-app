@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.37.0 — genuine two-sided comparison loop, renamed scale, Zones
+
+- The 5-tier answer scale has new names: All In, Keen, Curious, If You're
+  Up For It, Not For Me (was Full Spark, Warming Up, Blushing Yes, Just
+  For You, Cold Card). Same gauge, same underlying values — just better
+  words. Checked the whole app for leftover hardcoded mentions of the old
+  names; none left.
+- "Headings" renamed to "Zones" everywhere it's shown to you — button
+  labels, hint text, error messages, CSV import instructions (which now
+  also accepts "zone" as a column header, not just "category"). Internal
+  code names are unchanged; this was purely about what you see.
+- Built the actual two-sided comparison loop this was all missing: when
+  one of you answers a follow-up question after completing a dare, the
+  other partner now gets invited to answer that exact same question —
+  live if the app's open, or the next time they open it. Verified this
+  directly against the database: Jacki's answered card showed up
+  correctly as "pending comparison" for Martin before this was built,
+  and now it surfaces as an actual prompt instead of sitting invisible.
+- This is what makes a Zone's picture genuinely mutual instead of
+  one-sided — whoever completes more dares doesn't get to unilaterally
+  shape where a Zone lands; both of you have to weigh in on the same
+  cards for them to count.
+
 ## 1.36.0 — real fanfare, and a genuine notification bug fixed
 
 - Found and fixed the actual cause of "no notification at all": the app

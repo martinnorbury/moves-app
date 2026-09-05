@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.36.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.37.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.36.0';
+const APP_VERSION = '1.37.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -395,7 +395,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $app = document.getElementById('app');
 
 const ANSWER_LABELS = {
-  full_spark: 'Full Spark', warming_up: 'Warming Up', blushing_yes: 'Blushing Yes', just_for_you: 'Just For You', cold_card: 'Cold Card'
+  full_spark: 'All In', warming_up: 'Keen', blushing_yes: 'Curious', just_for_you: "If You're Up For It", cold_card: 'Not For Me'
 };
 const ANSWER_ORDER = ['full_spark', 'warming_up', 'blushing_yes', 'just_for_you', 'cold_card'];
 const GAUGE_ORDER = ['cold_card', 'just_for_you', 'blushing_yes', 'warming_up', 'full_spark'];
@@ -566,11 +566,11 @@ async function loadEverything() {
 
 async function checkForCompletionReveal() {
   const unread = state.notifications.filter(n => !n.read && n.dare_id && n.message === 'Your move was completed.');
-  if (!unread.length) return;
+  if (!unread.length) { await checkForPendingComparison(); return; }
   await loadDares(); // guard against a race where this fires before the dare's own points have synced
   const notif = unread[0];
   const dare = state.dares.find(d => d.id === notif.dare_id);
-  if (!dare) { await sb.from('notifications').update({ read: true }).eq('id', notif.id); return; }
+  if (!dare) { await sb.from('notifications').update({ read: true }).eq('id', notif.id); await checkForPendingComparison(); return; }
   await sb.from('notifications').update({ read: true }).eq('id', notif.id);
   state.notifications = state.notifications.filter(n => n.id !== notif.id);
   const heatGain = Math.max(1, Math.round((dare.points_awarded || 0) / 10));
@@ -579,9 +579,42 @@ async function checkForCompletionReveal() {
     byName: state.partner ? state.partner.display_name : 'Your partner',
     points: dare.points_awarded,
     bonusPoints: dare.quality_bonus_points,
-    heatGain
+    heatGain,
+    onContinue: checkForPendingComparison
   });
 }
+
+async function checkForPendingComparison() {
+  const { data, error } = await sb.rpc('get_pending_comparison_cards');
+  if (error || !data || !data.length) return;
+  openComparisonQuestionModal(data[0]);
+}
+
+function openComparisonQuestionModal(q) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Your turn to weigh in</h2>
+        <p class="hint-text" style="margin-bottom:14px">Your partner shared where they stand on this in ${esc(q.category)} — here's your chance to answer the same question, so you can see how you compare.</p>
+        <div class="deck-card-title" style="margin-bottom:8px">${esc(q.title)}</div>
+        ${q.explanation ? `<div class="deck-card-explain" style="margin-bottom:12px">${esc(q.explanation)}</div>` : ''}
+        ${renderAnswerControl(q, null, (a) => `data-comparison-answer="${a}" data-comparison-id="${q.question_id}"`)}
+        <button class="link-btn" id="modal-cancel" style="margin-top:16px">Skip for now</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  $app.querySelectorAll('[data-comparison-answer]').forEach(el => el.onclick = async () => {
+    const qId = el.dataset.comparisonId, val = el.dataset.comparisonAnswer;
+    state.answers[qId] = val;
+    await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
+    await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
+    closeModal();
+    showToast('Answer saved — your zone picture just updated.');
+  });
+}
+
 
 async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle();
@@ -765,7 +798,7 @@ function renderStep1Complete() {
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
         <h1>Step 1 complete 🎉</h1>
-        <p>You've both answered the general question for every heading. Here's where that leaves you.</p>
+        <p>You've both answered the general question for every zone. Here's where that leaves you.</p>
       </div>
       ${renderOverallStanding()}
       ${renderHeadingAccessList()}
@@ -795,7 +828,7 @@ function renderWizard(q, remaining) {
 
   return `
     <div class="screen" style="padding-top:22px">
-      <div class="deck-progress">${answeredGeneral + 1} of ${totalGeneral} — a general sense of each heading</div>
+      <div class="deck-progress">${answeredGeneral + 1} of ${totalGeneral} — a general sense of each zone</div>
       <div class="deck-card">
         ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
         <div class="deck-card-body">
@@ -1269,7 +1302,7 @@ function renderOverallStanding() {
   const parts = order.filter(a => counts[a]).map(a => `${counts[a]} ${esc(ACCESS_LABELS[a])}`);
   return `
     <div class="status-strip" style="margin-bottom:18px">
-      <div class="status-label">Overall, across all ${state.headingAccess.length} headings</div>
+      <div class="status-label">Overall, across all ${state.headingAccess.length} zones</div>
       <div class="status-value">${parts.join(' · ')}</div>
     </div>
   `;
@@ -1306,7 +1339,7 @@ function renderHeadingExpansion(category) {
     .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
 
   if (!items.length) {
-    return `<div class="empty-state" style="padding:10px 0">Nothing answered by both of you in this heading yet.</div>`;
+    return `<div class="empty-state" style="padding:10px 0">Nothing answered by both of you in this zone yet.</div>`;
   }
 
   return `
@@ -1329,8 +1362,8 @@ function renderAllAnswers() {
   return `
     <button class="link-btn" id="btn-close-all-answers">‹ Back to your report</button>
     <div class="section-head" style="margin-top:14px"><h2>All your answers (${answered.length})</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Every question you've personally answered, across every heading. Change any of them right here.</p>
-    <div class="field" style="margin-bottom:14px"><input type="text" id="all-answers-search" placeholder="Search by title or heading…" value="${esc(state.allAnswersFilter)}"></div>
+    <p class="hint-text" style="margin-bottom:14px">Every question you've personally answered, across every zone. Change any of them right here.</p>
+    <div class="field" style="margin-bottom:14px"><input type="text" id="all-answers-search" placeholder="Search by title or zone…" value="${esc(state.allAnswersFilter)}"></div>
     ${filtered.length ? filtered.map(q => {
       const headerHtml = q.category !== lastCategory ? `<div class="hint-text" style="margin:16px 0 6px; font-weight:600; color:var(--text)">${esc(q.category)}</div>` : '';
       lastCategory = q.category;
@@ -1362,8 +1395,8 @@ function renderBoundariesTab(unanswered) {
     `).join('')}
 
     <div class="divider"></div>
-    <div class="section-head"><h2>Heading access</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">A running average across every question you've both answered in that heading — the general one plus any specific cards. Each card keeps its own score regardless; this is just the heading-level picture. The more you've both answered, the less any single new answer shifts it — except a genuine Cold Card answer, which always closes the whole heading, average or not.</p>
+    <div class="section-head"><h2>Zone access</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">A running average across every question you've both answered in that zone — the general one plus any specific cards. Each card keeps its own score regardless; this is just the zone-level picture. The more you've both answered, the less any single new answer shifts it — except a genuine Not For Me answer, which always closes the whole zone, average or not.</p>
     ${renderOverallStanding()}
     ${renderHeadingAccessList()}
 
@@ -1413,10 +1446,10 @@ function renderQuestionsColumn() {
         </div>
       `).join('') : `<div class="empty-state">No cards match "${esc(state.questionsSearch)}".</div>`}
     ` : `
-    <p class="hint-text" style="margin-bottom:14px">Tap a heading to see its cards, add new ones, or edit them.</p>
+    <p class="hint-text" style="margin-bottom:14px">Tap a zone to see its cards, add new ones, or edit them.</p>
 
     <div class="btn-row" style="margin-bottom:14px">
-      <button class="btn btn-ghost" id="btn-new-heading">Add a new heading</button>
+      <button class="btn btn-ghost" id="btn-new-heading">Add a new zone</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
 
@@ -1434,7 +1467,7 @@ function renderQuestionsColumn() {
       `;
     }).join('')}
 
-    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every heading</button>` : ''}
+    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every zone</button>` : ''}
     `}
   `;
 }
@@ -1463,7 +1496,7 @@ function renderDaresColumn() {
         </div>
       `).join('') : `<div class="empty-state">No dares match "${esc(state.daresSearch)}".</div>`}
     ` : `
-    <p class="hint-text" style="margin-bottom:14px">Tap a heading to see its dares, add new ones, or edit them.</p>
+    <p class="hint-text" style="margin-bottom:14px">Tap a zone to see its dares, add new ones, or edit them.</p>
 
     <div class="btn-row" style="margin-bottom:14px">
       <button class="btn btn-ghost" id="btn-add-dare">Add a dare</button>
@@ -1492,7 +1525,7 @@ function renderDareHeadingView() {
   const dares = state.dareLibrary.filter(d => d.category === state.openDareCategory);
 
   return `
-    <button class="link-btn" data-close-dare-category="1">‹ Back to headings</button>
+    <button class="link-btn" data-close-dare-category="1">‹ Back to zones</button>
     <div class="section-head" style="margin-top:14px"><h2>${esc(state.openDareCategory)}</h2></div>
     ${dares.length ? dares.map(d => `
       <div class="category-row" data-edit-dare="${d.id}" style="cursor:pointer">
@@ -1520,7 +1553,7 @@ function renderDeckView() {
 
   if (cards.length === 0) {
     return `
-      <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
+      <button class="link-btn" data-close-deck="1">‹ Back to zones</button>
       <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
       <button class="btn btn-gold" id="btn-add-card">Add the first card</button>
     `;
@@ -1535,7 +1568,7 @@ function renderDeckListView(cards, modeToggle) {
   const filtered = filterText ? cards.filter(q => q.title.toLowerCase().includes(filterText)) : cards;
 
   return `
-    <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
+    <button class="link-btn" data-close-deck="1">‹ Back to zones</button>
     ${modeToggle}
     <div class="field" style="margin-bottom:14px"><input type="text" id="deck-search" placeholder="Search ${esc(state.openCategory)}…" value="${esc(state.deckFilter)}"></div>
     ${filtered.length ? filtered.map((q, i) => {
@@ -1568,7 +1601,7 @@ function renderDeckCardView(cards, modeToggle) {
   const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
 
   return `
-    <button class="link-btn" data-close-deck="1">‹ Back to headings</button>
+    <button class="link-btn" data-close-deck="1">‹ Back to zones</button>
     ${modeToggle}
     <div class="deck-progress">${esc(state.openCategory)} — card ${idx + 1} of ${cards.length}</div>
     <div class="deck-card">
@@ -1666,8 +1699,8 @@ function openCreateDareModal() {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Create a move</h2>
-        ${eligible.length === 0 ? `<p class="hint-text">No headings are open for a move yet — answer more questions together first.</p>` : `
-        <div class="field"><label>Heading</label>
+        ${eligible.length === 0 ? `<p class="hint-text">No zones are open for a move yet — answer more questions together first.</p>` : `
+        <div class="field"><label>Zone</label>
           <select id="d-category">
             ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
           </select>
@@ -1722,7 +1755,7 @@ function openCreateDareModal() {
     const matches = state.dareLibrary.filter(d => d.category === cat && allowed.includes(d.intensity));
     const box = document.getElementById('d-suggestions');
     if (!matches.length) {
-      box.innerHTML = `<p class="hint-text">No library dares for this heading yet.</p>`;
+      box.innerHTML = `<p class="hint-text">No library dares for this zone yet.</p>`;
       return;
     }
     box.innerHTML = `<p class="hint-text" style="margin-bottom:8px">Suggested for you:</p>` + matches.map(d => `
@@ -2029,7 +2062,7 @@ function attachMainHandlers() {
 
   const deleteAllCardsBtn = document.getElementById('btn-delete-all-cards');
   if (deleteAllCardsBtn) deleteAllCardsBtn.onclick = async () => {
-    if (!confirm('Delete every card across every heading? This removes all your boundary content and can\'t be undone. Headings themselves stay.')) return;
+    if (!confirm('Delete every card across every zone? This removes all your boundary content and can\'t be undone. Zones themselves stay.')) return;
     const { error } = await sb.from('boundary_questions').delete().eq('couple_id', state.coupleId);
     if (error) { showToast(error.message); return; }
     state.openCategory = null; state.deckIndex = 0;
@@ -2104,7 +2137,7 @@ function openAddHeadingModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>Add a new heading</h2>
+        <h2>Add a new zone</h2>
         <form id="heading-form" class="stack">
           <div class="field"><input type="text" id="heading-name" placeholder="e.g. Travel Fantasies" required></div>
           <div id="heading-form-error" class="error-text"></div>
@@ -2135,7 +2168,7 @@ function openEditCardModal(q) {
       <div class="modal-sheet">
         <h2>Edit card</h2>
         <form id="edit-card-form" class="stack">
-          <div class="field"><label>Heading</label>
+          <div class="field"><label>Zone</label>
             <select id="edit-card-category">
               ${state.categories.map(c => `<option value="${esc(c.name)}" ${c.name===q.category?'selected':''}>${esc(c.name)}</option>`).join('')}
             </select>
@@ -2149,7 +2182,7 @@ function openEditCardModal(q) {
             <select id="edit-card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}" ${t===q.suitable_for?'selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
-            <input type="checkbox" id="edit-card-is-general" style="width:auto" ${q.is_general ? 'checked' : ''}> This is the general "where do you sit" question for this heading
+            <input type="checkbox" id="edit-card-is-general" style="width:auto" ${q.is_general ? 'checked' : ''}> This is the general "where do you sit" question for this zone
           </label>
           <div id="edit-card-form-error" class="error-text"></div>
           <div class="btn-row">
@@ -2188,7 +2221,7 @@ function openAddCardModal() {
       <div class="modal-sheet">
         <h2>Add a card</h2>
         <form id="card-form" class="stack">
-          <div class="field"><label>Heading</label>
+          <div class="field"><label>Zone</label>
             <select id="card-category">
               ${state.categories.map(c => `<option value="${esc(c.name)}" ${c.name===state.openCategory?'selected':''}>${esc(c.name)}</option>`).join('')}
             </select>
@@ -2208,7 +2241,7 @@ function openAddCardModal() {
             <select id="card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
-            <input type="checkbox" id="card-is-general" style="width:auto"> This is the general "where do you sit" question for this heading (shown in the after-login wizard)
+            <input type="checkbox" id="card-is-general" style="width:auto"> This is the general "where do you sit" question for this zone (shown in the after-login wizard)
           </label>
           <div id="card-form-error" class="error-text"></div>
           <div class="btn-row">
@@ -2441,7 +2474,7 @@ function openImportCsvModal() {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Import cards from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus optional <b>image_filename</b> and <b>is_general</b> columns. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). is_general (true/false, one per heading) marks the broad "where do you sit on this" question shown in the after-login wizard, as opposed to specific cards. Headings that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus optional <b>image_filename</b> and <b>is_general</b> columns. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). is_general (true/false, one per zone) marks the broad "where do you sit on this" question shown in the after-login wizard, as opposed to specific cards. Zones that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
         <input type="file" id="csv-file" accept=".csv">
         <div id="import-progress" class="hint-text" style="margin-top:14px"></div>
         <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
@@ -2485,7 +2518,7 @@ async function runCsvImport(rows) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const lineNum = i + 2; // account for header row, 1-indexed
-    const category = pick(row, 'category', 'heading', 'category_heading').trim();
+    const category = pick(row, 'category', 'heading', 'zone', 'category_heading').trim();
     const title = pick(row, 'title', 'name', 'card_title').trim();
     const explanation = pick(row, 'explanation', 'description', 'details').trim() || null;
     const rawIntensity = pick(row, 'max_intensity', 'intensity');
@@ -2514,7 +2547,7 @@ async function runCsvImport(rows) {
     let resolvedCategory = categoryLookup[categoryKey];
     if (!resolvedCategory) {
       const { error: catErr } = await sb.rpc('add_boundary_category', { p_name: category });
-      if (catErr) { skipped++; errors.push(`Row ${lineNum}: couldn't create heading "${category}" — skipped.`); continue; }
+      if (catErr) { skipped++; errors.push(`Row ${lineNum}: couldn't create zone "${category}" — skipped.`); continue; }
       resolvedCategory = category;
       categoryLookup[categoryKey] = category;
     }
@@ -2549,7 +2582,7 @@ function openLibraryDareModal(existing, defaultCategory) {
       <div class="modal-sheet">
         <h2>${existing ? 'Edit dare' : 'Add a dare'}</h2>
         <form id="library-dare-form" class="stack">
-          <div class="field"><label>Heading</label>
+          <div class="field"><label>Zone</label>
             <select id="ld-category">
               ${state.categories.map(c => `<option value="${esc(c.name)}" ${(existing ? existing.category : defaultCategory) === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
             </select>
@@ -2610,7 +2643,7 @@ function openImportDaresCsvModal() {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Import dare library from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, teaser, instructions, intensity</b>. category must match an existing heading exactly. intensity must be tease/risque/bold/wild. teaser is optional. Type (Apart/Together/Either/Reunion) isn't part of the library — whoever sends the dare picks that at the time.</p>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, teaser, instructions, intensity</b>. category must match an existing zone exactly. intensity must be tease/risque/bold/wild. teaser is optional. Type (Apart/Together/Either/Reunion) isn't part of the library — whoever sends the dare picks that at the time.</p>
         <input type="file" id="dares-csv-file" accept=".csv">
         <div id="dares-import-progress" class="hint-text" style="margin-top:14px"></div>
         <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
@@ -2656,7 +2689,7 @@ async function runDaresCsvImport(rows) {
       skipped++; errors.push(`Row ${lineNum}: missing category, title, or instructions — skipped.`); continue;
     }
     if (!knownCategories.has(category.toLowerCase())) {
-      skipped++; errors.push(`Row ${lineNum}: "${category}" doesn't match an existing heading — skipped.`); continue;
+      skipped++; errors.push(`Row ${lineNum}: "${category}" doesn't match an existing zone — skipped.`); continue;
     }
     if (!VALID_INTENSITIES.includes(intensity)) {
       skipped++; errors.push(`Row ${lineNum}: invalid intensity "${row.intensity || ''}" — skipped.`); continue;
@@ -2758,7 +2791,7 @@ function openFollowUpQuestionModal(q) {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Nice work — points added</h2>
-        <p class="hint-text" style="margin-bottom:14px">Since you just completed one from ${esc(q.category)}, here's another question from that heading, if you're up for it.</p>
+        <p class="hint-text" style="margin-bottom:14px">Since you just completed one from ${esc(q.category)}, here's another question from that zone, if you're up for it.</p>
         <div class="deck-card-title" style="margin-bottom:8px">${esc(q.title)}</div>
         ${q.explanation ? `<div class="deck-card-explain" style="margin-bottom:12px">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, null, (a) => `data-followup-answer="${a}" data-followup-id="${q.id}"`)}
