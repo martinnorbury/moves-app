@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <style>
   :root{
     /* Neutral default, used before a theme (gender) is chosen — auth/signup only */
@@ -353,11 +354,27 @@
   }
   .modal-sheet h2{font-size:19px; margin-bottom:16px;}
 
+  .celebrate-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:400;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .celebrate-card{
+    background:linear-gradient(160deg, var(--wine), var(--gold));
+    color:#fff; border-radius:20px; padding:36px 26px; text-align:center;
+    max-width:400px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.4);
+  }
+  .celebrate-emoji{font-size:52px; margin-bottom:6px;}
+  .celebrate-title{font-family:var(--serif); font-size:26px; font-weight:600; margin-bottom:6px;}
+  .celebrate-name{font-size:14px; opacity:0.9; margin-bottom:18px;}
+  .celebrate-points{font-family:var(--serif); font-size:56px; font-weight:700; line-height:1;}
+  .celebrate-points-label{font-size:12px; text-transform:uppercase; letter-spacing:1.5px; opacity:0.85; margin-bottom:20px;}
+  .celebrate-heat{font-size:13px; opacity:0.9; margin-bottom:24px;}
+
   .loading{display:flex; align-items:center; justify-content:center; height:100vh; color:var(--text-faint); font-size:13px;}
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.35.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.36.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -365,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.35.1';
+const APP_VERSION = '1.36.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -438,6 +455,39 @@ function showToast(msg) {
   render();
   setTimeout(() => { state.toast = null; render(); }, 3200);
 }
+
+function fireConfetti() {
+  if (typeof confetti !== 'function') return;
+  const colors = ['#C24C63', '#D9A65C', '#EFE7DC'];
+  confetti({ particleCount: 90, spread: 75, origin: { y: 0.35 }, colors, startVelocity: 45, scalar: 1.1 });
+  setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { y: 0.5 }, colors, scalar: 0.9 }), 250);
+}
+
+function celebrateCompletion({ title, byName, points, bonusPoints, heatGain, onContinue }) {
+  fireConfetti();
+  const totalPoints = points + (bonusPoints || 0);
+  const overlay = document.createElement('div');
+  overlay.className = 'celebrate-backdrop';
+  overlay.innerHTML = `
+    <div class="celebrate-card">
+      <div class="celebrate-emoji">🎉</div>
+      <div class="celebrate-title">Move Complete!</div>
+      <div class="celebrate-name">${esc(byName)} just finished "${esc(title)}"</div>
+      <div class="celebrate-points">+${totalPoints}</div>
+      <div class="celebrate-points-label">points${bonusPoints ? ` (incl. ${bonusPoints} bonus)` : ''}</div>
+      <div class="celebrate-heat">🔥 Heat Meter +${heatGain}%</div>
+      <button class="btn" style="background:#fff; color:var(--wine); width:100%;" id="btn-celebrate-continue">Nice!</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('btn-celebrate-continue').onclick = () => {
+    overlay.remove();
+    if (onContinue) onContinue();
+  };
+  // Auto-dismiss after a few seconds if nobody taps through.
+  setTimeout(() => { if (document.body.contains(overlay)) { overlay.remove(); if (onContinue) onContinue(); } }, 6000);
+}
+
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -511,6 +561,26 @@ async function loadEverything() {
   }
   state.loading = false;
   render();
+  checkForCompletionReveal();
+}
+
+async function checkForCompletionReveal() {
+  const unread = state.notifications.filter(n => !n.read && n.dare_id && n.message === 'Your move was completed.');
+  if (!unread.length) return;
+  await loadDares(); // guard against a race where this fires before the dare's own points have synced
+  const notif = unread[0];
+  const dare = state.dares.find(d => d.id === notif.dare_id);
+  if (!dare) { await sb.from('notifications').update({ read: true }).eq('id', notif.id); return; }
+  await sb.from('notifications').update({ read: true }).eq('id', notif.id);
+  state.notifications = state.notifications.filter(n => n.id !== notif.id);
+  const heatGain = Math.max(1, Math.round((dare.points_awarded || 0) / 10));
+  celebrateCompletion({
+    title: dare.title,
+    byName: state.partner ? state.partner.display_name : 'Your partner',
+    points: dare.points_awarded,
+    bonusPoints: dare.quality_bonus_points,
+    heatGain
+  });
 }
 
 async function loadProfile() {
@@ -601,9 +671,9 @@ function subscribeRealtime() {
   if (realtimeChannel) return;
   realtimeChannel = sb.channel('couple-' + state.coupleId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
-      () => { loadDares(); loadScoreboard(); loadHeat(); render(); })
+      async () => { await loadDares(); await loadScoreboard(); await loadHeat(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `couple_id=eq.${state.coupleId}` },
-      () => { loadNotifications(); render(); })
+      async () => { await loadNotifications(); render(); await checkForCompletionReveal(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards', filter: `couple_id=eq.${state.coupleId}` },
       () => { loadRewards(); render(); })
     .subscribe();
@@ -2643,13 +2713,18 @@ function openCompleteModal(dareId) {
       }
     }
     await Promise.all([loadDares(), loadScoreboard(), loadHeat(), loadDareEvidence()]);
+    const updatedDare = state.dares.find(d => d.id === el.dataset.completeId);
     const followUp = category ? state.questions.find(q => q.category === category && !state.answers[q.id]) : null;
-    if (followUp) {
-      openFollowUpQuestionModal(followUp);
-    } else {
-      closeModal();
-      showToast('Nice work — points added.');
-    }
+    closeModal();
+    const heatGain = updatedDare ? Math.max(1, Math.round((updatedDare.points_awarded || 0) / 10)) : 0;
+    celebrateCompletion({
+      title: updatedDare ? updatedDare.title : 'Move',
+      byName: state.profile ? state.profile.display_name : 'You',
+      points: updatedDare ? updatedDare.points_awarded : 0,
+      bonusPoints: updatedDare ? updatedDare.quality_bonus_points : 0,
+      heatGain,
+      onContinue: () => { if (followUp) openFollowUpQuestionModal(followUp); }
+    });
   });
 }
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.36.0 — real fanfare, and a genuine notification bug fixed
+
+- Found and fixed the actual cause of "no notification at all": the app
+  was writing "Your move was completed" notifications to the database
+  correctly the whole time, but nothing in the interface ever displayed
+  them. That's fixed now, not just made more exciting.
+- Completing a move now triggers real confetti and a big "Move Complete!"
+  card showing who did it, points earned (including any bonus), and the
+  Heat Meter gain — replacing the quiet toast that was easy to miss.
+- The sender gets the same celebration — live, immediately, if the app is
+  open when it happens; otherwise the next time they open it. Either way,
+  it's now impossible to complete a move and have your partner never find
+  out.
+
 ## 1.35.1 — app renamed to TwoPlay
 
 - The app itself is now called "TwoPlay" (browser tab, home screen icon,
