@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Moves</title>
+<title>TwoPlay</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Moves">
-<meta name="theme-color" content="#1B1714">
+<meta name="apple-mobile-web-app-title" content="TwoPlay">
+<meta name="theme-color" content="#F6F3F0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -90,11 +90,20 @@
 
   /* ---------- top bar ---------- */
   .topbar{
-    display:flex; align-items:baseline; justify-content:space-between;
-    padding:22px 20px 14px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 20px 14px;
   }
-  .topbar .wordmark{font-family:var(--serif); font-size:22px; letter-spacing:0.2px; color:var(--gold);}
-  .topbar .version{font-size:11px; color:var(--text-faint);}
+  .topbar .wordmark{font-family:var(--serif); font-size:16px; letter-spacing:0.2px; color:var(--gold); text-align:right;}
+  .topbar .version{font-size:10.5px; color:var(--text-faint); text-align:right;}
+  .topbar-identity{display:flex; align-items:center; gap:9px; cursor:pointer; background:none; border:none; padding:0;}
+  .topbar-avatar{
+    width:34px; height:34px; border-radius:50%; flex-shrink:0; overflow:hidden;
+    background:var(--surface-raised); border:1.5px solid var(--gold);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .topbar-avatar img{width:100%; height:100%; object-fit:cover;}
+  .topbar-avatar .avatar-initial{font-size:14px;}
+  .topbar-name{font-family:var(--serif); font-size:15px; color:var(--text);}
 
   /* ---------- generic layout ---------- */
   .screen{padding:0 20px 100px; flex:1;}
@@ -154,9 +163,6 @@
   .status-strip .status-value{font-family:var(--serif); font-size:19px; color:var(--text);}
   .status-strip .status-value.awaiting{color:var(--gold);}
 
-  /* ---------- welcome hero ---------- */
-  .welcome-hero{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
-
   .inplay-hero{
     margin:0 -20px 22px; padding:22px 20px;
     background:linear-gradient(135deg, var(--wine), var(--gold));
@@ -172,19 +178,7 @@
   .inplay-hero-countdown.overdue{color:#FFE0E0;}
   .inplay-hero-sub{font-size:12.5px; opacity:0.9; margin-top:4px;}
   .inplay-hero-more{font-size:12px; opacity:0.85; margin-top:10px;}
-  .avatar-circle{
-    width:64px; height:64px; border-radius:50%; flex-shrink:0; position:relative;
-    background:var(--surface-raised); border:2px solid var(--gold);
-    display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer;
-  }
-  .avatar-circle img{width:100%; height:100%; object-fit:cover;}
   .avatar-initial{font-family:var(--serif); font-size:26px; color:var(--gold);}
-  .avatar-hint{
-    position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.55);
-    color:#fff; font-size:8.5px; text-align:center; padding:2px 0;
-  }
-  .welcome-greeting{font-size:12.5px; color:var(--text-dim); margin-bottom:2px;}
-  .welcome-name{font-family:var(--serif); font-size:28px; color:var(--text); line-height:1.1;}
 
   /* ---------- scoreboard ---------- */
   .scoreboard{display:flex; gap:12px; margin-bottom:18px;}
@@ -363,7 +357,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.34.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.35.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -371,7 +365,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.34.1';
+const APP_VERSION = '1.35.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -790,10 +784,19 @@ function render() {
   else if (state.tab === 'history') body = renderHistoryTab();
   else if (state.tab === 'admin') body = renderSetupArea();
 
+  const initial = state.profile && state.profile.display_name ? state.profile.display_name.charAt(0).toUpperCase() : '?';
   $app.innerHTML = `
     <div class="topbar">
-      <div class="wordmark">Moves</div>
-      <div class="version" id="version-tap" style="text-decoration:underline; text-underline-offset:2px; cursor:pointer">v${APP_VERSION}</div>
+      <button class="topbar-identity" id="btn-open-account">
+        <div class="topbar-avatar">
+          ${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : `<div class="avatar-initial">${esc(initial)}</div>`}
+        </div>
+        <div class="topbar-name">${esc(state.profile ? state.profile.display_name : '')}</div>
+      </button>
+      <div>
+        <div class="wordmark">TwoPlay</div>
+        <div class="version" id="version-tap" style="text-decoration:underline; text-underline-offset:2px; cursor:pointer">v${APP_VERSION}</div>
+      </div>
     </div>
     <div class="screen">${body}</div>
     ${renderTabbar()}
@@ -1017,7 +1020,6 @@ function computeTurnMessage() {
 function renderHome(unanswered) {
   const pendingForMe = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent');
   const nextReward = state.rewards.find(r => !r.completed && r.heat_threshold && r.heat_threshold > state.heat);
-  const initial = state.profile && state.profile.display_name ? state.profile.display_name.charAt(0).toUpperCase() : '?';
   const turnMessage = computeTurnMessage();
   const inPlayHtml = renderInPlayHero();
 
@@ -1033,18 +1035,6 @@ function renderHome(unanswered) {
     ${!inPlayHtml && !pendingForMe.length && !unanswered ? `<div class="empty-state" style="margin-bottom:18px">You're all caught up.</div>` : ''}
     ${unanswered > 0 ? `<div class="hint-text" style="margin-bottom:18px">${unanswered} boundary question${unanswered===1?'':'s'} still to answer.</div>` : ''}
     ${turnMessage ? `<div class="hint-text" style="margin-bottom:18px">${esc(turnMessage)}</div>` : ''}
-
-    <div class="welcome-hero">
-      <div class="avatar-circle" id="btn-change-avatar">
-        ${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : `<div class="avatar-initial">${esc(initial)}</div>`}
-        <div class="avatar-hint">${state.avatarUrl ? 'Change' : 'Add photo'}</div>
-      </div>
-      <div>
-        <div class="welcome-greeting">Welcome back,</div>
-        <div class="welcome-name">${esc(state.profile ? state.profile.display_name : '')}</div>
-        <button class="link-btn" id="btn-signal-number" style="padding:0; margin-top:2px">${state.profile && state.profile.signal_phone ? 'Change Signal number' : 'Add your Signal number'}</button>
-      </div>
-    </div>
 
     ${renderScoreboard()}
     ${renderHeatBlock(nextReward)}
@@ -1837,10 +1827,8 @@ function closeModal() { state.modal = ''; render(); }
 function attachMainHandlers() {
   const vtap = document.getElementById('version-tap');
   if (vtap) vtap.onclick = openVersionModal;
-  const avatarBtn = document.getElementById('btn-change-avatar');
-  if (avatarBtn) avatarBtn.onclick = openAvatarModal;
-  const signalBtn = document.getElementById('btn-signal-number');
-  if (signalBtn) signalBtn.onclick = openSignalNumberModal;
+  const openAccountBtn = document.getElementById('btn-open-account');
+  if (openAccountBtn) openAccountBtn.onclick = openAccountModal;
   $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
@@ -2270,37 +2258,50 @@ async function runBulkImageImport(files) {
   }
 }
 
-function openSignalNumberModal() {
-  const current = state.profile && state.profile.signal_phone ? state.profile.signal_phone : '';
+function openAccountModal() {
+  const currentPhone = state.profile && state.profile.signal_phone ? state.profile.signal_phone : '';
+  const currentName = state.profile ? state.profile.display_name : '';
+  const initial = currentName ? currentName.charAt(0).toUpperCase() : '?';
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>Your Signal number</h2>
-        <p class="hint-text" style="margin-bottom:14px">Lets your partner message you on Signal with one tap during an in-play move. Include the country code, e.g. +447700900000.</p>
-        <div class="field"><input type="tel" id="signal-number-input" value="${esc(current)}" placeholder="+447700900000"></div>
-        <div id="signal-number-error" class="error-text" style="margin-top:8px"></div>
+        <h2>Your account</h2>
+        <div class="image-upload-row" style="margin-bottom:18px">
+          <div class="topbar-avatar" style="width:56px; height:56px">
+            ${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : `<div class="avatar-initial" style="font-size:22px">${esc(initial)}</div>`}
+          </div>
+          <button class="link-btn" id="btn-change-avatar-inline">${state.avatarUrl ? 'Change photo' : 'Add a photo'}</button>
+        </div>
+        <div class="field" style="margin-bottom:14px"><label>Your name</label><input type="text" id="account-name-input" value="${esc(currentName)}"></div>
+        <div class="field"><label>Your Signal number</label><input type="tel" id="signal-number-input" value="${esc(currentPhone)}" placeholder="+447700900000"></div>
+        <p class="hint-text" style="margin-top:6px">Lets your partner message you on Signal with one tap during an in-play move. Include the country code.</p>
+        <div id="account-error" class="error-text" style="margin-top:8px"></div>
         <div class="btn-row" style="margin-top:16px">
           <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="btn-save-signal-number">Save</button>
+          <button type="button" class="btn btn-primary" id="btn-save-account">Save</button>
         </div>
       </div>
     </div>
   `;
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
-  document.getElementById('btn-save-signal-number').onclick = async () => {
-    const errEl = document.getElementById('signal-number-error');
-    const value = document.getElementById('signal-number-input').value.trim();
-    if (value && !/^\+[1-9]\d{6,14}$/.test(value)) {
-      errEl.textContent = 'Enter it in international format, starting with + and the country code.';
+  document.getElementById('btn-change-avatar-inline').onclick = openAvatarModal;
+  document.getElementById('btn-save-account').onclick = async () => {
+    const errEl = document.getElementById('account-error');
+    const name = document.getElementById('account-name-input').value.trim();
+    const phone = document.getElementById('signal-number-input').value.trim();
+    if (!name) { errEl.textContent = 'Name can\'t be empty.'; return; }
+    if (phone && !/^\+[1-9]\d{6,14}$/.test(phone)) {
+      errEl.textContent = 'Enter the Signal number in international format, starting with + and the country code.';
       return;
     }
-    const { error } = await sb.from('profiles').update({ signal_phone: value || null }).eq('id', state.session.user.id);
+    const { error } = await sb.from('profiles').update({ display_name: name, signal_phone: phone || null }).eq('id', state.session.user.id);
     if (error) { errEl.textContent = error.message; return; }
-    state.profile.signal_phone = value || null;
+    state.profile.display_name = name;
+    state.profile.signal_phone = phone || null;
     closeModal();
     render();
-    showToast('Signal number saved.');
+    showToast('Account updated.');
   };
 }
 

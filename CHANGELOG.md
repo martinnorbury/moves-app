@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.35.1 — app renamed to TwoPlay
+
+- The app itself is now called "TwoPlay" (browser tab, home screen icon,
+  the header brand mark) — "Playroom" stays as the name of the first tab,
+  same relationship as "Kinks" and "Dares" being tab names under the app,
+  not the app itself.
+
+## 1.35.0 — app renamed to Playroom, identity moved into the header
+
+- Renamed the app itself from "Moves" to "Playroom" — the browser tab
+  title, home screen icon name, and the small brand mark in the top-right
+  corner all reflect this now.
+- Your photo and name now live in the header, visible from every screen,
+  not just Home — tap them anytime to open your account.
+- New shared "Your account" screen (tap your name/photo in the header) —
+  change your photo, your name, and your Signal number, all in one place.
+  Available equally to both accounts, since none of this is a
+  content-management function — it's just your own details. The separate
+  Admin tab (Questions & Dares) stays exactly as restricted as before.
+- Playroom's body no longer repeats your photo and name, since they're
+  always visible in the header now — one less duplicated thing on screen.
+- Cleaned up a stale dark-mode browser color left over from the very
+  first version, before the light themes existed.
+
 ## 1.34.1 — Home renamed to Playroom
 
 - "Heat" renamed to "Playroom" — same slim screen, just a name that
