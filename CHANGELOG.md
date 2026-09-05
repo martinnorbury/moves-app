@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.32.0 — one-tap Signal link on in-play moves
+
+- Added a place to save your own Signal number, under your name on Home
+  ("Add your Signal number"). Your partner's number is visible to you
+  specifically so the app can build a link to message them — not shown
+  anywhere else, and this isn't the same as any of the boundary-answer
+  privacy, since it's contact info you're sharing with each other on
+  purpose.
+- In-play moves now show "Message on Signal →" whenever your partner's
+  number is saved — opens straight to your Signal chat with them, no
+  searching. Only appears once both the move is active and their number
+  is known; Martin's number is saved already, Jacki's still needs adding
+  before his own outbound link works.
+
+## 1.31.0 — accepted moves actually feel "in play"
+
+- An accepted (or countered/in-progress) move now gets a warm gold glow, a
+  pulsing "In Play" indicator, and — if it has a deadline — a live
+  countdown ("2h 14m left") that actually ticks down while the app is
+  open, on both the sender's and recipient's screens. Replaces the small
+  status badge that was easy to miss.
+- The countdown updates every 30 seconds without needing new data, and
+  deliberately pauses while any modal is open so it never yanks focus out
+  from under someone mid-form.
+- Deliberately did not build live chat or a "during the dare" experience
+  into the app — that's what Signal is for, matching the "not a
+  replacement for a private messaging app" principle from the original
+  brief.
+
 ## 1.30.0 — evidence photos, sign-off, and the admin alignment fixed for real
 
 - Evidence photos can now be attached in-app when marking a move

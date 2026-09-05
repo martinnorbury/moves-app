@@ -199,6 +199,22 @@
   }
   .dare.locked{border-left:3px solid var(--wine);}
   .dare.unlocked{border-left:3px solid var(--gold);}
+  .dare.in-play{
+    border:2px solid var(--gold); border-left:2px solid var(--gold);
+    box-shadow:0 0 0 1px var(--gold) inset, 0 6px 20px rgba(201,169,97,0.18);
+    background:linear-gradient(135deg, var(--surface), var(--surface-raised));
+  }
+  .in-play-banner{
+    display:flex; align-items:center; gap:7px; margin-bottom:10px;
+    font-size:11.5px; font-weight:700; letter-spacing:0.5px; color:var(--gold); text-transform:uppercase;
+  }
+  .in-play-dot{width:8px; height:8px; border-radius:50%; background:var(--gold); animation:pulse-dot 1.6s ease-in-out infinite;}
+  @keyframes pulse-dot{
+    0%,100%{opacity:1; transform:scale(1);}
+    50%{opacity:0.4; transform:scale(0.7);}
+  }
+  .countdown-text{font-size:12.5px; color:var(--gold); font-weight:600; margin-bottom:8px;}
+  .countdown-text.overdue{color:var(--wine-bright);}
   .dare-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
   .dare-title{font-family:var(--serif); font-size:17px; color:var(--text);}
   .dare-meta{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
@@ -331,7 +347,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.30.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.32.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -339,7 +355,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.30.0';
+const APP_VERSION = '1.32.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -417,6 +433,19 @@ function fmtDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' +
          d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+function fmtCountdown(iso) {
+  if (!iso) return null;
+  const diffMs = new Date(iso) - new Date();
+  if (diffMs <= 0) return { text: 'Overdue', overdue: true };
+  const mins = Math.floor(diffMs / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  let text;
+  if (days > 0) text = `${days}d ${hrs % 24}h left`;
+  else if (hrs > 0) text = `${hrs}h ${mins % 60}m left`;
+  else text = `${mins}m left`;
+  return { text, overdue: false };
 }
 
 /* ==========================================================================
@@ -963,6 +992,7 @@ function renderHome(unanswered) {
       <div>
         <div class="welcome-greeting">Welcome back,</div>
         <div class="welcome-name">${esc(state.profile ? state.profile.display_name : '')}</div>
+        <button class="link-btn" id="btn-signal-number" style="padding:0; margin-top:2px">${state.profile && state.profile.signal_phone ? 'Change Signal number' : 'Add your Signal number'}</button>
       </div>
     </div>
 
@@ -1063,9 +1093,14 @@ function renderDareCard(d, actionable, compact) {
 
   const totalPoints = d.points_awarded != null ? d.points_awarded + (d.quality_bonus_points || 0) : null;
   const evidenceCount = state.dareEvidence.filter(e => e.dare_id === d.id).length;
+  const inPlay = ['accepted', 'in_progress', 'countered'].includes(d.status);
+  const countdown = inPlay ? fmtCountdown(d.deadline) : null;
 
   return `
-    <div class="dare ${d.status==='sent' && !isMine ? 'locked' : 'unlocked'}">
+    <div class="dare ${d.status==='sent' && !isMine ? 'locked' : inPlay ? 'in-play' : 'unlocked'}">
+      ${inPlay ? `<div class="in-play-banner"><span class="in-play-dot"></span>In play</div>` : ''}
+      ${countdown ? `<div class="countdown-text ${countdown.overdue ? 'overdue' : ''}">${esc(countdown.text)}</div>` : ''}
+      ${inPlay && state.partner && state.partner.signal_phone ? `<a class="link-btn" href="https://signal.me/#p/${encodeURIComponent(state.partner.signal_phone)}" target="_blank" rel="noopener" style="display:inline-block; margin-bottom:8px">Message on Signal →</a><br>` : ''}
       <div class="dare-top">
         <div class="dare-title">${esc(d.title)}</div>
         ${totalPoints != null ? `<div class="dare-points">${totalPoints} pts${d.quality_bonus_points ? ` <span class="hint-text">(+${d.quality_bonus_points} bonus)</span>` : ''}</div>` : ''}
@@ -1761,6 +1796,8 @@ function attachMainHandlers() {
   if (vtap) vtap.onclick = openVersionModal;
   const avatarBtn = document.getElementById('btn-change-avatar');
   if (avatarBtn) avatarBtn.onclick = openAvatarModal;
+  const signalBtn = document.getElementById('btn-signal-number');
+  if (signalBtn) signalBtn.onclick = openSignalNumberModal;
   $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
@@ -2190,6 +2227,40 @@ async function runBulkImageImport(files) {
   }
 }
 
+function openSignalNumberModal() {
+  const current = state.profile && state.profile.signal_phone ? state.profile.signal_phone : '';
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Your Signal number</h2>
+        <p class="hint-text" style="margin-bottom:14px">Lets your partner message you on Signal with one tap during an in-play move. Include the country code, e.g. +447700900000.</p>
+        <div class="field"><input type="tel" id="signal-number-input" value="${esc(current)}" placeholder="+447700900000"></div>
+        <div id="signal-number-error" class="error-text" style="margin-top:8px"></div>
+        <div class="btn-row" style="margin-top:16px">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-save-signal-number">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('btn-save-signal-number').onclick = async () => {
+    const errEl = document.getElementById('signal-number-error');
+    const value = document.getElementById('signal-number-input').value.trim();
+    if (value && !/^\+[1-9]\d{6,14}$/.test(value)) {
+      errEl.textContent = 'Enter it in international format, starting with + and the country code.';
+      return;
+    }
+    const { error } = await sb.from('profiles').update({ signal_phone: value || null }).eq('id', state.session.user.id);
+    if (error) { errEl.textContent = error.message; return; }
+    state.profile.signal_phone = value || null;
+    closeModal();
+    render();
+    showToast('Signal number saved.');
+  };
+}
+
 function openAvatarModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -2587,6 +2658,15 @@ function openFollowUpQuestionModal(q) {
     showToast('Answer saved.');
   });
 }
+
+// Keeps in-play countdowns ticking without needing a data refresh — only
+// re-renders when there's actually a live countdown on screen, to avoid
+// pointless work the rest of the time.
+setInterval(() => {
+  if (state.session && !state.modal && state.dares.some(d => ['accepted','in_progress','countered'].includes(d.status) && d.deadline)) {
+    render();
+  }
+}, 30000);
 
 boot();
 
