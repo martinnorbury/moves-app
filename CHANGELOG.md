@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.34.1 — Home renamed to Playroom
+
+- "Heat" renamed to "Playroom" — same slim screen, just a name that
+  actually reads as a place rather than a stat.
+
+## 1.34.0 — Home slimmed to a real summary, tabs renamed and reordered
+
+- Renamed and reordered tabs: Heat (was Home) is now first, then Kinks,
+  Dares (was Moves), Rewards, History.
+- Home ("Heat") no longer duplicates the full dare lists — it's now: the
+  in-play hero if something's active, an equally visible nudge if
+  something's waiting on your response, a calm "you're all caught up"
+  otherwise, your welcome/avatar/Signal number, the scoreboard, the Heat
+  Meter, and "Create a move." One screen, one job: what's happening right
+  now, how are we doing overall.
+- The Dares tab now properly holds what moved off Home: New for you, In
+  play, and Sent by you — the full interactive cards with Accept/Decline/
+  Counter/Mark Complete live there, where a dedicated tab actually makes
+  sense for them.
+- "Recent" dropped entirely — History already covers completed moves, no
+  need for the same thing in two places.
+
 ## 1.33.0 — an in-play move you actually can't miss
 
 - The small banner and 12px countdown from last time weren't enough —
