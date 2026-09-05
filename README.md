@@ -161,6 +161,7 @@ index.html                      the entire website: markup, styling, config, and
 supabase/schema.sql              current database setup — accurate reference copy, already applied
 boundary-cards-template.csv       starter template for bulk-importing your own cards
 dare-library-template.csv         starter template for bulk-importing dare library entries
+forfeit-library-template.csv      starter template for bulk-importing forfeits
 README.md                        this file (documentation only — not part of the website)
 CHANGELOG.md                      version history (the app's own version screen reads this live)
 ```
