@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.33.0 — an in-play move you actually can't miss
+
+- The small banner and 12px countdown from last time weren't enough —
+  fixed properly. There's now a full-width, wine-to-gold banner at the
+  very top of Home, above even the welcome greeting, whenever a move is
+  in play: the dare's title, a large 38px countdown, and whose move it is
+  to act on. If more than one move is active, the most urgent (soonest
+  deadline) leads, with a note about how many others are running.
+
 ## 1.32.0 — one-tap Signal link on in-play moves
 
 - Added a place to save your own Signal number, under your name on Home
