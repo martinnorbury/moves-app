@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="TwoPlay">
-<meta name="theme-color" content="#F6F3F0">
+<meta name="theme-color" content="#14100F">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,49 +17,49 @@
 <style>
   :root{
     /* Neutral default, used before a theme (gender) is chosen — auth/signup only */
-    --bg:#F6F3F0;
-    --surface:#FFFFFF;
-    --surface-raised:#EFEAE4;
-    --line:#E2DAD2;
-    --wine:#8C5A46;
-    --wine-bright:#A8735D;
-    --gold:#B98A4E;
-    --text:#2B2622;
-    --text-dim:#71675D;
-    --text-faint:#A89C90;
-    --good:#6B8F63;
+    --bg:#14100F;
+    --surface:#221A18;
+    --surface-raised:#2C221F;
+    --line:#3D302B;
+    --wine:#B8483F;
+    --wine-bright:#D65A50;
+    --gold:#D9A857;
+    --text:#F3E9E0;
+    --text-dim:#B9A99C;
+    --text-faint:#7D6D63;
+    --good:#8FB37F;
     --radius-s:6px;
     --radius-m:10px;
     --serif: 'Fraunces', Georgia, serif;
     --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
-  /* Lighter, warmer theme */
+  /* Deep, rose-red theme */
   body.theme-female{
-    --bg:#FBF2F3;
-    --surface:#FFFFFF;
-    --surface-raised:#FCE8EB;
-    --line:#F1D6DC;
-    --wine:#C2607B;
-    --wine-bright:#D97C97;
-    --gold:#B98A4E;
-    --text:#3D2A30;
-    --text-dim:#8C6E76;
-    --text-faint:#B79CA3;
-    --good:#6B8F63;
+    --bg:#180F12;
+    --surface:#261A1E;
+    --surface-raised:#302026;
+    --line:#443036;
+    --wine:#E0567F;
+    --wine-bright:#F0708F;
+    --gold:#D9A857;
+    --text:#F5E6EA;
+    --text-dim:#C2A3AC;
+    --text-faint:#8A6D75;
+    --good:#8FB37F;
   }
-  /* Lighter, cooler theme */
+  /* Deep, cool-blue theme */
   body.theme-male{
-    --bg:#F1F5FA;
-    --surface:#FFFFFF;
-    --surface-raised:#E6EDF5;
-    --line:#D6E2EE;
-    --wine:#3D6690;
-    --wine-bright:#4F7FAE;
-    --gold:#B98A4E;
-    --text:#24313E;
-    --text-dim:#66788A;
-    --text-faint:#9AACBC;
-    --good:#6B8F63;
+    --bg:#0E1218;
+    --surface:#1A222C;
+    --surface-raised:#212B37;
+    --line:#2E3B48;
+    --wine:#5B8FC7;
+    --wine-bright:#75A6DA;
+    --gold:#D9A857;
+    --text:#E8EEF5;
+    --text-dim:#9FB0C0;
+    --text-faint:#66788A;
+    --good:#8FB37F;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
@@ -233,11 +233,11 @@
     font-size:11px; padding:3px 9px; border-radius:99px; border:1px solid var(--line); color:var(--text-dim);
     white-space:nowrap;
   }
-  .pill.intensity-tease{background:#EAF3E4; color:#4B6B3E; border-color:#CFE3C2;}
-  .pill.intensity-risque{background:#FBEEDC; color:#8A5A1E; border-color:#F0D9B0;}
-  .pill.intensity-bold{background:#FBE6DC; color:#9A4A22; border-color:#F0C3AC;}
-  .pill.intensity-wild{background:#FBE3E6; color:#9A2F3D; border-color:#F0BEC5;}
-  .pill.access-full{background:#FBF1DC; color:#8A6A1E; border-color:#F0DFB0; font-weight:600;}
+  .pill.intensity-tease{background:#243019; color:#A8CC96; border-color:#3D5230;}
+  .pill.intensity-risque{background:#332711; color:#E0B368; border-color:#5C4620;}
+  .pill.intensity-bold{background:#331F14; color:#E0935E; border-color:#5C3826;}
+  .pill.intensity-wild{background:#331319; color:#E07485; border-color:#5C2530;}
+  .pill.access-full{background:#332711; color:#E8C878; border-color:#5C4620; font-weight:600;}
   .dare-body{color:var(--text-dim); font-size:13.5px; margin-bottom:12px;}
   .dare-instructions{color:var(--text); font-size:14px; margin-bottom:12px; line-height:1.55;}
   .dare-points{font-size:12px; color:var(--gold);}
@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.38.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.40.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.38.0';
+const APP_VERSION = '1.40.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -453,6 +453,40 @@ function esc(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+function downloadCsv(filename, rows) {
+  const csv = Papa.unparse(rows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportQuestionsCsv() {
+  const rows = state.questions.map(q => ({
+    category: q.category, title: q.title, explanation: q.explanation || '',
+    max_intensity: q.max_intensity, suitable_for: q.suitable_for,
+    is_general: q.is_general ? 'true' : 'false', image_filename: ''
+  }));
+  downloadCsv('questions-export.csv', rows);
+}
+
+function exportDaresCsv() {
+  const rows = state.dareLibrary.map(d => ({
+    category: d.category, title: d.title, teaser: d.teaser || '', instructions: d.instructions, intensity: d.intensity
+  }));
+  downloadCsv('dares-export.csv', rows);
+}
+
+function exportForfeitsCsv() {
+  const rows = state.forfeitLibrary.map(f => ({
+    title: f.title, teaser: f.teaser || '', instructions: f.instructions,
+    is_intimate: f.is_intimate ? 'true' : 'false', category: f.category || '', intensity: f.intensity || ''
+  }));
+  downloadCsv('forfeits-export.csv', rows);
+}
+
 function showToast(msg) {
   state.toast = msg;
   render();
@@ -469,26 +503,32 @@ function fireConfetti() {
 function celebrateCompletion({ title, byName, points, bonusPoints, heatGain, onContinue }) {
   fireConfetti();
   const totalPoints = points + (bonusPoints || 0);
-  const overlay = document.createElement('div');
-  overlay.className = 'celebrate-backdrop';
-  overlay.innerHTML = `
-    <div class="celebrate-card">
-      <div class="celebrate-emoji">🎉</div>
-      <div class="celebrate-title">Dare Complete!</div>
-      <div class="celebrate-name">${esc(byName)} just finished "${esc(title)}"</div>
-      <div class="celebrate-points">+${totalPoints}</div>
-      <div class="celebrate-points-label">points${bonusPoints ? ` (incl. ${bonusPoints} bonus)` : ''}</div>
-      <div class="celebrate-heat">🔥 Heat Meter +${heatGain}%</div>
-      <button class="btn" style="background:#fff; color:var(--wine); width:100%;" id="btn-celebrate-continue">Nice!</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  document.getElementById('btn-celebrate-continue').onclick = () => {
-    overlay.remove();
-    if (onContinue) onContinue();
-  };
-  // Auto-dismiss after a few seconds if nobody taps through.
-  setTimeout(() => { if (document.body.contains(overlay)) { overlay.remove(); if (onContinue) onContinue(); } }, 6000);
+
+  // Give the confetti a couple of seconds to actually be seen before the
+  // dark overlay covers the screen — showing both at once meant the
+  // burst was hidden behind the card the instant it appeared.
+  setTimeout(() => {
+    const overlay = document.createElement('div');
+    overlay.className = 'celebrate-backdrop';
+    overlay.innerHTML = `
+      <div class="celebrate-card">
+        <div class="celebrate-emoji">🎉</div>
+        <div class="celebrate-title">Dare Complete!</div>
+        <div class="celebrate-name">${esc(byName)} just finished "${esc(title)}"</div>
+        <div class="celebrate-points">+${totalPoints}</div>
+        <div class="celebrate-points-label">points${bonusPoints ? ` (incl. ${bonusPoints} bonus)` : ''}</div>
+        <div class="celebrate-heat">🔥 Heat Meter +${heatGain}%</div>
+        <button class="btn" style="background:#fff; color:var(--wine); width:100%;" id="btn-celebrate-continue">Nice!</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('btn-celebrate-continue').onclick = () => {
+      overlay.remove();
+      if (onContinue) onContinue();
+    };
+    // Auto-dismiss after a few seconds if nobody taps through.
+    setTimeout(() => { if (document.body.contains(overlay)) { overlay.remove(); if (onContinue) onContinue(); } }, 6000);
+  }, 1400);
 }
 
 function fmtDate(iso) {
@@ -1489,10 +1529,11 @@ function renderForfeitsSection() {
   return `
     <div class="section-head" style="margin-top:0"><h2>Forfeits</h2></div>
     <p class="hint-text" style="margin-bottom:14px">Picked by whoever loses the week — never imposed by the winner. Intimate ones are capped by that Temptation's current intensity, same as dares.</p>
-    <div class="btn-row" style="margin-bottom:14px">
+    <div class="btn-row" style="margin-bottom:8px">
       <button class="btn btn-ghost" id="btn-add-forfeit">Add a forfeit</button>
       <button class="btn btn-ghost" id="btn-import-forfeits-csv">Import from CSV</button>
     </div>
+    ${state.forfeitLibrary.length ? `<button class="link-btn" id="btn-export-forfeits-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
     ${state.forfeitLibrary.length ? state.forfeitLibrary.map(f => `
       <div class="category-row" data-edit-forfeit="${f.id}" style="cursor:pointer">
         <div>
@@ -1536,11 +1577,11 @@ function renderQuestionsColumn() {
     ` : `
     <p class="hint-text" style="margin-bottom:14px">Tap a temptation to see its cards, add new ones, or edit them.</p>
 
-    <div class="btn-row" style="margin-bottom:14px">
+    <div class="btn-row" style="margin-bottom:8px">
       <button class="btn btn-ghost" id="btn-new-heading">Add a new temptation</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
-
+    ${state.questions.length ? `<button class="link-btn" id="btn-export-questions-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
       const answered = answeredByCategory[c.name] || 0;
@@ -1586,10 +1627,11 @@ function renderDaresColumn() {
     ` : `
     <p class="hint-text" style="margin-bottom:14px">Tap a temptation to see its dares, add new ones, or edit them.</p>
 
-    <div class="btn-row" style="margin-bottom:14px">
+    <div class="btn-row" style="margin-bottom:8px">
       <button class="btn btn-ghost" id="btn-add-dare">Add a dare</button>
       <button class="btn btn-ghost" id="btn-import-dares-csv">Import from CSV</button>
     </div>
+    ${state.dareLibrary.length ? `<button class="link-btn" id="btn-export-dares-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -2091,6 +2133,12 @@ function attachMainHandlers() {
   if (importDaresCsvBtn) importDaresCsvBtn.onclick = openImportDaresCsvModal;
   const importForfeitsCsvBtn = document.getElementById('btn-import-forfeits-csv');
   if (importForfeitsCsvBtn) importForfeitsCsvBtn.onclick = openImportForfeitsCsvModal;
+  const exportQuestionsBtn = document.getElementById('btn-export-questions-csv');
+  if (exportQuestionsBtn) exportQuestionsBtn.onclick = exportQuestionsCsv;
+  const exportDaresBtn = document.getElementById('btn-export-dares-csv');
+  if (exportDaresBtn) exportDaresBtn.onclick = exportDaresCsv;
+  const exportForfeitsBtn = document.getElementById('btn-export-forfeits-csv');
+  if (exportForfeitsBtn) exportForfeitsBtn.onclick = exportForfeitsCsv;
   const addForfeitBtn = document.getElementById('btn-add-forfeit');
   if (addForfeitBtn) addForfeitBtn.onclick = () => openLibraryForfeitModal(null);
   $app.querySelectorAll('[data-edit-forfeit]').forEach(el => el.onclick = () => {

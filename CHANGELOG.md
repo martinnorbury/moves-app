@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.40.0 — full dark redesign, all three themes
+
+- Replaced the light pastel palette (cream/pale pink/pale blue) with
+  near-black backgrounds across all three themes — the default, and both
+  gendered variants. Each theme keeps its own accent identity, just
+  bolder and richer: default is deep red and gold, the rose theme is a
+  vivid magenta-red, the blue theme is a saturated cool blue — all
+  against near-black surfaces instead of white cards on a pale
+  background.
+- Swept the whole file for hardcoded colors that weren't using the theme
+  system and would've clashed against dark backgrounds: the intensity
+  pills (Tease/Risqué/Bold/Wild) and the Perfect Match tier pill were both
+  pale pastels designed for white cards — redesigned as dark, saturated
+  chips with light text so they read as rich rather than washed out.
+  Checked the answer gauge and confetti colors too; both were already
+  vivid enough to work fine on dark and needed no change.
+- Updated the browser status bar color to match the new dark background.
+
+## 1.39.0 — export to CSV for Questions, Dares, and Forfeits
+
+- Added "Export to CSV" for all three admin sections, each producing a
+  file in exactly the same format its own import expects — round-trip
+  editing with Grok is now: export, hand the file over for revisions,
+  re-import the result.
+- Added forfeit-library-template.csv, matching the same starter-template
+  pattern as the boundary card and dare library templates.
+- Caught and fixed a mistake in my own draft template before shipping —
+  an example forfeit described the partner picking your next dare, which
+  directly contradicts the loser-always-picks-their-own design. Replaced
+  it with an example that's actually consistent with how it works.
+
+## 1.38.2 — realtime actually works now, and confetti gets to breathe
+
+- Found and fixed a real, significant bug: the three tables the app's
+  realtime subscriptions depend on (dares, notifications, rewards) were
+  never added to the database's actual realtime publication. The
+  JavaScript subscription code was correct the whole time, but the
+  database was never configured to broadcast changes for it to receive —
+  so nothing has ever updated live until now. Verified directly that all
+  three tables are now properly registered.
+- Delayed the "Dare Complete!" card by 1.4 seconds after the confetti
+  fires, so the burst is actually visible before the dark overlay covers
+  the screen — previously they appeared at the same instant and the
+  confetti was hidden behind the card immediately.
+
+## 1.38.1 — closed the loose dares update policy
+
+- Removed the broad database policy that let either partner directly
+  update any field on a dare via a raw table call. Verified the fix by
+  actually trying the exploit before and after: attempting to set
+  `points_awarded` to 999999 and status to completed directly succeeded
+  silently before this change and is now fully blocked (the row stays
+  untouched). Confirmed the legitimate path still works exactly as
+  before — completing a dare through the app still awards points
+  correctly. No app-side change needed; this was purely a database fix.
+
 ## 1.38.0 — weekly forfeits, and images on dares
 
 - Built the weekly forfeit system discussed: a live "this week" score
