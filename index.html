@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.37.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.38.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.37.0';
+const APP_VERSION = '1.38.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -431,6 +431,9 @@ let state = {
   cardReport: [],              // per-card joint tiers, from get_card_report()
   dareLibrary: [],              // admin-written dare templates, browsable by both partners
   dareEvidence: [],              // evidence photo records, keyed by dare_id
+  weeklyScore: [],                 // this week's live scores, resets naturally each week
+  currentSettlement: null,         // most recent settled week, if any
+  forfeitLibrary: [],               // admin-written forfeit templates
   partnerTeaser: [],            // partner's already-given general answers, shuffled — from get_partner_teaser()
   viewedTeaser: false,           // shown once per login, before the wizard, if the partner's already started
   viewingAllAnswers: false,      // whether the full answer-review screen is open
@@ -471,7 +474,7 @@ function celebrateCompletion({ title, byName, points, bonusPoints, heatGain, onC
   overlay.innerHTML = `
     <div class="celebrate-card">
       <div class="celebrate-emoji">🎉</div>
-      <div class="celebrate-title">Move Complete!</div>
+      <div class="celebrate-title">Dare Complete!</div>
       <div class="celebrate-name">${esc(byName)} just finished "${esc(title)}"</div>
       <div class="celebrate-points">+${totalPoints}</div>
       <div class="celebrate-points-label">points${bonusPoints ? ` (incl. ${bonusPoints} bonus)` : ''}</div>
@@ -529,6 +532,7 @@ function resetState() {
   state.wizardSkipped = new Set();
   state.headingAccess = [];
   state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.dareEvidence = [];
+  state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
@@ -551,8 +555,10 @@ async function loadEverything() {
       if (state.coupleId) {
         await Promise.all([
           loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(),
-          loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications()
+          loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
+        await sb.rpc('settle_past_weeks');
+        await loadCurrentSettlement();
         subscribeRealtime();
       }
     }
@@ -566,11 +572,11 @@ async function loadEverything() {
 
 async function checkForCompletionReveal() {
   const unread = state.notifications.filter(n => !n.read && n.dare_id && n.message === 'Your move was completed.');
-  if (!unread.length) { await checkForPendingComparison(); return; }
+  if (!unread.length) { await runEngagementChecks(); return; }
   await loadDares(); // guard against a race where this fires before the dare's own points have synced
   const notif = unread[0];
   const dare = state.dares.find(d => d.id === notif.dare_id);
-  if (!dare) { await sb.from('notifications').update({ read: true }).eq('id', notif.id); await checkForPendingComparison(); return; }
+  if (!dare) { await sb.from('notifications').update({ read: true }).eq('id', notif.id); await runEngagementChecks(); return; }
   await sb.from('notifications').update({ read: true }).eq('id', notif.id);
   state.notifications = state.notifications.filter(n => n.id !== notif.id);
   const heatGain = Math.max(1, Math.round((dare.points_awarded || 0) / 10));
@@ -580,14 +586,24 @@ async function checkForCompletionReveal() {
     points: dare.points_awarded,
     bonusPoints: dare.quality_bonus_points,
     heatGain,
-    onContinue: checkForPendingComparison
+    onContinue: runEngagementChecks
   });
 }
 
-async function checkForPendingComparison() {
+// One step at a time: pending comparisons first, then a forfeit that
+// needs picking. Each modal's own close/answer handler calls this again,
+// so the chain naturally continues until nothing's left to show.
+async function runEngagementChecks() {
   const { data, error } = await sb.rpc('get_pending_comparison_cards');
-  if (error || !data || !data.length) return;
-  openComparisonQuestionModal(data[0]);
+  if (!error && data && data.length) { openComparisonQuestionModal(data[0]); return; }
+  await checkForPendingForfeit();
+}
+
+async function checkForPendingForfeit() {
+  const s = state.currentSettlement;
+  if (s && s.loser_id === state.session.user.id && !s.forfeit_id) {
+    openForfeitPickerModal(s);
+  }
 }
 
 function openComparisonQuestionModal(q) {
@@ -595,7 +611,7 @@ function openComparisonQuestionModal(q) {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Your turn to weigh in</h2>
-        <p class="hint-text" style="margin-bottom:14px">Your partner shared where they stand on this in ${esc(q.category)} — here's your chance to answer the same question, so you can see how you compare.</p>
+        <p class="hint-text" style="margin-bottom:14px">${esc(state.partner ? state.partner.display_name : 'Your partner')} shared where they stand on this in ${esc(q.category)} — here's your chance to answer the same question, so you can see how you compare.</p>
         <div class="deck-card-title" style="margin-bottom:8px">${esc(q.title)}</div>
         ${q.explanation ? `<div class="deck-card-explain" style="margin-bottom:12px">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, null, (a) => `data-comparison-answer="${a}" data-comparison-id="${q.question_id}"`)}
@@ -604,14 +620,15 @@ function openComparisonQuestionModal(q) {
     </div>
   `;
   render();
-  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('modal-cancel').onclick = () => { closeModal(); runEngagementChecks(); };
   $app.querySelectorAll('[data-comparison-answer]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.comparisonId, val = el.dataset.comparisonAnswer;
     state.answers[qId] = val;
     await sb.from('boundary_answers').upsert({ user_id: state.session.user.id, question_id: qId, answer: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id,question_id' });
     await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     closeModal();
-    showToast('Answer saved — your zone picture just updated.');
+    showToast('Answer saved — your temptation picture just updated.');
+    runEngagementChecks();
   });
 }
 
@@ -673,6 +690,18 @@ async function loadDareLibrary() {
 async function loadDareEvidence() {
   const { data, error } = await sb.from('dare_evidence').select('*');
   state.dareEvidence = error ? [] : (data || []);
+}
+async function loadWeeklyScore() {
+  const { data, error } = await sb.rpc('get_weekly_score');
+  state.weeklyScore = error ? [] : (data || []);
+}
+async function loadForfeitLibrary() {
+  const { data, error } = await sb.from('forfeit_library').select('*').eq('active', true).order('sort_order');
+  state.forfeitLibrary = error ? [] : (data || []);
+}
+async function loadCurrentSettlement() {
+  const { data, error } = await sb.from('weekly_settlements').select('*').order('week_start', { ascending: false }).limit(1).maybeSingle();
+  state.currentSettlement = error ? null : data;
 }
 async function loadPartnerTeaser() {
   const { data, error } = await sb.rpc('get_partner_teaser');
@@ -798,13 +827,13 @@ function renderStep1Complete() {
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
         <h1>Step 1 complete 🎉</h1>
-        <p>You've both answered the general question for every zone. Here's where that leaves you.</p>
+        <p>You've both answered the general question for every temptation. Here's where that leaves you.</p>
       </div>
       ${renderOverallStanding()}
       ${renderHeadingAccessList()}
       <div class="divider"></div>
       <div class="auth-hero" style="margin-top:0">
-        <h1 style="font-size:22px">Step 2: your first move</h1>
+        <h1 style="font-size:22px">Step 2: your first dare</h1>
         <p>Next up is actually sending each other a dare. We'll figure out together how that gets suggested to you — for now, head into the app and take a look around.</p>
       </div>
       <button class="btn btn-gold" id="btn-step1-continue" style="width:100%">Let's go</button>
@@ -828,7 +857,7 @@ function renderWizard(q, remaining) {
 
   return `
     <div class="screen" style="padding-top:22px">
-      <div class="deck-progress">${answeredGeneral + 1} of ${totalGeneral} — a general sense of each zone</div>
+      <div class="deck-progress">${answeredGeneral + 1} of ${totalGeneral} — a general sense of each temptation</div>
       <div class="deck-card">
         ${imgUrl ? `<img src="${esc(imgUrl)}" alt="">` : ''}
         <div class="deck-card-body">
@@ -916,7 +945,7 @@ function renderAuth() {
   return `
     <div class="center-screen">
       <div class="auth-hero">
-        <h1>Moves</h1>
+        <h1>TwoPlay</h1>
         <p>A private, two-player game. Just for the two of you.</p>
       </div>
       <div class="auth-tabs">
@@ -1099,13 +1128,13 @@ function renderInPlayHero() {
 
   return `
     <div class="inplay-hero">
-      <div class="inplay-hero-label"><span class="inplay-hero-dot"></span>Move In Play</div>
+      <div class="inplay-hero-label"><span class="inplay-hero-dot"></span>Dare In Play</div>
       <div class="inplay-hero-title">${esc(d.title)}</div>
       ${countdown
         ? `<div class="inplay-hero-countdown ${countdown.overdue ? 'overdue' : ''}">${esc(countdown.text)}</div>`
         : `<div class="inplay-hero-sub">No deadline set</div>`}
-      <div class="inplay-hero-sub">${isRecipient ? "It's on you to complete this one." : "Waiting on them to complete it."}</div>
-      ${more > 0 ? `<div class="inplay-hero-more">+${more} more move${more===1?'':'s'} in play</div>` : ''}
+      <div class="inplay-hero-sub">${isRecipient ? "It's on you to complete this one." : `Waiting on ${esc(state.partner ? state.partner.display_name : 'them')} to complete it.`}</div>
+      ${more > 0 ? `<div class="inplay-hero-more">+${more} more dare${more===1?'':'s'} in play</div>` : ''}
     </div>
   `;
 }
@@ -1117,7 +1146,7 @@ function computeTurnMessage() {
   const turnUserId = mostRecent.recipient_id; // whoever just completed a move is nudged to send the next one
   if (turnUserId === state.session.user.id) return "It's your turn to send a move, whenever you're ready.";
   const partnerName = state.partner ? state.partner.display_name : 'Your partner';
-  return `It's ${partnerName}'s turn to send a move — you can still send one anytime too.`;
+  return `It's ${partnerName}'s turn to send a dare — you can still send one anytime too.`;
 }
 
 function renderHome(unanswered) {
@@ -1131,7 +1160,7 @@ function renderHome(unanswered) {
     ${!inPlayHtml && pendingForMe.length ? `
       <div class="inplay-hero" style="background:linear-gradient(135deg, var(--gold), var(--wine))">
         <div class="inplay-hero-label"><span class="inplay-hero-dot"></span>Waiting On You</div>
-        <div class="inplay-hero-title">${pendingForMe.length} move${pendingForMe.length===1?'':'s'} to respond to</div>
+        <div class="inplay-hero-title">${pendingForMe.length} dare${pendingForMe.length===1?'':'s'} to respond to</div>
         <div class="inplay-hero-sub">Head to Dares to accept, decline, or counter.</div>
       </div>
     ` : ''}
@@ -1140,11 +1169,45 @@ function renderHome(unanswered) {
     ${turnMessage ? `<div class="hint-text" style="margin-bottom:18px">${esc(turnMessage)}</div>` : ''}
 
     ${renderScoreboard()}
+    ${renderWeeklyScore()}
+    ${renderForfeitStatus()}
     ${renderHeatBlock(nextReward)}
 
-    <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:8px">Create a move</button>
+    <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:8px">Create a dare</button>
     <button class="link-btn" data-tab="dares" style="display:block; text-align:center">See all your dares →</button>
   `;
+}
+
+function renderWeeklyScore() {
+  if (!state.weeklyScore.length) return '';
+  const mine = state.weeklyScore.find(s => s.user_id === state.session.user.id);
+  const theirs = state.weeklyScore.find(s => s.user_id !== state.session.user.id);
+  return `
+    <div class="hint-text" style="margin-bottom:18px">
+      This week: ${state.profile ? esc(state.profile.display_name) : 'You'} ${mine ? mine.score : 0} · ${state.partner ? esc(state.partner.display_name) : 'Them'} ${theirs ? theirs.score : 0}
+    </div>
+  `;
+}
+
+function renderForfeitStatus() {
+  const s = state.currentSettlement;
+  if (!s || !s.loser_id) return '';
+  const isLoser = s.loser_id === state.session.user.id;
+  const loserName = isLoser ? 'You' : (state.partner ? state.partner.display_name : 'They');
+  const winnerName = isLoser ? (state.partner ? state.partner.display_name : 'They') : 'You';
+
+  if (!s.forfeit_id) {
+    return `<div class="hint-text" style="margin-bottom:18px">${esc(winnerName)} won last week (${s.winner_points} to ${s.loser_points}) — ${isLoser ? 'pick your forfeit below.' : `waiting on ${esc(loserName)} to pick theirs.`}</div>`;
+  }
+  if (!s.forfeit_completed_at) {
+    return `
+      <div class="hint-text" style="margin-bottom:18px">
+        ${esc(loserName)} owe${isLoser ? '' : 's'} a forfeit from last week: <b>${esc(s.forfeit_title)}</b>
+        ${isLoser ? `<button class="link-btn" id="btn-complete-forfeit" style="display:block; padding:4px 0 0">Mark it done</button>` : ''}
+      </div>
+    `;
+  }
+  return '';
 }
 
 function renderScoreboard() {
@@ -1182,7 +1245,9 @@ function renderDareCard(d, actionable, compact) {
 
   let body;
   if (revealed && !canReveal) {
-    body = `<div class="dare-instructions">${esc(d.instructions)}</div>`;
+    if (d.image_path && !state.imageUrls[d.image_path]) fetchSignedImageUrl(d.image_path, 'dare-images');
+    const imgUrl = d.image_path ? state.imageUrls[d.image_path] : null;
+    body = `${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:10px;">` : ''}<div class="dare-instructions">${esc(d.instructions)}</div>`;
   } else {
     body = `<div class="dare-body">${d.teaser ? esc(d.teaser) : 'Details hidden until you reveal it.'}</div>`;
   }
@@ -1256,13 +1321,13 @@ function renderDaresTab() {
   const sentByYou = state.dares.filter(d => d.creator_id === state.session.user.id && !['accepted','in_progress','countered'].includes(d.status));
 
   return `
-    <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:22px">Create a move</button>
+    <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:22px">Create a dare</button>
 
     <div class="section-head" style="margin-top:0"><h2>New for you</h2></div>
     ${pendingForMe.length ? pendingForMe.map(d => renderDareCard(d, true)).join('') : `<div class="empty-state">Nothing new right now.</div>`}
 
     <div class="section-head"><h2>In play</h2></div>
-    ${active.length ? active.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">No active moves.</div>`}
+    ${active.length ? active.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">No active dares.</div>`}
 
     <div class="section-head"><h2>Sent by you</h2></div>
     ${sentByYou.length ? sentByYou.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">Nothing else sent right now.</div>`}
@@ -1302,7 +1367,7 @@ function renderOverallStanding() {
   const parts = order.filter(a => counts[a]).map(a => `${counts[a]} ${esc(ACCESS_LABELS[a])}`);
   return `
     <div class="status-strip" style="margin-bottom:18px">
-      <div class="status-label">Overall, across all ${state.headingAccess.length} zones</div>
+      <div class="status-label">Overall, across all ${state.headingAccess.length} temptations</div>
       <div class="status-value">${parts.join(' · ')}</div>
     </div>
   `;
@@ -1339,7 +1404,7 @@ function renderHeadingExpansion(category) {
     .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
 
   if (!items.length) {
-    return `<div class="empty-state" style="padding:10px 0">Nothing answered by both of you in this zone yet.</div>`;
+    return `<div class="empty-state" style="padding:10px 0">Nothing answered by both of you in this temptation yet.</div>`;
   }
 
   return `
@@ -1362,8 +1427,8 @@ function renderAllAnswers() {
   return `
     <button class="link-btn" id="btn-close-all-answers">‹ Back to your report</button>
     <div class="section-head" style="margin-top:14px"><h2>All your answers (${answered.length})</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Every question you've personally answered, across every zone. Change any of them right here.</p>
-    <div class="field" style="margin-bottom:14px"><input type="text" id="all-answers-search" placeholder="Search by title or zone…" value="${esc(state.allAnswersFilter)}"></div>
+    <p class="hint-text" style="margin-bottom:14px">Every question you've personally answered, across every temptation. Change any of them right here.</p>
+    <div class="field" style="margin-bottom:14px"><input type="text" id="all-answers-search" placeholder="Search by title or temptation…" value="${esc(state.allAnswersFilter)}"></div>
     ${filtered.length ? filtered.map(q => {
       const headerHtml = q.category !== lastCategory ? `<div class="hint-text" style="margin:16px 0 6px; font-weight:600; color:var(--text)">${esc(q.category)}</div>` : '';
       lastCategory = q.category;
@@ -1395,8 +1460,8 @@ function renderBoundariesTab(unanswered) {
     `).join('')}
 
     <div class="divider"></div>
-    <div class="section-head"><h2>Zone access</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">A running average across every question you've both answered in that zone — the general one plus any specific cards. Each card keeps its own score regardless; this is just the zone-level picture. The more you've both answered, the less any single new answer shifts it — except a genuine Not For Me answer, which always closes the whole zone, average or not.</p>
+    <div class="section-head"><h2>Temptation access</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">A running average across every question you've both answered in that temptation — the general one plus any specific cards. Each card keeps its own score regardless; this is just the temptation-level picture. The more you've both answered, the less any single new answer shifts it — except a genuine Not For Me answer, which always closes the whole temptation, average or not.</p>
     ${renderOverallStanding()}
     ${renderHeadingAccessList()}
 
@@ -1415,6 +1480,29 @@ function renderSetupArea() {
       <div>${renderQuestionsColumn()}</div>
       <div>${renderDaresColumn()}</div>
     </div>
+    <div class="divider"></div>
+    ${renderForfeitsSection()}
+  `;
+}
+
+function renderForfeitsSection() {
+  return `
+    <div class="section-head" style="margin-top:0"><h2>Forfeits</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Picked by whoever loses the week — never imposed by the winner. Intimate ones are capped by that Temptation's current intensity, same as dares.</p>
+    <div class="btn-row" style="margin-bottom:14px">
+      <button class="btn btn-ghost" id="btn-add-forfeit">Add a forfeit</button>
+      <button class="btn btn-ghost" id="btn-import-forfeits-csv">Import from CSV</button>
+    </div>
+    ${state.forfeitLibrary.length ? state.forfeitLibrary.map(f => `
+      <div class="category-row" data-edit-forfeit="${f.id}" style="cursor:pointer">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${esc(f.title)}</div>
+          <div class="cat-count">${f.is_intimate ? `${esc(f.category)} · <span class="pill intensity-${f.intensity}">${INTENSITY_LABELS[f.intensity]}</span>` : 'Non-intimate'}</div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    `).join('') : `<div class="empty-state">No forfeits yet.</div>`}
+    ${state.forfeitLibrary.length ? `<button class="link-btn" id="btn-delete-all-forfeits" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.forfeitLibrary.length} forfeits</button>` : ''}
   `;
 }
 
@@ -1446,10 +1534,10 @@ function renderQuestionsColumn() {
         </div>
       `).join('') : `<div class="empty-state">No cards match "${esc(state.questionsSearch)}".</div>`}
     ` : `
-    <p class="hint-text" style="margin-bottom:14px">Tap a zone to see its cards, add new ones, or edit them.</p>
+    <p class="hint-text" style="margin-bottom:14px">Tap a temptation to see its cards, add new ones, or edit them.</p>
 
     <div class="btn-row" style="margin-bottom:14px">
-      <button class="btn btn-ghost" id="btn-new-heading">Add a new zone</button>
+      <button class="btn btn-ghost" id="btn-new-heading">Add a new temptation</button>
       <button class="btn btn-ghost" id="btn-import-csv">Import from CSV</button>
     </div>
 
@@ -1467,7 +1555,7 @@ function renderQuestionsColumn() {
       `;
     }).join('')}
 
-    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every zone</button>` : ''}
+    ${state.questions.length ? `<button class="link-btn" id="btn-delete-all-cards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.questions.length} cards across every temptation</button>` : ''}
     `}
   `;
 }
@@ -1496,7 +1584,7 @@ function renderDaresColumn() {
         </div>
       `).join('') : `<div class="empty-state">No dares match "${esc(state.daresSearch)}".</div>`}
     ` : `
-    <p class="hint-text" style="margin-bottom:14px">Tap a zone to see its dares, add new ones, or edit them.</p>
+    <p class="hint-text" style="margin-bottom:14px">Tap a temptation to see its dares, add new ones, or edit them.</p>
 
     <div class="btn-row" style="margin-bottom:14px">
       <button class="btn btn-ghost" id="btn-add-dare">Add a dare</button>
@@ -1525,7 +1613,7 @@ function renderDareHeadingView() {
   const dares = state.dareLibrary.filter(d => d.category === state.openDareCategory);
 
   return `
-    <button class="link-btn" data-close-dare-category="1">‹ Back to zones</button>
+    <button class="link-btn" data-close-dare-category="1">‹ Back to temptations</button>
     <div class="section-head" style="margin-top:14px"><h2>${esc(state.openDareCategory)}</h2></div>
     ${dares.length ? dares.map(d => `
       <div class="category-row" data-edit-dare="${d.id}" style="cursor:pointer">
@@ -1553,7 +1641,7 @@ function renderDeckView() {
 
   if (cards.length === 0) {
     return `
-      <button class="link-btn" data-close-deck="1">‹ Back to zones</button>
+      <button class="link-btn" data-close-deck="1">‹ Back to temptations</button>
       <div class="auth-hero" style="margin-top:20px"><h1>${esc(state.openCategory)}</h1><p>No cards here yet.</p></div>
       <button class="btn btn-gold" id="btn-add-card">Add the first card</button>
     `;
@@ -1568,7 +1656,7 @@ function renderDeckListView(cards, modeToggle) {
   const filtered = filterText ? cards.filter(q => q.title.toLowerCase().includes(filterText)) : cards;
 
   return `
-    <button class="link-btn" data-close-deck="1">‹ Back to zones</button>
+    <button class="link-btn" data-close-deck="1">‹ Back to temptations</button>
     ${modeToggle}
     <div class="field" style="margin-bottom:14px"><input type="text" id="deck-search" placeholder="Search ${esc(state.openCategory)}…" value="${esc(state.deckFilter)}"></div>
     ${filtered.length ? filtered.map((q, i) => {
@@ -1601,7 +1689,7 @@ function renderDeckCardView(cards, modeToggle) {
   const imgUrl = q.image_path ? state.imageUrls[q.image_path] : null;
 
   return `
-    <button class="link-btn" data-close-deck="1">‹ Back to zones</button>
+    <button class="link-btn" data-close-deck="1">‹ Back to temptations</button>
     ${modeToggle}
     <div class="deck-progress">${esc(state.openCategory)} — card ${idx + 1} of ${cards.length}</div>
     <div class="deck-card">
@@ -1627,10 +1715,10 @@ function renderDeckCardView(cards, modeToggle) {
   `;
 }
 
-async function fetchSignedImageUrl(path) {
+async function fetchSignedImageUrl(path, bucket = 'boundary-images') {
   if (state.imageUrls[path] === 'pending') return;
   state.imageUrls[path] = 'pending';
-  const { data } = await sb.storage.from('boundary-images').createSignedUrl(path, 3600);
+  const { data } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
   if (data && data.signedUrl) {
     state.imageUrls[path] = data.signedUrl;
     render();
@@ -1698,9 +1786,9 @@ function openCreateDareModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>Create a move</h2>
-        ${eligible.length === 0 ? `<p class="hint-text">No zones are open for a move yet — answer more questions together first.</p>` : `
-        <div class="field"><label>Zone</label>
+        <h2>Create a dare</h2>
+        ${eligible.length === 0 ? `<p class="hint-text">No temptations are open for a dare yet — answer more questions together first.</p>` : `
+        <div class="field"><label>Temptation</label>
           <select id="d-category">
             ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
           </select>
@@ -1718,6 +1806,10 @@ function openCreateDareModal() {
             <select id="d-intensity"></select>
           </div>
           <div class="field"><label>Deadline (optional)</label><input type="datetime-local" id="d-deadline"></div>
+          <div class="field"><label>Image (optional)</label>
+            <div id="d-image-preview"></div>
+            <input type="file" id="d-image" accept="image/*">
+          </div>
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
             <input type="checkbox" id="d-confirm" style="width:auto"> Requires my confirmation to count as complete
           </label>
@@ -1739,6 +1831,7 @@ function openCreateDareModal() {
   const intensitySelect = document.getElementById('d-intensity');
   const writeOwnBtn = document.getElementById('btn-write-own');
   const form = document.getElementById('dare-form');
+  let pickedImagePath = null;
 
   function currentMaxIntensity() {
     return categorySelect.options[categorySelect.selectedIndex].dataset.max;
@@ -1755,7 +1848,7 @@ function openCreateDareModal() {
     const matches = state.dareLibrary.filter(d => d.category === cat && allowed.includes(d.intensity));
     const box = document.getElementById('d-suggestions');
     if (!matches.length) {
-      box.innerHTML = `<p class="hint-text">No library dares for this zone yet.</p>`;
+      box.innerHTML = `<p class="hint-text">No library dares for this temptation yet.</p>`;
       return;
     }
     box.innerHTML = `<p class="hint-text" style="margin-bottom:8px">Suggested for you:</p>` + matches.map(d => `
@@ -1767,13 +1860,21 @@ function openCreateDareModal() {
         <div class="cat-arrow">›</div>
       </div>
     `).join('');
-    box.querySelectorAll('[data-pick-library]').forEach(el => el.onclick = () => {
+    box.querySelectorAll('[data-pick-library]').forEach(el => el.onclick = async () => {
       const d = matches.find(x => x.id === el.dataset.pickLibrary);
       document.getElementById('d-title').value = d.title;
       document.getElementById('d-teaser').value = d.teaser || '';
       document.getElementById('d-instructions').value = d.instructions;
       populateIntensityOptions();
       intensitySelect.value = d.intensity;
+      pickedImagePath = d.image_path || null;
+      const previewEl = document.getElementById('d-image-preview');
+      if (d.image_path) {
+        if (!state.imageUrls[d.image_path]) await fetchSignedImageUrl(d.image_path, 'dare-images');
+        previewEl.innerHTML = state.imageUrls[d.image_path] ? `<img src="${esc(state.imageUrls[d.image_path])}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : '';
+      } else {
+        previewEl.innerHTML = '';
+      }
       form.style.display = '';
       form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
@@ -1785,6 +1886,8 @@ function openCreateDareModal() {
     document.getElementById('d-title').value = '';
     document.getElementById('d-teaser').value = '';
     document.getElementById('d-instructions').value = '';
+    pickedImagePath = null;
+    document.getElementById('d-image-preview').innerHTML = '';
     form.style.display = '';
     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
@@ -1795,6 +1898,15 @@ function openCreateDareModal() {
     e.preventDefault();
     const errEl = document.getElementById('dare-form-error');
     const deadlineVal = document.getElementById('d-deadline').value;
+    let finalImagePath = pickedImagePath;
+    const imageFile = document.getElementById('d-image').files[0];
+    if (imageFile) {
+      const ext = imageFile.name.split('.').pop();
+      const path = `${state.coupleId}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await sb.storage.from('dare-images').upload(path, imageFile);
+      if (uploadError) { errEl.textContent = 'Image upload failed: ' + uploadError.message; return; }
+      finalImagePath = path;
+    }
     const { error } = await sb.rpc('create_dare', {
       p_category: categorySelect.value,
       p_title: document.getElementById('d-title').value.trim(),
@@ -1806,12 +1918,13 @@ function openCreateDareModal() {
       p_requires_confirmation: document.getElementById('d-confirm').checked,
       p_reward_text: null,
       p_reusable: false,
-      p_question_id: null
+      p_question_id: null,
+      p_image_path: finalImagePath
     });
     if (error) { errEl.textContent = error.message; return; }
     closeModal();
     await loadDares();
-    showToast('Move sent.');
+    showToast('Dare sent.');
   };
 }
 
@@ -1821,7 +1934,7 @@ function openCounterModal(dareId) {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>Counter this move</h2>
+        <h2>Counter this dare</h2>
         <form id="counter-form" class="stack">
           <div class="field"><label>Adjusted instructions</label><textarea id="c-instructions">${esc(d.instructions)}</textarea></div>
           <div class="field"><label>Adjusted intensity</label>
@@ -1932,6 +2045,14 @@ function attachMainHandlers() {
   if (vtap) vtap.onclick = openVersionModal;
   const openAccountBtn = document.getElementById('btn-open-account');
   if (openAccountBtn) openAccountBtn.onclick = openAccountModal;
+  const completeForfeitBtn = document.getElementById('btn-complete-forfeit');
+  if (completeForfeitBtn) completeForfeitBtn.onclick = async () => {
+    const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: state.currentSettlement.id });
+    if (error) { showToast(error.message); return; }
+    await loadCurrentSettlement();
+    render();
+    showToast('Forfeit marked complete.');
+  };
   $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
@@ -1968,6 +2089,23 @@ function attachMainHandlers() {
   if (importCsvBtn) importCsvBtn.onclick = openImportCsvModal;
   const importDaresCsvBtn = document.getElementById('btn-import-dares-csv');
   if (importDaresCsvBtn) importDaresCsvBtn.onclick = openImportDaresCsvModal;
+  const importForfeitsCsvBtn = document.getElementById('btn-import-forfeits-csv');
+  if (importForfeitsCsvBtn) importForfeitsCsvBtn.onclick = openImportForfeitsCsvModal;
+  const addForfeitBtn = document.getElementById('btn-add-forfeit');
+  if (addForfeitBtn) addForfeitBtn.onclick = () => openLibraryForfeitModal(null);
+  $app.querySelectorAll('[data-edit-forfeit]').forEach(el => el.onclick = () => {
+    const forfeit = state.forfeitLibrary.find(f => f.id === el.dataset.editForfeit);
+    if (forfeit) openLibraryForfeitModal(forfeit);
+  });
+  const deleteAllForfeitsBtn = document.getElementById('btn-delete-all-forfeits');
+  if (deleteAllForfeitsBtn) deleteAllForfeitsBtn.onclick = async () => {
+    if (!confirm(`Delete all ${state.forfeitLibrary.length} forfeits? This can't be undone.`)) return;
+    const { error } = await sb.from('forfeit_library').delete().eq('couple_id', state.coupleId);
+    if (error) { showToast(error.message); return; }
+    await loadForfeitLibrary();
+    render();
+    showToast('Forfeits cleared.');
+  };
   const questionsSearchInput = document.getElementById('questions-search');
   if (questionsSearchInput) {
     questionsSearchInput.oninput = () => { state.questionsSearch = questionsSearchInput.value; state.lastFocusedSearch = 'questions-search'; render(); };
@@ -2062,7 +2200,7 @@ function attachMainHandlers() {
 
   const deleteAllCardsBtn = document.getElementById('btn-delete-all-cards');
   if (deleteAllCardsBtn) deleteAllCardsBtn.onclick = async () => {
-    if (!confirm('Delete every card across every zone? This removes all your boundary content and can\'t be undone. Zones themselves stay.')) return;
+    if (!confirm('Delete every card across every temptation? This removes all your boundary content and can\'t be undone. Temptations themselves stay.')) return;
     const { error } = await sb.from('boundary_questions').delete().eq('couple_id', state.coupleId);
     if (error) { showToast(error.message); return; }
     state.openCategory = null; state.deckIndex = 0;
@@ -2074,7 +2212,7 @@ function attachMainHandlers() {
 
   const bulkImagesBtn = document.getElementById('btn-bulk-images');
   if (bulkImagesBtn) bulkImagesBtn.onclick = openBulkImageModal;
-  $app.querySelectorAll('[data-attach-image]').forEach(el => el.onclick = () => openSingleImageModal(el.dataset.attachImage));
+  $app.querySelectorAll('[data-attach-image]').forEach(el => el.onclick = () => openSingleImageModal('boundary-images', 'boundary_questions', el.dataset.attachImage, loadQuestions));
   $app.querySelectorAll('[data-edit-card]').forEach(el => el.onclick = () => {
     const q = state.questions.find(x => x.id === el.dataset.editCard);
     if (q) openEditCardModal(q);
@@ -2137,7 +2275,7 @@ function openAddHeadingModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>Add a new zone</h2>
+        <h2>Add a new temptation</h2>
         <form id="heading-form" class="stack">
           <div class="field"><input type="text" id="heading-name" placeholder="e.g. Travel Fantasies" required></div>
           <div id="heading-form-error" class="error-text"></div>
@@ -2168,7 +2306,7 @@ function openEditCardModal(q) {
       <div class="modal-sheet">
         <h2>Edit card</h2>
         <form id="edit-card-form" class="stack">
-          <div class="field"><label>Zone</label>
+          <div class="field"><label>Temptation</label>
             <select id="edit-card-category">
               ${state.categories.map(c => `<option value="${esc(c.name)}" ${c.name===q.category?'selected':''}>${esc(c.name)}</option>`).join('')}
             </select>
@@ -2182,7 +2320,7 @@ function openEditCardModal(q) {
             <select id="edit-card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}" ${t===q.suitable_for?'selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
-            <input type="checkbox" id="edit-card-is-general" style="width:auto" ${q.is_general ? 'checked' : ''}> This is the general "where do you sit" question for this zone
+            <input type="checkbox" id="edit-card-is-general" style="width:auto" ${q.is_general ? 'checked' : ''}> This is the general "where do you sit" question for this temptation
           </label>
           <div id="edit-card-form-error" class="error-text"></div>
           <div class="btn-row">
@@ -2221,7 +2359,7 @@ function openAddCardModal() {
       <div class="modal-sheet">
         <h2>Add a card</h2>
         <form id="card-form" class="stack">
-          <div class="field"><label>Zone</label>
+          <div class="field"><label>Temptation</label>
             <select id="card-category">
               ${state.categories.map(c => `<option value="${esc(c.name)}" ${c.name===state.openCategory?'selected':''}>${esc(c.name)}</option>`).join('')}
             </select>
@@ -2241,7 +2379,7 @@ function openAddCardModal() {
             <select id="card-suitable">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
-            <input type="checkbox" id="card-is-general" style="width:auto"> This is the general "where do you sit" question for this zone (shown in the after-login wizard)
+            <input type="checkbox" id="card-is-general" style="width:auto"> This is the general "where do you sit" question for this temptation (shown in the after-login wizard)
           </label>
           <div id="card-form-error" class="error-text"></div>
           <div class="btn-row">
@@ -2377,7 +2515,7 @@ function openAccountModal() {
         </div>
         <div class="field" style="margin-bottom:14px"><label>Your name</label><input type="text" id="account-name-input" value="${esc(currentName)}"></div>
         <div class="field"><label>Your Signal number</label><input type="tel" id="signal-number-input" value="${esc(currentPhone)}" placeholder="+447700900000"></div>
-        <p class="hint-text" style="margin-top:6px">Lets your partner message you on Signal with one tap during an in-play move. Include the country code.</p>
+        <p class="hint-text" style="margin-top:6px">Lets ${esc(state.partner ? state.partner.display_name : 'your partner')} message you on Signal with one tap during an in-play move. Include the country code.</p>
         <div id="account-error" class="error-text" style="margin-top:8px"></div>
         <div class="btn-row" style="margin-top:16px">
           <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
@@ -2439,7 +2577,7 @@ function openAvatarModal() {
   };
 }
 
-function openSingleImageModal(questionId) {
+function openSingleImageModal(bucket, table, rowId, onDone) {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
@@ -2458,12 +2596,12 @@ function openSingleImageModal(questionId) {
     const errEl = document.getElementById('single-image-error');
     const ext = file.name.split('.').pop();
     const path = `${state.coupleId}/${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await sb.storage.from('boundary-images').upload(path, file);
+    const { error: uploadError } = await sb.storage.from(bucket).upload(path, file);
     if (uploadError) { errEl.textContent = 'Upload failed: ' + uploadError.message; return; }
-    const { error: updateError } = await sb.from('boundary_questions').update({ image_path: path }).eq('id', questionId);
+    const { error: updateError } = await sb.from(table).update({ image_path: path }).eq('id', rowId);
     if (updateError) { errEl.textContent = updateError.message; return; }
     closeModal();
-    await loadQuestions();
+    if (onDone) await onDone();
     render();
     showToast('Image attached.');
   };
@@ -2474,7 +2612,7 @@ function openImportCsvModal() {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Import cards from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus optional <b>image_filename</b> and <b>is_general</b> columns. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). is_general (true/false, one per zone) marks the broad "where do you sit on this" question shown in the after-login wizard, as opposed to specific cards. Zones that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, explanation, max_intensity, suitable_for</b>, plus optional <b>image_filename</b> and <b>is_general</b> columns. max_intensity must be tease/risque/bold/wild. suitable_for must be apart/together/either/reunion (defaults to "either" if left blank or invalid). is_general (true/false, one per temptation) marks the broad "where do you sit on this" question shown in the after-login wizard, as opposed to specific cards. Temptations that don't exist yet are created automatically. The CSV can't carry the image itself — but if you add an image_filename column, "Attach images to cards" will match that exact filename first, before falling back to matching by title.</p>
         <input type="file" id="csv-file" accept=".csv">
         <div id="import-progress" class="hint-text" style="margin-top:14px"></div>
         <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
@@ -2518,7 +2656,7 @@ async function runCsvImport(rows) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const lineNum = i + 2; // account for header row, 1-indexed
-    const category = pick(row, 'category', 'heading', 'zone', 'category_heading').trim();
+    const category = pick(row, 'category', 'heading', 'temptation', 'category_heading').trim();
     const title = pick(row, 'title', 'name', 'card_title').trim();
     const explanation = pick(row, 'explanation', 'description', 'details').trim() || null;
     const rawIntensity = pick(row, 'max_intensity', 'intensity');
@@ -2547,7 +2685,7 @@ async function runCsvImport(rows) {
     let resolvedCategory = categoryLookup[categoryKey];
     if (!resolvedCategory) {
       const { error: catErr } = await sb.rpc('add_boundary_category', { p_name: category });
-      if (catErr) { skipped++; errors.push(`Row ${lineNum}: couldn't create zone "${category}" — skipped.`); continue; }
+      if (catErr) { skipped++; errors.push(`Row ${lineNum}: couldn't create temptation "${category}" — skipped.`); continue; }
       resolvedCategory = category;
       categoryLookup[categoryKey] = category;
     }
@@ -2576,13 +2714,90 @@ async function runCsvImport(rows) {
   // as the modal is closed.
 }
 
+function openLibraryForfeitModal(existing) {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${existing ? 'Edit forfeit' : 'Add a forfeit'}</h2>
+        <form id="forfeit-form" class="stack">
+          <div class="field"><label>Title</label><input type="text" id="lf-title" value="${existing ? esc(existing.title) : ''}" required></div>
+          <div class="field"><label>Teaser (optional)</label><input type="text" id="lf-teaser" value="${existing && existing.teaser ? esc(existing.teaser) : ''}"></div>
+          <div class="field"><label>Instructions</label><textarea id="lf-instructions" required>${existing ? esc(existing.instructions) : ''}</textarea></div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim)">
+            <input type="checkbox" id="lf-intimate" style="width:auto" ${existing && existing.is_intimate ? 'checked' : ''}> This is intimate — cap it by a Temptation's current intensity
+          </label>
+          <div id="lf-intimate-fields" style="display:${existing && existing.is_intimate ? '' : 'none'}">
+            <div class="field"><label>Temptation</label>
+              <select id="lf-category">
+                ${state.categories.map(c => `<option value="${esc(c.name)}" ${existing && existing.category===c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label>Intensity</label>
+              <select id="lf-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${existing && existing.intensity===i ? 'selected' : ''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
+            </div>
+          </div>
+          <div id="forfeit-error" class="error-text"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">${existing ? 'Save changes' : 'Add forfeit'}</button>
+          </div>
+          ${existing ? `<button type="button" class="link-btn" id="btn-delete-forfeit" style="margin-top:10px; color:var(--wine-bright)">Delete this forfeit</button>` : ''}
+        </form>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+
+  const intimateCheckbox = document.getElementById('lf-intimate');
+  const intimateFields = document.getElementById('lf-intimate-fields');
+  intimateCheckbox.onchange = () => { intimateFields.style.display = intimateCheckbox.checked ? '' : 'none'; };
+
+  document.getElementById('forfeit-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('forfeit-error');
+    const isIntimate = intimateCheckbox.checked;
+    const payload = {
+      p_category: isIntimate ? document.getElementById('lf-category').value : null,
+      p_title: document.getElementById('lf-title').value.trim(),
+      p_teaser: document.getElementById('lf-teaser').value.trim() || null,
+      p_instructions: document.getElementById('lf-instructions').value.trim(),
+      p_is_intimate: isIntimate,
+      p_intensity: isIntimate ? document.getElementById('lf-intensity').value : null
+    };
+    const { error } = existing
+      ? await sb.rpc('update_library_forfeit', { p_id: existing.id, ...payload })
+      : await sb.rpc('add_library_forfeit', payload);
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    await loadForfeitLibrary();
+    render();
+    showToast(existing ? 'Forfeit updated.' : 'Forfeit added.');
+  };
+
+  const deleteBtn = document.getElementById('btn-delete-forfeit');
+  if (deleteBtn) deleteBtn.onclick = async () => {
+    if (!confirm('Delete this forfeit?')) return;
+    const { error } = await sb.from('forfeit_library').delete().eq('id', existing.id);
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadForfeitLibrary();
+    render();
+    showToast('Forfeit deleted.');
+  };
+}
+
 function openLibraryDareModal(existing, defaultCategory) {
+  if (existing && existing.image_path && !state.imageUrls[existing.image_path]) {
+    fetchSignedImageUrl(existing.image_path, 'dare-images');
+  }
+  const imgUrl = existing && existing.image_path ? state.imageUrls[existing.image_path] : null;
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>${existing ? 'Edit dare' : 'Add a dare'}</h2>
         <form id="library-dare-form" class="stack">
-          <div class="field"><label>Zone</label>
+          <div class="field"><label>Temptation</label>
             <select id="ld-category">
               ${state.categories.map(c => `<option value="${esc(c.name)}" ${(existing ? existing.category : defaultCategory) === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
             </select>
@@ -2592,6 +2807,10 @@ function openLibraryDareModal(existing, defaultCategory) {
           <div class="field"><label>Instructions</label><textarea id="ld-instructions" required>${existing ? esc(existing.instructions) : ''}</textarea></div>
           <div class="field"><label>Intensity</label>
             <select id="ld-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${existing && existing.intensity===i ? 'selected' : ''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Image (optional — carries through to the actual move if it's picked)</label>
+            ${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : ''}
+            <input type="file" id="ld-image" accept="image/*">
           </div>
           <div id="library-dare-error" class="error-text"></div>
           <div class="btn-row">
@@ -2616,10 +2835,18 @@ function openLibraryDareModal(existing, defaultCategory) {
       p_instructions: document.getElementById('ld-instructions').value.trim(),
       p_intensity: document.getElementById('ld-intensity').value
     };
-    const { error } = existing
+    const { data, error } = existing
       ? await sb.rpc('update_library_dare', { p_id: existing.id, ...payload })
       : await sb.rpc('add_library_dare', payload);
     if (error) { errEl.textContent = error.message; return; }
+    const dareId = existing ? existing.id : data;
+    const imageFile = document.getElementById('ld-image').files[0];
+    if (imageFile) {
+      const ext = imageFile.name.split('.').pop();
+      const path = `${state.coupleId}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await sb.storage.from('dare-images').upload(path, imageFile);
+      if (!uploadError) await sb.from('dare_library').update({ image_path: path }).eq('id', dareId);
+    }
     closeModal();
     await loadDareLibrary();
     render();
@@ -2643,7 +2870,7 @@ function openImportDaresCsvModal() {
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Import dare library from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, teaser, instructions, intensity</b>. category must match an existing zone exactly. intensity must be tease/risque/bold/wild. teaser is optional. Type (Apart/Together/Either/Reunion) isn't part of the library — whoever sends the dare picks that at the time.</p>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>category, title, teaser, instructions, intensity</b>. category must match an existing temptation exactly. intensity must be tease/risque/bold/wild. teaser is optional. Type (Apart/Together/Either/Reunion) isn't part of the library — whoever sends the dare picks that at the time.</p>
         <input type="file" id="dares-csv-file" accept=".csv">
         <div id="dares-import-progress" class="hint-text" style="margin-top:14px"></div>
         <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
@@ -2689,7 +2916,7 @@ async function runDaresCsvImport(rows) {
       skipped++; errors.push(`Row ${lineNum}: missing category, title, or instructions — skipped.`); continue;
     }
     if (!knownCategories.has(category.toLowerCase())) {
-      skipped++; errors.push(`Row ${lineNum}: "${category}" doesn't match an existing zone — skipped.`); continue;
+      skipped++; errors.push(`Row ${lineNum}: "${category}" doesn't match an existing temptation — skipped.`); continue;
     }
     if (!VALID_INTENSITIES.includes(intensity)) {
       skipped++; errors.push(`Row ${lineNum}: invalid intensity "${row.intensity || ''}" — skipped.`); continue;
@@ -2705,6 +2932,81 @@ async function runDaresCsvImport(rows) {
   await loadDareLibrary();
   if (progressEl) {
     progressEl.innerHTML = `<b>${added} dare${added===1?'':'s'} added, ${skipped} skipped.</b>` +
+      (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
+  }
+}
+
+function openImportForfeitsCsvModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Import forfeits from CSV</h2>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>title, teaser, instructions, is_intimate, category, intensity</b>. is_intimate is true/false. category and intensity are only required when is_intimate is true — category must match an existing temptation exactly, intensity must be tease/risque/bold/wild. teaser is optional.</p>
+        <input type="file" id="forfeits-csv-file" accept=".csv">
+        <div id="forfeits-import-progress" class="hint-text" style="margin-top:14px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('forfeits-csv-file').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_'),
+      complete: (results) => runForfeitsCsvImport(results.data)
+    });
+  };
+}
+
+async function runForfeitsCsvImport(rows) {
+  const progressEl = document.getElementById('forfeits-import-progress');
+  const knownCategories = new Set(state.categories.map(c => c.name.toLowerCase()));
+  let added = 0, skipped = 0;
+  const errors = [];
+
+  function normalize(s) {
+    return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const lineNum = i + 2;
+    const title = (row.title || '').trim();
+    const teaser = (row.teaser || '').trim() || null;
+    const instructions = (row.instructions || '').trim();
+    const isIntimate = ['true', 'yes', '1'].includes(normalize(row.is_intimate));
+    const category = (row.category || '').trim() || null;
+    const intensity = normalize(row.intensity) || null;
+
+    if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
+
+    if (!title || !instructions) {
+      skipped++; errors.push(`Row ${lineNum}: missing title or instructions — skipped.`); continue;
+    }
+    if (isIntimate) {
+      if (!category || !knownCategories.has(category.toLowerCase())) {
+        skipped++; errors.push(`Row ${lineNum}: intimate forfeit needs a category matching an existing temptation — skipped.`); continue;
+      }
+      if (!VALID_INTENSITIES.includes(intensity)) {
+        skipped++; errors.push(`Row ${lineNum}: invalid intensity "${row.intensity || ''}" — skipped.`); continue;
+      }
+    }
+
+    const { error } = await sb.rpc('add_library_forfeit', {
+      p_category: isIntimate ? category : null, p_title: title, p_teaser: teaser, p_instructions: instructions,
+      p_is_intimate: isIntimate, p_intensity: isIntimate ? intensity : null
+    });
+    if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
+    added++;
+  }
+
+  await loadForfeitLibrary();
+  if (progressEl) {
+    progressEl.innerHTML = `<b>${added} forfeit${added===1?'':'s'} added, ${skipped} skipped.</b>` +
       (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
   }
 }
@@ -2751,7 +3053,7 @@ function openCompleteModal(dareId) {
     closeModal();
     const heatGain = updatedDare ? Math.max(1, Math.round((updatedDare.points_awarded || 0) / 10)) : 0;
     celebrateCompletion({
-      title: updatedDare ? updatedDare.title : 'Move',
+      title: updatedDare ? updatedDare.title : 'Dare',
       byName: state.profile ? state.profile.display_name : 'You',
       points: updatedDare ? updatedDare.points_awarded : 0,
       bonusPoints: updatedDare ? updatedDare.quality_bonus_points : 0,
@@ -2786,12 +3088,51 @@ async function openEvidenceModal(dareId) {
   }
 }
 
+function openForfeitPickerModal(settlement) {
+  const eligible = state.forfeitLibrary.filter(f => {
+    if (!f.is_intimate) return true;
+    const access = state.headingAccess.find(h => h.category === f.category);
+    if (!access || access.access === 'off_table' || access.access === 'pending') return false;
+    const max = TIER_MAX_INTENSITY[access.access];
+    return VALID_INTENSITIES.indexOf(f.intensity) <= VALID_INTENSITIES.indexOf(max);
+  });
+  const winnerName = state.partner ? state.partner.display_name : 'They';
+
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>This week goes to ${esc(winnerName)}</h2>
+        <p class="hint-text" style="margin-bottom:14px">${settlement.loser_points} to ${settlement.winner_points} — pick your own forfeit. Nobody's choosing this for you.</p>
+        ${eligible.length ? eligible.map(f => `
+          <div class="category-row" data-pick-forfeit="${f.id}" style="cursor:pointer">
+            <div>
+              <div class="cat-name" style="font-size:14.5px">${esc(f.title)}</div>
+              <div class="cat-count">${f.is_intimate ? `${esc(f.category)} · <span class="pill intensity-${f.intensity}">${INTENSITY_LABELS[f.intensity]}</span>` : 'Non-intimate'}</div>
+            </div>
+            <div class="cat-arrow">›</div>
+          </div>
+        `).join('') : `<div class="empty-state">No forfeits available right now — ask whoever manages content to add some.</div>`}
+        <button class="link-btn" id="modal-cancel" style="margin-top:16px">Decide later</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  $app.querySelectorAll('[data-pick-forfeit]').forEach(el => el.onclick = async () => {
+    const { error } = await sb.rpc('pick_forfeit', { p_settlement_id: settlement.id, p_forfeit_id: el.dataset.pickForfeit });
+    if (error) { showToast(error.message); return; }
+    await loadCurrentSettlement();
+    closeModal();
+    showToast('Forfeit picked.');
+  });
+}
+
 function openFollowUpQuestionModal(q) {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>Nice work — points added</h2>
-        <p class="hint-text" style="margin-bottom:14px">Since you just completed one from ${esc(q.category)}, here's another question from that zone, if you're up for it.</p>
+        <p class="hint-text" style="margin-bottom:14px">Since you just completed one from ${esc(q.category)}, here's another question from that temptation, if you're up for it.</p>
         <div class="deck-card-title" style="margin-bottom:8px">${esc(q.title)}</div>
         ${q.explanation ? `<div class="deck-card-explain" style="margin-bottom:12px">${esc(q.explanation)}</div>` : ''}
         ${renderAnswerControl(q, null, (a) => `data-followup-answer="${a}" data-followup-id="${q.id}"`)}
@@ -2800,7 +3141,7 @@ function openFollowUpQuestionModal(q) {
     </div>
   `;
   render();
-  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('modal-cancel').onclick = () => { closeModal(); checkForPendingForfeit(); };
   $app.querySelectorAll('[data-followup-answer]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.followupId, val = el.dataset.followupAnswer;
     state.answers[qId] = val;
@@ -2808,6 +3149,7 @@ function openFollowUpQuestionModal(q) {
     await loadBoundary(); await loadHeadingAccess(); await loadCardReport();
     closeModal();
     showToast('Answer saved.');
+    checkForPendingForfeit();
   });
 }
 

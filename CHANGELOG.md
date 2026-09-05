@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.38.0 — weekly forfeits, and images on dares
+
+- Built the weekly forfeit system discussed: a live "this week" score
+  separate from the lifetime total, settled once a week has genuinely
+  ended. Tested directly against the database — settling twice in a row
+  correctly created only one record, the winner was rejected trying to
+  pick the loser's forfeit for them, and an intimate forfeit above what a
+  Temptation currently allows was correctly rejected too.
+- The loser always picks their own forfeit — never imposed by the winner,
+  matching the same principle behind quality bonuses and sign-off.
+  Intimate forfeits are capped by that Temptation's current intensity,
+  same rule as every dare.
+- Admin gets a new Forfeits section — add one at a time or import a CSV,
+  same pattern as Dares and Questions.
+- Added images to dares: library dares can now have one (with a preview
+  when editing), and creating a dare either inherits the picked library
+  dare's image automatically or lets you attach your own — shown right on
+  the dare card once it's revealed.
+- While building this, found a broad pre-existing database policy that
+  lets either partner directly update any field on a dare via a raw table
+  call, not just through the safe functions. Didn't touch it or rely on
+  it for this feature, but it's worth tightening separately.
+
+## 1.37.3 — remaining "Move" text renamed to "Dare"
+
+- "Create a move" → "Create a dare," plus 13 other leftover mentions
+  (celebration title, in-play banner, turn message, counter modal,
+  toasts, empty states) — all now say Dare, matching the tab rename from
+  a while back.
+- Bonus catch while sweeping for these: the login screen's big title
+  still said "Moves" from before the app was renamed to TwoPlay — fixed
+  that too.
+- Left "which way you moved it" alone — that's a different meaning
+  entirely (moving a gauge slider), not the Dare feature.
+
+## 1.37.2 — replaced remaining "your partner"/"them" with actual names
+
+- Most of the app already used real names (the wizard, teaser screen, and
+  turn message all did from the start) — found and fixed the three spots
+  that still said "your partner" or "them": the comparison question
+  prompt, the Signal number hint in Account settings, and the in-play
+  hero's "waiting on them" line. All three now show the actual name when
+  it's known.
+- Left a few "your partner" mentions alone on purpose — the ones on the
+  signup and pairing screens, since those happen before you're actually
+  paired and there's no name to use yet.
+
+## 1.37.1 — Zones renamed to Temptations
+
+- "Zones" renamed to "Temptations" everywhere it appears — same 37
+  places just updated for "Zones," done the same careful way (checked the
+  count matched exactly before and after, so nothing was missed or
+  double-changed). CSV import now also accepts a "temptation" column
+  header alongside "category" and "zone."
+
 ## 1.37.0 — genuine two-sided comparison loop, renamed scale, Zones
 
 - The 5-tier answer scale has new names: All In, Keen, Curious, If You're
