@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.43.0 — Rewards into Admin, Dares search/collapse, calendar fix, sender-side waiting status
+
+- **Rewards moved fully into Admin**, matching Questions/Dares/Forfeits
+  exactly: add/edit/delete, CSV import, CSV export. Tested directly —
+  Jacki's account correctly rejected when trying to add a reward, and
+  claiming (which stays open to both) still worked and was verified.
+  The Rewards tab is now view-and-claim only.
+- Found and fixed a real bug while doing this: a reward's `revealed`
+  flag was set to false on creation and never updated anywhere — every
+  reward would have stayed "Locked" forever regardless of Heat Meter
+  progress. Now computed live from your current heat instead of a stale
+  stored flag.
+- **Dares tab**: added "Done by you" alongside "Sent by you" — both now
+  collapsible (collapsed by default) with their own search box, reusing
+  the same focus-safe search pattern from Admin so typing in one doesn't
+  steal focus from the other.
+- **Forfeit modal hardened** with event delegation instead of direct
+  element lookups, and the forfeit CSV export was reviewed line-by-line
+  against the working Dares/Questions pattern with no difference found —
+  if either is still broken after this, it's very likely the PWA serving
+  a cached older version; try a hard refresh or removing and re-adding
+  the home screen icon.
+- **Deadline picker**: found a likely real cause — Chromium's native
+  calendar icon renders dark by default and was going invisible against
+  the new dark theme. Added a fix to invert it for visibility. iOS
+  Safari's picker doesn't use a separate icon so should be unaffected
+  either way.
+- **Sender-side waiting status**: Playroom now shows "Waiting On
+  [partner]" for dares you've sent that haven't been responded to yet —
+  previously only the recipient got any status banner at all.
+
 ## 1.42.2 — fixed deleting a forfeit, and a real mistake caught along the way
 
 - Deleting a forfeit that had ever been picked for a settled week was

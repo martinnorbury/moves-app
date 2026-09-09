@@ -119,6 +119,14 @@
   .field input:focus, .field textarea:focus, .field select:focus{
     outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);
   }
+  /* Chromium renders the calendar/clock picker icon dark by default,
+     which goes invisible against our dark inputs — this is very likely
+     why the deadline picker seemed to disappear after the dark redesign. */
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator{
+    filter: invert(0.85); cursor: pointer;
+  }
 
   .btn{
     display:inline-flex; align-items:center; justify-content:center; gap:8px;
@@ -374,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.42.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.43.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.42.2';
+const APP_VERSION = '1.43.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -421,7 +429,9 @@ let state = {
   openDareCategory: null,  // heading currently drilled into on the Dares side of Admin
   questionsSearch: '',      // Admin: search across every card's title
   daresSearch: '',           // Admin: search across every dare's title
-  lastFocusedSearch: null,   // which of the two Admin search boxes to restore focus to after re-render
+  lastFocusedSearch: null,   // which search box to restore focus to after re-render (Admin or Dares tab)
+  sentByYouExpanded: false, sentByYouSearch: '',
+  doneByYouExpanded: false, doneByYouSearch: '',
   deckIndex: 0,          // position within the open deck
   deckViewMode: 'card',   // 'card' (one at a time) or 'list' (browsable list) within an open heading
   deckFilter: '',         // search text filtering the list view
@@ -486,6 +496,14 @@ function exportForfeitsCsv() {
     is_intimate: f.is_intimate ? 'true' : 'false', category: f.category || '', intensity: f.intensity || ''
   }));
   downloadCsv('forfeits-export.csv', rows);
+}
+
+function exportRewardsCsv() {
+  const rows = state.rewards.map(r => ({
+    title: r.title, teaser: r.teaser || '', details: r.details,
+    unlock_condition: r.unlock_condition, heat_threshold: r.heat_threshold !== null ? r.heat_threshold : ''
+  }));
+  downloadCsv('rewards-export.csv', rows);
 }
 
 function showToast(msg) {
@@ -1223,6 +1241,7 @@ function computeTurnMessage() {
 
 function renderHome(unanswered) {
   const pendingForMe = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent');
+  const pendingFromMe = state.dares.filter(d => d.creator_id === state.session.user.id && d.status === 'sent');
   const nextReward = state.rewards.find(r => !r.completed && r.heat_threshold && r.heat_threshold > state.heat);
   const turnMessage = computeTurnMessage();
   const inPlayHtml = renderInPlayHero();
@@ -1236,7 +1255,14 @@ function renderHome(unanswered) {
         <div class="inplay-hero-sub">Head to Dares to accept, decline, or counter.</div>
       </div>
     ` : ''}
-    ${!inPlayHtml && !pendingForMe.length && !unanswered ? `<div class="empty-state" style="margin-bottom:18px">You're all caught up.</div>` : ''}
+    ${!inPlayHtml && !pendingForMe.length && pendingFromMe.length ? `
+      <div class="inplay-hero" style="background:linear-gradient(135deg, var(--gold), var(--wine))">
+        <div class="inplay-hero-label"><span class="inplay-hero-dot"></span>Waiting On ${esc(state.partner ? state.partner.display_name : 'Them')}</div>
+        <div class="inplay-hero-title">${pendingFromMe.length} dare${pendingFromMe.length===1?'':'s'} still to be answered</div>
+        <div class="inplay-hero-sub">Nothing to do — just sitting with them for now.</div>
+      </div>
+    ` : ''}
+    ${!inPlayHtml && !pendingForMe.length && !pendingFromMe.length && !unanswered ? `<div class="empty-state" style="margin-bottom:18px">You're all caught up.</div>` : ''}
     ${unanswered > 0 ? `<div class="hint-text" style="margin-bottom:18px">${unanswered} boundary question${unanswered===1?'':'s'} still to answer.</div>` : ''}
     ${turnMessage ? `<div class="hint-text" style="margin-bottom:18px">${esc(turnMessage)}</div>` : ''}
 
@@ -1294,21 +1320,27 @@ function openForfeitDetailModal(settlement) {
         <h2>${esc(settlement.forfeit_title)}</h2>
         <p class="hint-text" style="margin-bottom:14px">${esc(loserName)} lost the week ${settlement.loser_points} to ${settlement.winner_points}.</p>
         <div class="dare-instructions" style="margin-bottom:16px">${esc(settlement.forfeit_instructions)}</div>
-        ${isLoser ? `<button class="btn btn-gold" id="btn-complete-forfeit" style="width:100%; margin-bottom:10px">Mark it done</button>` : ''}
-        <button class="btn btn-ghost" id="modal-cancel" style="width:100%">Close</button>
+        ${isLoser ? `<button type="button" class="btn btn-gold" data-forfeit-modal-action="complete" style="width:100%; margin-bottom:10px">Mark it done</button>` : ''}
+        <button type="button" class="btn btn-ghost" data-forfeit-modal-action="close" style="width:100%">Close</button>
       </div>
     </div>
   `;
   render();
-  document.getElementById('modal-cancel').onclick = closeModal;
-  const completeBtn = document.getElementById('btn-complete-forfeit');
-  if (completeBtn) completeBtn.onclick = async () => {
-    const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: settlement.id });
-    if (error) { showToast(error.message); return; }
-    await loadCurrentSettlement();
-    closeModal();
-    showToast('Forfeit marked complete.');
-  };
+  const backdrop = document.getElementById('modal-backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', async (e) => {
+      const actionEl = e.target.closest('[data-forfeit-modal-action]');
+      if (!actionEl) return;
+      if (actionEl.dataset.forfeitModalAction === 'close') { closeModal(); return; }
+      if (actionEl.dataset.forfeitModalAction === 'complete') {
+        const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: settlement.id });
+        if (error) { showToast(error.message); return; }
+        await loadCurrentSettlement();
+        closeModal();
+        showToast('Forfeit marked complete.');
+      }
+    });
+  }
 }
 
 function renderScoreboard() {
@@ -1420,6 +1452,7 @@ function renderDaresTab() {
   const pendingForMe = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent');
   const active = state.dares.filter(d => ['accepted','in_progress','countered'].includes(d.status));
   const sentByYou = state.dares.filter(d => d.creator_id === state.session.user.id && !['accepted','in_progress','countered'].includes(d.status));
+  const doneByYou = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'completed');
 
   return `
     <button class="btn btn-gold" data-nav="create-dare" style="margin-bottom:22px">Create a dare</button>
@@ -1430,8 +1463,25 @@ function renderDaresTab() {
     <div class="section-head"><h2>In play</h2></div>
     ${active.length ? active.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">No active dares.</div>`}
 
-    <div class="section-head"><h2>Sent by you</h2></div>
-    ${sentByYou.length ? sentByYou.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">Nothing else sent right now.</div>`}
+    ${renderCollapsibleDareSection('Sent by you', sentByYou, 'sentByYouExpanded', 'sentByYouSearch', 'sent-search')}
+    ${renderCollapsibleDareSection('Done by you', doneByYou, 'doneByYouExpanded', 'doneByYouSearch', 'done-search')}
+  `;
+}
+
+function renderCollapsibleDareSection(title, dares, expandedKey, searchKey, searchInputId) {
+  const expanded = state[expandedKey];
+  const searchText = state[searchKey].trim().toLowerCase();
+  const filtered = searchText ? dares.filter(d => d.title.toLowerCase().includes(searchText)) : dares;
+
+  return `
+    <div class="section-head" data-toggle-section="${expandedKey}" style="cursor:pointer">
+      <h2>${title} (${dares.length})</h2>
+      <span class="see-all">${expanded ? '▲' : '▼'}</span>
+    </div>
+    ${expanded ? `
+      ${dares.length ? `<div class="field" style="margin-bottom:14px"><input type="text" id="${searchInputId}" placeholder="Search ${title.toLowerCase()}…" value="${esc(state[searchKey])}"></div>` : ''}
+      ${filtered.length ? filtered.map(d => renderDareCard(d, false)).join('') : `<div class="empty-state">${dares.length ? 'No matches.' : 'Nothing here yet.'}</div>`}
+    ` : ''}
   `;
 }
 
@@ -1583,6 +1633,30 @@ function renderSetupArea() {
     </div>
     <div class="divider"></div>
     ${renderForfeitsSection()}
+    <div class="divider"></div>
+    ${renderRewardsSection()}
+  `;
+}
+
+function renderRewardsSection() {
+  return `
+    <div class="section-head" style="margin-top:0"><h2>Rewards</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Unlocked automatically as the Heat Meter rises. Either of you can claim one once it's revealed.</p>
+    <div class="btn-row" style="margin-bottom:8px">
+      <button class="btn btn-ghost" id="btn-add-reward">Add a reward</button>
+      <button class="btn btn-ghost" id="btn-import-rewards-csv">Import from CSV</button>
+    </div>
+    ${state.rewards.length ? `<button class="link-btn" id="btn-export-rewards-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
+    ${state.rewards.length ? state.rewards.map(r => `
+      <div class="category-row" data-edit-reward="${r.id}" style="cursor:pointer">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${esc(r.title)}</div>
+          <div class="cat-count">${r.heat_threshold !== null ? `Unlocks at ${r.heat_threshold}%` : 'No auto-unlock threshold'}${r.completed ? ' · claimed' : ''}</div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    `).join('') : `<div class="empty-state">No rewards yet.</div>`}
+    ${state.rewards.length ? `<button class="link-btn" id="btn-delete-all-rewards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.rewards.length} rewards</button>` : ''}
   `;
 }
 
@@ -1834,18 +1908,20 @@ async function fetchSignedImageUrl(path, bucket = 'boundary-images') {
    ========================================================================== */
 function renderRewardsTab() {
   return `
-    <button class="btn btn-gold" data-nav="create-reward" style="margin-bottom:22px">Add a reward</button>
-    ${state.rewards.length ? state.rewards.map(r => `
-      <div class="dare ${r.revealed ? 'unlocked' : 'locked'}">
+    ${state.rewards.length ? state.rewards.map(r => {
+      const revealed = r.heat_threshold === null || state.heat >= r.heat_threshold;
+      return `
+      <div class="dare ${revealed ? 'unlocked' : 'locked'}">
         <div class="dare-top">
-          <div class="dare-title">${r.revealed ? esc(r.title) : 'Locked reward'}</div>
+          <div class="dare-title">${revealed ? esc(r.title) : 'Locked reward'}</div>
           ${r.completed ? `<span class="pill">claimed</span>` : ''}
         </div>
-        <div class="dare-body">${r.revealed ? esc(r.details) : (r.teaser ? esc(r.teaser) : 'Keep playing to reveal this.')}</div>
+        <div class="dare-body">${revealed ? esc(r.details) : (r.teaser ? esc(r.teaser) : 'Keep playing to reveal this.')}</div>
         <div class="hint-text">${esc(r.unlock_condition)}</div>
-        ${(!r.completed && r.revealed) ? `<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost btn-small" data-reward-complete="${r.id}">Mark claimed</button></div>` : ''}
+        ${(!r.completed && revealed) ? `<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost btn-small" data-reward-complete="${r.id}">Mark claimed</button></div>` : ''}
       </div>
-    `).join('') : `<div class="empty-state">No rewards set up yet.</div>`}
+    `;
+    }).join('') : `<div class="empty-state">No rewards set up yet — ask whoever manages content to add some in Admin.</div>`}
   `;
 }
 
@@ -2095,23 +2171,25 @@ function openCounterModal(dareId) {
   };
 }
 
-function openCreateRewardModal() {
+function openLibraryRewardModal(existing) {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>Add a reward</h2>
+        <h2>${existing ? 'Edit reward' : 'Add a reward'}</h2>
         <form id="reward-form" class="stack">
-          <div class="field"><label>Title</label><input type="text" id="r-title" required></div>
-          <div class="field"><label>Teaser (shown while locked)</label><input type="text" id="r-teaser"></div>
-          <div class="field"><label>Full details (hidden until unlocked)</label><textarea id="r-details" required></textarea></div>
-          <div class="field"><label>Unlock condition (in words)</label><input type="text" id="r-condition" placeholder="e.g. Reach 75% on the Heat Meter" required></div>
+          <div class="field"><label>Title</label><input type="text" id="r-title" value="${existing ? esc(existing.title) : ''}" required></div>
+          <div class="field"><label>Teaser (shown while locked)</label><input type="text" id="r-teaser" value="${existing && existing.teaser ? esc(existing.teaser) : ''}"></div>
+          <div class="field"><label>Full details (hidden until unlocked)</label><textarea id="r-details" required>${existing ? esc(existing.details) : ''}</textarea></div>
+          <div class="field"><label>Unlock condition (in words)</label><input type="text" id="r-condition" value="${existing ? esc(existing.unlock_condition) : ''}" placeholder="e.g. Reach 75% on the Heat Meter" required></div>
           <div class="field"><label>Heat Meter threshold to auto-reveal (optional)</label>
-            <select id="r-threshold"><option value="">None</option>${HEAT_THRESHOLDS.map(t => `<option value="${t}">${t}%</option>`).join('')}</select>
+            <select id="r-threshold"><option value="">None</option>${HEAT_THRESHOLDS.map(t => `<option value="${t}" ${existing && existing.heat_threshold === t ? 'selected' : ''}>${t}%</option>`).join('')}</select>
           </div>
+          <div id="reward-error" class="error-text"></div>
           <div class="btn-row">
             <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary">${existing ? 'Save changes' : 'Add reward'}</button>
           </div>
+          ${existing ? `<button type="button" class="link-btn" id="btn-delete-reward" style="margin-top:10px; color:var(--wine-bright)">Delete this reward</button>` : ''}
         </form>
       </div>
     </div>
@@ -2120,21 +2198,33 @@ function openCreateRewardModal() {
   document.getElementById('modal-cancel').onclick = closeModal;
   document.getElementById('reward-form').onsubmit = async (e) => {
     e.preventDefault();
+    const errEl = document.getElementById('reward-error');
     const threshold = document.getElementById('r-threshold').value;
-    const { error } = await sb.from('rewards').insert({
-      couple_id: state.coupleId,
-      creator_id: state.session.user.id,
-      title: document.getElementById('r-title').value.trim(),
-      teaser: document.getElementById('r-teaser').value.trim() || null,
-      details: document.getElementById('r-details').value.trim(),
-      unlock_condition: document.getElementById('r-condition').value.trim(),
-      heat_threshold: threshold ? parseInt(threshold) : null,
-      revealed: false
-    });
+    const payload = {
+      p_title: document.getElementById('r-title').value.trim(),
+      p_teaser: document.getElementById('r-teaser').value.trim() || null,
+      p_details: document.getElementById('r-details').value.trim(),
+      p_unlock_condition: document.getElementById('r-condition').value.trim(),
+      p_heat_threshold: threshold ? parseInt(threshold) : null
+    };
+    const { error } = existing
+      ? await sb.rpc('update_reward', { p_id: existing.id, ...payload })
+      : await sb.rpc('add_reward', payload);
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    await loadRewards();
+    render();
+    showToast(existing ? 'Reward updated.' : 'Reward added.');
+  };
+  const deleteBtn = document.getElementById('btn-delete-reward');
+  if (deleteBtn) deleteBtn.onclick = async () => {
+    if (!confirm('Delete this reward?')) return;
+    const { error } = await sb.from('rewards').delete().eq('id', existing.id);
     if (error) { showToast(error.message); return; }
     closeModal();
     await loadRewards();
-    showToast('Reward saved.');
+    render();
+    showToast('Reward deleted.');
   };
 }
 
@@ -2177,7 +2267,6 @@ function attachMainHandlers() {
   if (viewForfeitEl) viewForfeitEl.onclick = () => openForfeitDetailModal(state.currentSettlement);
   $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
-  $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);
 
   $app.querySelectorAll('[data-open-category]').forEach(el => el.onclick = () => {
     state.openCategory = el.dataset.openCategory; state.deckIndex = 0; state.deckFilter = ''; render();
@@ -2234,6 +2323,25 @@ function attachMainHandlers() {
     render();
     showToast('Forfeits cleared.');
   };
+  const importRewardsCsvBtn = document.getElementById('btn-import-rewards-csv');
+  if (importRewardsCsvBtn) importRewardsCsvBtn.onclick = openImportRewardsCsvModal;
+  const exportRewardsBtn = document.getElementById('btn-export-rewards-csv');
+  if (exportRewardsBtn) exportRewardsBtn.onclick = exportRewardsCsv;
+  const addRewardBtn = document.getElementById('btn-add-reward');
+  if (addRewardBtn) addRewardBtn.onclick = () => openLibraryRewardModal(null);
+  $app.querySelectorAll('[data-edit-reward]').forEach(el => el.onclick = () => {
+    const reward = state.rewards.find(r => r.id === el.dataset.editReward);
+    if (reward) openLibraryRewardModal(reward);
+  });
+  const deleteAllRewardsBtn = document.getElementById('btn-delete-all-rewards');
+  if (deleteAllRewardsBtn) deleteAllRewardsBtn.onclick = async () => {
+    if (!confirm(`Delete all ${state.rewards.length} rewards? This can't be undone.`)) return;
+    const { error } = await sb.from('rewards').delete().eq('couple_id', state.coupleId);
+    if (error) { showToast(error.message); return; }
+    await loadRewards();
+    render();
+    showToast('Rewards cleared.');
+  };
   const questionsSearchInput = document.getElementById('questions-search');
   if (questionsSearchInput) {
     questionsSearchInput.oninput = () => { state.questionsSearch = questionsSearchInput.value; state.lastFocusedSearch = 'questions-search'; render(); };
@@ -2242,10 +2350,23 @@ function attachMainHandlers() {
   if (daresSearchInput) {
     daresSearchInput.oninput = () => { state.daresSearch = daresSearchInput.value; state.lastFocusedSearch = 'dares-search'; render(); };
   }
+  const sentSearchInput = document.getElementById('sent-search');
+  if (sentSearchInput) {
+    sentSearchInput.oninput = () => { state.sentByYouSearch = sentSearchInput.value; state.lastFocusedSearch = 'sent-search'; render(); };
+  }
+  const doneSearchInput = document.getElementById('done-search');
+  if (doneSearchInput) {
+    doneSearchInput.oninput = () => { state.doneByYouSearch = doneSearchInput.value; state.lastFocusedSearch = 'done-search'; render(); };
+  }
   if (state.lastFocusedSearch) {
     const toFocus = document.getElementById(state.lastFocusedSearch);
     if (toFocus) { toFocus.focus(); toFocus.setSelectionRange(toFocus.value.length, toFocus.value.length); }
   }
+  $app.querySelectorAll('[data-toggle-section]').forEach(el => el.onclick = () => {
+    const key = el.dataset.toggleSection;
+    state[key] = !state[key];
+    render();
+  });
   $app.querySelectorAll('[data-jump-to-question]').forEach(el => el.onclick = () => {
     const q = state.questions.find(x => x.id === el.dataset.jumpToQuestion);
     if (!q) return;
@@ -2389,10 +2510,11 @@ function attachMainHandlers() {
   $app.querySelectorAll('[data-view-evidence]').forEach(el => el.onclick = () => openEvidenceModal(el.dataset.viewEvidence));
 
   $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async () => {
-    const id = el.dataset.rewardComplete;
-    await sb.from('rewards').update({ completed: true }).eq('id', id);
+    const { error } = await sb.rpc('claim_reward', { p_reward_id: el.dataset.rewardComplete });
+    if (error) { showToast(error.message); return; }
     await loadRewards();
     render();
+    showToast('Claimed.');
   });
 
   const backdrop = document.getElementById('modal-backdrop');
@@ -3135,6 +3257,70 @@ async function runForfeitsCsvImport(rows) {
   await loadForfeitLibrary();
   if (progressEl) {
     progressEl.innerHTML = `<b>${added} forfeit${added===1?'':'s'} added, ${skipped} skipped.</b>` +
+      (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
+  }
+}
+
+function openImportRewardsCsvModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Import rewards from CSV</h2>
+        <p class="hint-text" style="margin-bottom:14px">Columns: <b>title, teaser, details, unlock_condition, heat_threshold</b>. heat_threshold is optional — if set, must be one of 25/50/75/100.</p>
+        <input type="file" id="rewards-csv-file" accept=".csv">
+        <div id="rewards-import-progress" class="hint-text" style="margin-top:14px"></div>
+        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('rewards-csv-file').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_'),
+      complete: (results) => runRewardsCsvImport(results.data)
+    });
+  };
+}
+
+async function runRewardsCsvImport(rows) {
+  const progressEl = document.getElementById('rewards-import-progress');
+  let added = 0, skipped = 0;
+  const errors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const lineNum = i + 2;
+    const title = (row.title || '').trim();
+    const teaser = (row.teaser || '').trim() || null;
+    const details = (row.details || '').trim();
+    const unlockCondition = (row.unlock_condition || '').trim();
+    const rawThreshold = (row.heat_threshold || '').trim();
+    const threshold = rawThreshold ? parseInt(rawThreshold, 10) : null;
+
+    if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
+
+    if (!title || !details || !unlockCondition) {
+      skipped++; errors.push(`Row ${lineNum}: missing title, details, or unlock_condition — skipped.`); continue;
+    }
+    if (rawThreshold && !HEAT_THRESHOLDS.includes(threshold)) {
+      skipped++; errors.push(`Row ${lineNum}: heat_threshold must be 25, 50, 75, or 100 — skipped.`); continue;
+    }
+
+    const { error } = await sb.rpc('add_reward', {
+      p_title: title, p_teaser: teaser, p_details: details, p_unlock_condition: unlockCondition, p_heat_threshold: threshold
+    });
+    if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
+    added++;
+  }
+
+  await loadRewards();
+  if (progressEl) {
+    progressEl.innerHTML = `<b>${added} reward${added===1?'':'s'} added, ${skipped} skipped.</b>` +
       (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
   }
 }
