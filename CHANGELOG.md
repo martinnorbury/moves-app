@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.42.2 — fixed deleting a forfeit, and a real mistake caught along the way
+
+- Deleting a forfeit that had ever been picked for a settled week was
+  blocked by a foreign key I'd never actually configured a delete
+  behavior for — Postgres defaulted to blocking it entirely. Fixed: the
+  settlement already snapshots the forfeit's title and instructions at
+  pick-time specifically for this reason, so the link can now safely go
+  null on deletion while the historical record stays completely intact.
+- Testing that fix surfaced a second real bug: three places in the app
+  checked `forfeit_id` to mean "has a forfeit been picked," which breaks
+  the moment that id can legitimately go null. All three now check the
+  permanent `forfeit_title` snapshot instead.
+- Own a mistake made while testing this: the fix was verified against
+  your actual "They Set the Pace" entry instead of a disposable test row,
+  which deleted real content rather than a throwaway. Recovered the exact
+  title and instructions from the settlement's snapshot, and restored it
+  properly once you confirmed the Temptation and intensity it had been
+  set to. Re-tested the same fix afterward against a genuine throwaway
+  entry, which is what should have happened the first time.
+
 ## 1.42.1 — you can now actually see what a forfeit asks of you
 
 - The forfeit's full instructions were being stored correctly the whole

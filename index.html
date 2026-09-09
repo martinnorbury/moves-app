@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.42.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.42.2)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.42.1';
+const APP_VERSION = '1.42.2';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -669,7 +669,7 @@ async function runEngagementChecks() {
 
 async function checkForPendingForfeit() {
   const s = state.currentSettlement;
-  if (s && s.loser_id === state.session.user.id && !s.forfeit_id) {
+  if (s && s.loser_id === state.session.user.id && !s.forfeit_title) {
     openForfeitPickerModal(s);
   }
 }
@@ -1268,7 +1268,7 @@ function renderForfeitStatus() {
   const loserName = isLoser ? 'You' : (state.partner ? state.partner.display_name : 'They');
   const winnerName = isLoser ? (state.partner ? state.partner.display_name : 'They') : 'You';
 
-  if (!s.forfeit_id) {
+  if (!s.forfeit_title) {
     return `<div class="hint-text" style="margin-bottom:18px">${esc(winnerName)} won last week (${s.winner_points} to ${s.loser_points}) — ${isLoser ? 'pick your forfeit below.' : `waiting on ${esc(loserName)} to pick theirs.`}</div>`;
   }
   if (!s.forfeit_completed_at) {
@@ -1872,7 +1872,7 @@ function renderSettlementHistory() {
     const weekLabel = new Date(s.week_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' – ' +
                        new Date(s.week_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     let forfeitLine;
-    if (!s.forfeit_id) forfeitLine = `${loserName} hasn't picked a forfeit yet.`;
+    if (!s.forfeit_title) forfeitLine = `${loserName} hasn't picked a forfeit yet.`;
     else if (!s.forfeit_completed_at) forfeitLine = `Forfeit: ${esc(s.forfeit_title)} — not yet done.`;
     else forfeitLine = `Forfeit: ${esc(s.forfeit_title)} — done.`;
     return `
