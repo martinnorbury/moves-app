@@ -374,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.42.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.42.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -382,7 +382,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.42.0';
+const APP_VERSION = '1.42.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1273,13 +1273,42 @@ function renderForfeitStatus() {
   }
   if (!s.forfeit_completed_at) {
     return `
-      <div class="hint-text" style="margin-bottom:18px">
-        ${esc(loserName)} owe${isLoser ? '' : 's'} a forfeit from last week: <b>${esc(s.forfeit_title)}</b>
-        ${isLoser ? `<button class="link-btn" id="btn-complete-forfeit" style="display:block; padding:4px 0 0">Mark it done</button>` : ''}
+      <div class="category-row" data-view-forfeit="1" style="cursor:pointer; margin-bottom:18px">
+        <div>
+          <div class="cat-name" style="font-size:14.5px">${esc(loserName)} owe${isLoser ? '' : 's'} a forfeit: ${esc(s.forfeit_title)}</div>
+          <div class="cat-count">Tap to see the details${isLoser ? ' and mark it done' : ''}</div>
+        </div>
+        <div class="cat-arrow">›</div>
       </div>
     `;
   }
   return '';
+}
+
+function openForfeitDetailModal(settlement) {
+  const isLoser = settlement.loser_id === state.session.user.id;
+  const loserName = isLoser ? 'You' : (state.partner ? state.partner.display_name : 'They');
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${esc(settlement.forfeit_title)}</h2>
+        <p class="hint-text" style="margin-bottom:14px">${esc(loserName)} lost the week ${settlement.loser_points} to ${settlement.winner_points}.</p>
+        <div class="dare-instructions" style="margin-bottom:16px">${esc(settlement.forfeit_instructions)}</div>
+        ${isLoser ? `<button class="btn btn-gold" id="btn-complete-forfeit" style="width:100%; margin-bottom:10px">Mark it done</button>` : ''}
+        <button class="btn btn-ghost" id="modal-cancel" style="width:100%">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  const completeBtn = document.getElementById('btn-complete-forfeit');
+  if (completeBtn) completeBtn.onclick = async () => {
+    const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: settlement.id });
+    if (error) { showToast(error.message); return; }
+    await loadCurrentSettlement();
+    closeModal();
+    showToast('Forfeit marked complete.');
+  };
 }
 
 function renderScoreboard() {
@@ -2144,14 +2173,8 @@ function attachMainHandlers() {
   if (vtap) vtap.onclick = openVersionModal;
   const openAccountBtn = document.getElementById('btn-open-account');
   if (openAccountBtn) openAccountBtn.onclick = openAccountModal;
-  const completeForfeitBtn = document.getElementById('btn-complete-forfeit');
-  if (completeForfeitBtn) completeForfeitBtn.onclick = async () => {
-    const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: state.currentSettlement.id });
-    if (error) { showToast(error.message); return; }
-    await loadCurrentSettlement();
-    render();
-    showToast('Forfeit marked complete.');
-  };
+  const viewForfeitEl = document.querySelector('[data-view-forfeit]');
+  if (viewForfeitEl) viewForfeitEl.onclick = () => openForfeitDetailModal(state.currentSettlement);
   $app.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { state.tab = el.dataset.tab; render(); });
   $app.querySelectorAll('[data-nav="create-dare"]').forEach(el => el.onclick = openCreateDareModal);
   $app.querySelectorAll('[data-nav="create-reward"]').forEach(el => el.onclick = openCreateRewardModal);

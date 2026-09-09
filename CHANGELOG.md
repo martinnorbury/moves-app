@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.42.1 — you can now actually see what a forfeit asks of you
+
+- The forfeit's full instructions were being stored correctly the whole
+  time, just never displayed — the Playroom banner only ever showed the
+  title. Tapping it now opens the actual details, with "Mark it done"
+  living there instead of floating on the summary line with nothing to
+  read first.
+
 ## 1.42.0 — the three flagged gaps, all fixed
 
 - Notifications rewritten as a proper queue instead of only checking for
