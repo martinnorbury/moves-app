@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.60.0 — the next-reward bug, and rewards become genuinely mutual
+
+- Found the actual cause of the 50%-instead-of-25% bug: rewards were
+  loaded ordered by creation date, not by threshold — the "next reward"
+  logic just took the first array match, which only happened to be
+  correct if rewards were created in threshold order. Fixed to order by
+  threshold directly, which is what the logic actually depends on. Also
+  worth clarifying: "Something to look forward to" isn't a reward's
+  name — it's the teaser text for "A proper date night" (the real 25%
+  reward), shown because it hasn't unlocked yet.
+- Rewards were admin-only to add, edit, or delete, same as the dare and
+  forfeit libraries — but the reasoning for that pattern doesn't apply
+  here. Dares and forfeits benefit from single-curator quality control;
+  a reward is something both of you already know about, work toward
+  together, and experience together, so keeping it gated to one account
+  didn't fit. Moved the whole thing: either partner can now add, edit,
+  or delete rewards directly from the Rewards tab, tested against
+  Jacki's account specifically to confirm it actually works end to end.
+  Removed the now-duplicate admin section (with a note pointing to where
+  it moved) and the CSV import/export for rewards, which made much more
+  sense for the 100+-item dare and forfeit libraries than for a handful
+  of shared rewards.
+
+## 1.59.0 — Type now actually validates against the Temptation
+
+- Direct answer to the question that started this: Type was purely
+  cosmetic (a label on the card) except for Reunion, which uses a
+  different scoring formula — apart/together/either had zero functional
+  difference between them, and nothing stopped a nonsensical combination
+  like Apart + Positions & Core Acts.
+- Fixed properly, both sides: the Type dropdown now only offers options
+  that are physically possible for the selected Temptation (Apart is
+  excluded for Touch & Sensation and Positions & Core Acts, on both the
+  write-your-own and blind-send forms), and the same rule is enforced in
+  the database function itself, not just the UI. Tested directly:
+  Apart + Positions & Core Acts is correctly rejected server-side,
+  Together + the same category goes through fine.
+
 ## 1.58.0 — the actual cause of the missing comparison prompt, and answers finally collapse by Temptation
 
 - Checked the database directly rather than guessing again, and found

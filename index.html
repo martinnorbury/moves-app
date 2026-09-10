@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.58.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.60.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.58.0';
+const APP_VERSION = '1.60.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -411,6 +411,14 @@ const GAUGE_ICONS = { full_spark: '❤️', warming_up: '🧡', blushing_yes: '�
 const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
 const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
 const TYPE_LABELS = { apart: 'Apart', together: 'Together', either: 'Either', reunion: 'Reunion' };
+// Some Temptations are physically impossible to do apart — Apart isn't offered for these.
+const CATEGORIES_REQUIRING_TOGETHER = ['Touch & Sensation', 'Positions & Core Acts'];
+function availableTypesFor(category) {
+  const keys = CATEGORIES_REQUIRING_TOGETHER.includes(category)
+    ? Object.keys(TYPE_LABELS).filter(t => t !== 'apart')
+    : Object.keys(TYPE_LABELS);
+  return keys;
+}
 const HEAT_THRESHOLDS = [25, 50, 75, 100];
 
 let state = {
@@ -500,14 +508,6 @@ function exportForfeitsCsv() {
     is_intimate: f.is_intimate ? 'true' : 'false', category: f.category || '', intensity: f.intensity || ''
   }));
   downloadCsv('forfeits-export.csv', rows);
-}
-
-function exportRewardsCsv() {
-  const rows = state.rewards.map(r => ({
-    title: r.title, teaser: r.teaser || '', details: r.details,
-    unlock_condition: r.unlock_condition, heat_threshold: r.heat_threshold !== null ? r.heat_threshold : ''
-  }));
-  downloadCsv('rewards-export.csv', rows);
 }
 
 function showToast(msg) {
@@ -831,7 +831,7 @@ async function loadHeat() {
   state.heat = data ? data.progress : 0;
 }
 async function loadRewards() {
-  const { data } = await sb.from('rewards').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('rewards').select('*').order('heat_threshold', { ascending: true, nullsFirst: false });
   state.rewards = data || [];
 }
 async function loadNotifications() {
@@ -1894,7 +1894,8 @@ function renderSetupArea() {
     <div class="divider"></div>
     ${renderForfeitsSection()}
     <div class="divider"></div>
-    ${renderRewardsSection()}
+    <div class="section-head" style="margin-top:0"><h2>Rewards</h2></div>
+    <p class="hint-text" style="margin-bottom:16px">Rewards moved to the Rewards tab — since they're something you'll both experience, either of you can add, edit, or delete them there directly.</p>
     <div class="divider"></div>
     <div style="border:1.5px solid var(--wine-bright); border-radius:var(--radius-m); padding:16px; margin-top:6px">
       <div class="section-head" style="margin-top:0"><h2 style="color:var(--wine-bright)">Start again</h2></div>
@@ -1906,28 +1907,6 @@ function renderSetupArea() {
         <button class="btn btn-ghost" id="btn-remove-partner" style="width:100%; border-color:var(--wine-bright); color:var(--wine-bright)">Remove ${esc(state.partner.display_name)} and start a new pairing</button>
       ` : ''}
     </div>
-  `;
-}
-
-function renderRewardsSection() {
-  return `
-    <div class="section-head" style="margin-top:0"><h2>Rewards</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Unlocked automatically as the Heat Meter rises. Either of you can claim one once it's revealed.</p>
-    <div class="btn-row" style="margin-bottom:8px">
-      <button class="btn btn-ghost" id="btn-add-reward">Add a reward</button>
-      <button class="btn btn-ghost" id="btn-import-rewards-csv">Import from CSV</button>
-    </div>
-    ${state.rewards.length ? `<button class="link-btn" id="btn-export-rewards-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
-    ${state.rewards.length ? state.rewards.map(r => `
-      <div class="category-row" data-edit-reward="${r.id}" style="cursor:pointer">
-        <div>
-          <div class="cat-name" style="font-size:14.5px">${esc(r.title)}</div>
-          <div class="cat-count">${r.heat_threshold !== null ? `Unlocks at ${r.heat_threshold}%` : 'No auto-unlock threshold'}${r.completed ? ' · claimed' : ''}</div>
-        </div>
-        <div class="cat-arrow">›</div>
-      </div>
-    `).join('') : `<div class="empty-state">No rewards yet.</div>`}
-    ${state.rewards.length ? `<button class="link-btn" id="btn-delete-all-rewards" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.rewards.length} rewards</button>` : ''}
   `;
 }
 
@@ -2179,10 +2158,12 @@ async function fetchSignedImageUrl(path, bucket = 'boundary-images') {
    ========================================================================== */
 function renderRewardsTab() {
   return `
+    <p class="hint-text" style="margin-bottom:14px">Unlocked automatically as the Heat Meter rises. Since these are shared — you'll both experience whatever it is — either of you can add, edit, or claim one.</p>
+    <button class="btn btn-ghost" id="btn-add-reward" style="margin-bottom:16px">Add a reward</button>
     ${state.rewards.length ? state.rewards.map(r => {
       const revealed = r.heat_threshold === null || state.heat >= r.heat_threshold;
       return `
-      <div class="dare ${revealed ? 'unlocked' : 'locked'}">
+      <div class="dare ${revealed ? 'unlocked' : 'locked'}" data-edit-reward="${r.id}" style="cursor:pointer">
         <div class="dare-top">
           <div class="dare-title">${revealed ? esc(r.title) : 'Locked reward'}</div>
           ${r.completed ? `<span class="pill">claimed</span>` : ''}
@@ -2192,7 +2173,7 @@ function renderRewardsTab() {
         ${(!r.completed && revealed) ? `<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost btn-small" data-reward-complete="${r.id}">Mark claimed</button></div>` : ''}
       </div>
     `;
-    }).join('') : `<div class="empty-state">No rewards set up yet — ask whoever manages content to add some in Admin.</div>`}
+    }).join('') : `<div class="empty-state">No rewards set up yet — add the first one above.</div>`}
   `;
 }
 
@@ -2269,7 +2250,7 @@ function openCreateDareModal() {
           </select>
         </div>
         <div class="field"><label>Type</label>
-          <select id="d-blind-type">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
+          <select id="d-blind-type"></select>
         </div>
         <div class="field"><label>Intensity</label>
           <select id="d-blind-intensity"></select>
@@ -2285,7 +2266,7 @@ function openCreateDareModal() {
           <div class="field"><label>Teaser (shown before they reveal it)</label><input type="text" id="d-teaser"></div>
           <div class="field"><label>Full instructions</label><textarea id="d-instructions" required></textarea></div>
           <div class="field"><label>Type</label>
-            <select id="d-type">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
+            <select id="d-type"></select>
           </div>
           <div class="field"><label>Intensity</label>
             <select id="d-intensity"></select>
@@ -2317,6 +2298,8 @@ function openCreateDareModal() {
   const writeOwnBtn = document.getElementById('btn-write-own');
   const form = document.getElementById('dare-form');
   const blindIntensitySelect = document.getElementById('d-blind-intensity');
+  const typeSelect = document.getElementById('d-type');
+  const blindTypeSelect = document.getElementById('d-blind-type');
   let pickedImagePath = null;
 
   function currentMaxIntensity() {
@@ -2331,6 +2314,14 @@ function openCreateDareModal() {
     const max = currentMaxIntensity();
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
     blindIntensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]}</option>`).join('');
+  }
+  function populateTypeOptions() {
+    const types = availableTypesFor(categorySelect.value);
+    typeSelect.innerHTML = types.map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('');
+  }
+  function populateBlindTypeOptions() {
+    const types = availableTypesFor(categorySelect.value);
+    blindTypeSelect.innerHTML = types.map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('');
   }
 
   const blindSendBtn = document.getElementById('btn-blind-send');
@@ -2362,9 +2353,10 @@ function openCreateDareModal() {
     showToast('🙈 Sent blind — you\'ll find out together.');
   };
 
-  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); };
+  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); populateTypeOptions(); populateBlindTypeOptions(); };
   writeOwnBtn.onclick = () => {
     populateIntensityOptions();
+    populateTypeOptions();
     document.getElementById('d-title').value = '';
     document.getElementById('d-teaser').value = '';
     document.getElementById('d-instructions').value = '';
@@ -2375,6 +2367,8 @@ function openCreateDareModal() {
   };
   populateIntensityOptions();
   populateBlindIntensityOptions();
+  populateTypeOptions();
+  populateBlindTypeOptions();
 
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -2668,25 +2662,12 @@ function attachMainHandlers() {
     render();
     showToast('Forfeits cleared.');
   };
-  const importRewardsCsvBtn = document.getElementById('btn-import-rewards-csv');
-  if (importRewardsCsvBtn) importRewardsCsvBtn.onclick = openImportRewardsCsvModal;
-  const exportRewardsBtn = document.getElementById('btn-export-rewards-csv');
-  if (exportRewardsBtn) exportRewardsBtn.onclick = exportRewardsCsv;
   const addRewardBtn = document.getElementById('btn-add-reward');
   if (addRewardBtn) addRewardBtn.onclick = () => openLibraryRewardModal(null);
   $app.querySelectorAll('[data-edit-reward]').forEach(el => el.onclick = () => {
     const reward = state.rewards.find(r => r.id === el.dataset.editReward);
     if (reward) openLibraryRewardModal(reward);
   });
-  const deleteAllRewardsBtn = document.getElementById('btn-delete-all-rewards');
-  if (deleteAllRewardsBtn) deleteAllRewardsBtn.onclick = async () => {
-    if (!confirm(`Delete all ${state.rewards.length} rewards? This can't be undone.`)) return;
-    const { error } = await sb.from('rewards').delete().eq('couple_id', state.coupleId);
-    if (error) { showToast(error.message); return; }
-    await loadRewards();
-    render();
-    showToast('Rewards cleared.');
-  };
   const startAgainBtn = document.getElementById('btn-start-again');
   if (startAgainBtn) startAgainBtn.onclick = openResetConfirmModal;
   const removePartnerBtn = document.getElementById('btn-remove-partner');
@@ -2868,7 +2849,8 @@ function attachMainHandlers() {
 
   $app.querySelectorAll('[data-view-evidence]').forEach(el => el.onclick = () => openEvidenceModal(el.dataset.viewEvidence));
 
-  $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async () => {
+  $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async (e) => {
+    e.stopPropagation();
     const { error } = await sb.rpc('claim_reward', { p_reward_id: el.dataset.rewardComplete });
     if (error) { showToast(error.message); return; }
     await loadRewards();
@@ -3628,70 +3610,6 @@ async function runForfeitsCsvImport(rows) {
   await loadForfeitLibrary();
   if (progressEl) {
     progressEl.innerHTML = `<b>${added} forfeit${added===1?'':'s'} added, ${skipped} skipped.</b>` +
-      (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
-  }
-}
-
-function openImportRewardsCsvModal() {
-  state.modal = `
-    <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal-sheet">
-        <h2>Import rewards from CSV</h2>
-        <p class="hint-text" style="margin-bottom:14px">Columns: <b>title, teaser, details, unlock_condition, heat_threshold</b>. heat_threshold is optional — if set, must be one of 25/50/75/100.</p>
-        <input type="file" id="rewards-csv-file" accept=".csv">
-        <div id="rewards-import-progress" class="hint-text" style="margin-top:14px"></div>
-        <button class="btn btn-ghost" id="modal-cancel" style="margin-top:16px">Close</button>
-      </div>
-    </div>
-  `;
-  render();
-  document.getElementById('modal-cancel').onclick = closeModal;
-  document.getElementById('rewards-csv-file').onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_'),
-      complete: (results) => runRewardsCsvImport(results.data)
-    });
-  };
-}
-
-async function runRewardsCsvImport(rows) {
-  const progressEl = document.getElementById('rewards-import-progress');
-  let added = 0, skipped = 0;
-  const errors = [];
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const lineNum = i + 2;
-    const title = (row.title || '').trim();
-    const teaser = (row.teaser || '').trim() || null;
-    const details = (row.details || '').trim();
-    const unlockCondition = (row.unlock_condition || '').trim();
-    const rawThreshold = (row.heat_threshold || '').trim();
-    const threshold = rawThreshold ? parseInt(rawThreshold, 10) : null;
-
-    if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
-
-    if (!title || !details || !unlockCondition) {
-      skipped++; errors.push(`Row ${lineNum}: missing title, details, or unlock_condition — skipped.`); continue;
-    }
-    if (rawThreshold && !HEAT_THRESHOLDS.includes(threshold)) {
-      skipped++; errors.push(`Row ${lineNum}: heat_threshold must be 25, 50, 75, or 100 — skipped.`); continue;
-    }
-
-    const { error } = await sb.rpc('add_reward', {
-      p_title: title, p_teaser: teaser, p_details: details, p_unlock_condition: unlockCondition, p_heat_threshold: threshold
-    });
-    if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
-    added++;
-  }
-
-  await loadRewards();
-  if (progressEl) {
-    progressEl.innerHTML = `<b>${added} reward${added===1?'':'s'} added, ${skipped} skipped.</b>` +
       (errors.length ? `<div style="margin-top:8px; max-height:150px; overflow-y:auto">${errors.map(e => `<div>${esc(e)}</div>`).join('')}</div>` : '');
   }
 }
