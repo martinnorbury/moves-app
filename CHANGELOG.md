@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.53.0 — the actual root cause of the unresponsive popup, fixed properly
+
+- Traced this all the way through rather than patching the one modal:
+  the app checks for things like pending comparison questions on every
+  load, and can open a modal at that moment. But the onboarding screens
+  (welcome, the six questions, the explainer) bypass the app's normal
+  page structure entirely, which is the only place a modal actually gets
+  inserted into the page. So a modal could get created and have its
+  buttons wired up while the onboarding screens were still showing —
+  except there was nothing in the page yet for those buttons to attach
+  to. Once onboarding finished and the real page structure finally
+  rendered, the modal appeared for the first time, fully stale — only
+  the generic "click outside to close" handler (which attaches
+  separately, every time) actually worked.
+- Fixed at the root: these checks are now suppressed entirely until
+  onboarding is genuinely finished, and explicitly triggered the moment
+  it completes, so nothing pending gets silently lost either.
+- This was the same underlying issue behind the forfeit modal report
+  earlier — that one got a narrower fix (event delegation on that one
+  modal) rather than this root-cause one, so it's possible it or
+  something similar could resurface elsewhere with a modal I haven't
+  hardened. Flagging that honestly rather than claiming this is now
+  bulletproof everywhere.
+
 ## 1.52.0 — the "move" sweep done properly, and a real fix for the testing workflow
 
 - The two "move" mistakes flagged were real, and checking properly

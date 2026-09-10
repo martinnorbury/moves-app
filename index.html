@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.52.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.53.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.52.0';
+const APP_VERSION = '1.53.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -632,7 +632,11 @@ async function loadEverything() {
   }
   state.loading = false;
   render();
-  checkForCompletionReveal();
+  if (isOnboardingComplete()) checkForCompletionReveal();
+}
+
+function isOnboardingComplete() {
+  return !!(state.profile && state.profile.seen_wizard_intro && state.profile.seen_app_explainer);
 }
 
 async function checkForCompletionReveal() {
@@ -831,7 +835,7 @@ function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
       async () => { await loadDares(); await loadScoreboard(); await loadHeat(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `couple_id=eq.${state.coupleId}` },
-      async () => { await loadNotifications(); render(); await checkForCompletionReveal(); })
+      async () => { await loadNotifications(); render(); if (isOnboardingComplete()) await checkForCompletionReveal(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards', filter: `couple_id=eq.${state.coupleId}` },
       () => { loadRewards(); render(); })
     .subscribe();
@@ -1021,6 +1025,7 @@ function attachAppExplainerHandlers() {
     state.profile.seen_app_explainer = true;
     render();
     await sb.from('profiles').update({ seen_app_explainer: true }).eq('id', state.session.user.id);
+    if (isOnboardingComplete()) await checkForCompletionReveal();
   };
 }
 
