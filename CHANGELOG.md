@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.52.0 — the "move" sweep done properly, and a real fix for the testing workflow
+
+- The two "move" mistakes flagged were real, and checking properly
+  turned up eleven more, not two — five *inside the database functions
+  themselves*, including genuine user-facing error messages ("Move not
+  found", "Only the person who sent this move can react to it") that
+  would show verbatim if triggered, not just internal text. Fixed all
+  five functions (create_dare, complete_dare, respond_to_dare,
+  react_to_dare_quality, sign_off_dare) and reverified every grant
+  afterward — all still correctly locked down, zero duplicate function
+  versions created.
+- On the app side, my first sweep used a filter that accidentally hid a
+  real bug from itself (excluding any line containing `state.`, which
+  also matched a line with the actual mistake in it). Redid it with zero
+  exclusions and manually reviewed every hit. Found and fixed five more:
+  two notification-matching strings that had to be updated to match the
+  now-corrected database text or the celebration/toasts would have
+  silently stopped firing, the turn message, a fallback dare title, and
+  the Signal hint text.
+- Built the actual fix for the real problem — needing to fully recreate
+  an account just to preview a screen change. New "Preview my onboarding
+  again" button in Account settings, usable by either account on
+  themselves: resets your own six answers and your own welcome-screen
+  flags, touches nothing else — not your partner's data, not real
+  gameplay, no new account or pairing needed. Tested directly against
+  Jacki's actual account: her flags reset correctly, Martin's stayed
+  completely untouched.
+
 ## 1.51.0 — one page explaining the app, seen once, never again
 
 - Scaled back from a multi-screen guided tour to exactly what was asked

@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.51.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.52.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.51.0';
+const APP_VERSION = '1.52.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -643,7 +643,7 @@ async function checkForCompletionReveal() {
   await sb.from('notifications').update({ read: true }).eq('id', notif.id);
   state.notifications = state.notifications.filter(n => n.id !== notif.id);
 
-  if (notif.message === 'Your move was completed.' && notif.dare_id) {
+  if (notif.message === 'Your dare was completed.' && notif.dare_id) {
     await loadDares(); // guard against a race where this fires before the dare's own points have synced
     const dare = state.dares.find(d => d.id === notif.dare_id);
     if (dare) {
@@ -658,18 +658,18 @@ async function checkForCompletionReveal() {
       });
       return;
     }
-  } else if (notif.message === 'Your move was accepted.' && notif.dare_id) {
+  } else if (notif.message === 'Your dare was accepted.' && notif.dare_id) {
     await loadDares();
     const dare = state.dares.find(d => d.id === notif.dare_id);
-    showToast(`🎉 ${state.partner ? state.partner.display_name : 'Your partner'} accepted "${dare ? dare.title : 'your move'}"!`);
-  } else if (notif.message === 'Your move got a reaction.' && notif.dare_id) {
+    showToast(`🎉 ${state.partner ? state.partner.display_name : 'Your partner'} accepted "${dare ? dare.title : 'your dare'}"!`);
+  } else if (notif.message === 'Your dare got a reaction.' && notif.dare_id) {
     await loadDares();
     const dare = state.dares.find(d => d.id === notif.dare_id);
     if (dare && dare.quality_reaction) {
       const reactionLabel = { meh: 'Meh', good: 'Good', loved_it: 'Loved it' }[dare.quality_reaction] || dare.quality_reaction;
       showToast(`${state.partner ? state.partner.display_name : 'Your partner'} reacted "${reactionLabel}" to "${dare.title}"${dare.quality_bonus_points ? ` (+${dare.quality_bonus_points} bonus)` : ''}`);
     }
-  } else if (notif.message !== 'You have a new move waiting.') {
+  } else if (notif.message !== 'You have a new dare waiting.') {
     // Already covered live by the Playroom hero banner, so skip it silently.
     // Anything else unrecognized still gets shown rather than silently
     // dropped — this is what the earlier bug was: a message type nobody
@@ -990,10 +990,10 @@ function renderAppExplainer() {
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
         <h1>One more thing before we're in</h1>
-        <p>The quick version — where everything lives, and how a move actually works.</p>
+        <p>The quick version — where everything lives, and how a dare actually works.</p>
       </div>
 
-      <div class="category-row" style="cursor:default"><div><div class="cat-name">Playroom</div><div class="cat-count">Home base — what's happening right now, our scores, the Heat Meter.</div></div></div>
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">Playroom</div><div class="cat-count">Home base — what's happening right now, and our scores.</div></div></div>
       <div class="category-row" style="cursor:default"><div><div class="cat-name">Kinks</div><div class="cat-count">Where our answers live, and how we compare, area by area.</div></div></div>
       <div class="category-row" style="cursor:default"><div><div class="cat-name">Dares</div><div class="cat-count">The actual game — dares sent, waiting on us, and done.</div></div></div>
       <div class="category-row" style="cursor:default"><div><div class="cat-name">Rewards</div><div class="cat-count">What unlocks together as we go.</div></div></div>
@@ -1002,7 +1002,10 @@ function renderAppExplainer() {
       <div class="divider" style="margin:24px 0"></div>
 
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">How a move actually works:</b> one of us sends a dare — pick one from the library, or write our own. The other accepts, declines, or counters it, always their call. Complete it, and points land — the Heat Meter rises a little. Cross a threshold, a reward unlocks.
+        <b style="color:var(--text)">How a dare actually works:</b> one of us sends a dare — pick one from the library, or write our own. The other accepts, declines, or counters it, always their call. Complete it, and points land.
+      </p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
+        <b style="color:var(--text)">The Heat Meter:</b> a shared bar on Playroom that fills up a little every time we complete a dare together. Fill it past a threshold, and a reward unlocks.
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
         <b style="color:var(--text)">Forfeits:</b> each week, whoever's behind on points picks their own — never chosen for them.
@@ -1436,8 +1439,8 @@ function computeTurnMessage() {
   const completed = state.dares.filter(d => d.status === 'completed' && d.completed_at);
   if (!completed.length) return null;
   const mostRecent = completed.reduce((a, b) => new Date(a.completed_at) > new Date(b.completed_at) ? a : b);
-  const turnUserId = mostRecent.recipient_id; // whoever just completed a move is nudged to send the next one
-  if (turnUserId === state.session.user.id) return "It's your turn to send a move, whenever you're ready.";
+  const turnUserId = mostRecent.recipient_id; // whoever just completed a dare is nudged to send the next one
+  if (turnUserId === state.session.user.id) return "It's your turn to send a dare, whenever you're ready.";
   const partnerName = state.partner ? state.partner.display_name : 'Your partner';
   return `It's ${partnerName}'s turn to send a dare — you can still send one anytime too.`;
 }
@@ -3068,12 +3071,15 @@ function openAccountModal() {
         </div>
         <div class="field" style="margin-bottom:14px"><label>Your name</label><input type="text" id="account-name-input" value="${esc(currentName)}"></div>
         <div class="field"><label>Your Signal number</label><input type="tel" id="signal-number-input" value="${esc(currentPhone)}" placeholder="+447700900000"></div>
-        <p class="hint-text" style="margin-top:6px">Lets ${esc(state.partner ? state.partner.display_name : 'your partner')} message you on Signal with one tap during an in-play move. Include the country code.</p>
+        <p class="hint-text" style="margin-top:6px">Lets ${esc(state.partner ? state.partner.display_name : 'your partner')} message you on Signal with one tap during an in-play dare. Include the country code.</p>
         <div id="account-error" class="error-text" style="margin-top:8px"></div>
         <div class="btn-row" style="margin-top:16px">
           <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
           <button type="button" class="btn btn-primary" id="btn-save-account">Save</button>
         </div>
+        <div class="divider" style="margin:18px 0"></div>
+        <p class="hint-text" style="margin-bottom:10px">Want to re-see the welcome screens and the six questions, exactly as they first appeared? This only resets your own onboarding — your partner's answers, and everything else in the app, stay untouched.</p>
+        <button type="button" class="btn btn-ghost" id="btn-preview-onboarding" style="width:100%">Preview my onboarding again</button>
       </div>
     </div>
   `;
@@ -3096,6 +3102,15 @@ function openAccountModal() {
     closeModal();
     render();
     showToast('Account updated.');
+  };
+  const previewBtn = document.getElementById('btn-preview-onboarding');
+  if (previewBtn) previewBtn.onclick = async () => {
+    if (!confirm("This resets your own welcome screens and six general questions so you can see them fresh. It won't touch your partner's data or anything else. Continue?")) return;
+    const { error } = await sb.rpc('preview_my_onboarding');
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadEverything();
+    showToast('Ready — starting your onboarding fresh.');
   };
 }
 
@@ -3361,7 +3376,7 @@ function openLibraryDareModal(existing, defaultCategory) {
           <div class="field"><label>Intensity</label>
             <select id="ld-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${existing && existing.intensity===i ? 'selected' : ''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>Image (optional — carries through to the actual move if it's picked)</label>
+          <div class="field"><label>Image (optional — carries through to the actual dare if it's picked)</label>
             ${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : ''}
             <input type="file" id="ld-image" accept="image/*">
           </div>
