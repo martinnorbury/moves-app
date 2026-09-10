@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.49.2 — the TwoPlay/foreplay wordplay is now actually visible
+
+- Added a short italic line under the title: "(yes — as in foreplay.
+  That's rather the idea.)" — the wordplay in the app's own name was
+  invisible until pointed out directly; this lets it land without
+  over-explaining the joke.
+
+## 1.49.1 — welcome screen spacing and pronoun fixes
+
+- Switched from vertical centering (unpredictable with content this
+  long — could crowd the title depending on screen height) to a
+  deliberate, fixed top padding, so the spacing is now consistent
+  regardless of device.
+- Shifted "the two of you" to "us"/"we" throughout the parts describing
+  the shared activity ahead — the invite came from a real person, so
+  once you're actually in the app, it should read as something you're
+  in together, not a description of a couple from outside. Kept the
+  opening line ("You got an email...") in "you," since that's genuinely
+  about the individual reader's own specific action, not something
+  shared — a deliberate shift in voice, not an oversight.
+
 ## 1.49.0 — onboarding actually explains itself now
 
 - Found the real source of the generic screenshot text from a few

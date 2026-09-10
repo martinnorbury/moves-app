@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.49.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.49.2)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.49.0';
+const APP_VERSION = '1.49.2';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -889,23 +889,24 @@ function renderAnswerControl(q, currentAnswer, attrsFor) {
 function renderWizardIntro() {
   const name = state.profile ? state.profile.display_name : '';
   return `
-    <div class="center-screen">
+    <div class="screen" style="padding-top:48px">
       <div class="auth-hero">
         <h1>Welcome to TwoPlay${name ? ', ' + esc(name) : ''}</h1>
+        <p style="font-style:italic; font-size:13.5px; color:var(--text-faint); margin-bottom:14px">(yes — as in foreplay. That's rather the idea.)</p>
         <p>You got an email. It didn't say much. You clicked it anyway — that was rather the point.</p>
       </div>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">
-        Here's what it actually is: a private game, just for the two of you. It learns where you both stand — what excites you, what doesn't, how far is fun rather than too far — then plays accordingly. Nothing forced. Nothing either of you doesn't want.
+        Here's what it actually is: a private game, just for us. It learns where we both stand — what excites us, what doesn't, how far is fun rather than too far — then plays accordingly. Nothing forced. Nothing either of us doesn't want.
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
-        It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where you overlap.
+        It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where we overlap.
       </p>
       <div class="gauge-track" style="margin-bottom:8px"></div>
       <div class="gauge-row" style="margin-bottom:28px">
         ${GAUGE_ORDER.map(a => `<div class="gauge-stop" style="cursor:default">${GAUGE_ICONS[a]}</div>`).join('')}
       </div>
       <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:28px">
-        Once you've both answered, everything opens up — dares tailored to exactly where the two of you are, together.
+        Once we've both answered, everything opens up — dares tailored to exactly where we are, together.
       </p>
       <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%">Let's begin →</button>
     </div>
