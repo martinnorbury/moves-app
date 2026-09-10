@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.48.0 — the app generates and copies the invite email itself
+
+- "Waiting on your partner" now has a "Copy email" button, right below
+  the invite link — enter their name (optional), tap it, and the whole
+  designed email (with the current invite link already baked in) gets
+  copied as fully-formatted rich content, not raw HTML. Paste into a new
+  message in Mail and it arrives styled, link and all — no more opening
+  a separate file, selecting all, or manually swapping in the link.
+- The standalone HTML file from before still works if preferred, but
+  this is now the faster path, and the one that can't go stale (the link
+  is always the current invite code, generated fresh each time).
+
+## 1.47.0 — shareable invite link, no more typing a code
+
+- Generating an invite code now also shows a full link
+  (?invite=XXXXXX) with a "Copy link" button — send that instead of the
+  raw code and whoever opens it lands straight on the pairing screen
+  with the code already filled in, one tap to join.
+- This is the piece needed for the "email them a link" idea to actually
+  work end to end — the email-sending itself needs a real email service
+  with an API key, which I can't provision myself, but once that's
+  connected, this is exactly the link it would send.
+
+## 1.46.1 — theme picker copy fixed
+
+- "Lighter, warmer theme" / "Lighter, cooler theme" were leftover from
+  before the dark redesign — fixed in all three places they appeared
+  (signup form, the post-signup theme-choice screen, and its buttons).
+
 ## 1.46.0 — remove a partner and re-pair fresh
 
 - New Admin danger-zone action: removes your current partner from the

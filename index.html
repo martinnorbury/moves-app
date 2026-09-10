@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.46.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.48.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.46.0';
+const APP_VERSION = '1.48.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -456,6 +456,7 @@ let state = {
   notifications: [],
   loading: true,
   authMode: 'signin',
+  urlInviteCode: null,          // invite code captured from a ?invite= link, if any
   authError: '',
   toast: null,
 };
@@ -574,6 +575,10 @@ function fmtCountdown(iso) {
    BOOTSTRAP
    ========================================================================== */
 async function boot() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteFromUrl = urlParams.get('invite');
+  if (inviteFromUrl) state.urlInviteCode = inviteFromUrl.trim().toUpperCase();
+
   const { data: { session } } = await sb.auth.getSession();
   state.session = session;
   sb.auth.onAuthStateChange((_event, session) => {
@@ -1078,8 +1083,8 @@ function renderAuth() {
         <div class="field"><label>Your name</label><input type="text" id="auth-name" placeholder="How your partner will see you" required></div>
         <div class="field"><label>Theme</label>
           <select id="auth-gender">
-            <option value="female">Lighter, warmer theme</option>
-            <option value="male">Lighter, cooler theme</option>
+            <option value="female">Warmer theme — deep rose and gold</option>
+            <option value="male">Cooler theme — deep blue and gold</option>
           </select>
         </div>` : ''}
         <div class="field"><label>Email</label><input type="email" id="auth-email" required></div>
@@ -1131,8 +1136,8 @@ function renderCreateProfile() {
         <div class="field"><input type="text" id="profile-name" placeholder="Your name" required></div>
         <div class="field"><label>Theme</label>
           <select id="profile-gender">
-            <option value="female">Lighter, warmer theme</option>
-            <option value="male">Lighter, cooler theme</option>
+            <option value="female">Warmer theme — deep rose and gold</option>
+            <option value="male">Cooler theme — deep blue and gold</option>
           </select>
         </div>
         <button type="submit" class="btn btn-primary">Continue</button>
@@ -1155,8 +1160,8 @@ function renderChooseTheme() {
     <div class="center-screen">
       <div class="auth-hero"><h1>Pick a theme</h1><p>You can't change this later without asking me to — but it's just a colour, nothing else depends on it.</p></div>
       <div class="stack">
-        <button class="btn btn-primary" data-pick-gender="female">Lighter, warmer theme</button>
-        <button class="btn btn-primary" data-pick-gender="male">Lighter, cooler theme</button>
+        <button class="btn btn-primary" data-pick-gender="female">Warmer theme — deep rose and gold</button>
+        <button class="btn btn-primary" data-pick-gender="male">Cooler theme — deep blue and gold</button>
       </div>
     </div>
   `;
@@ -1176,11 +1181,19 @@ function renderPairing() {
     <div class="center-screen">
       <div class="auth-hero"><h1>Pair up</h1><p>Connect your accounts to start a private couple.</p></div>
       <div class="stack">
+        ${state.urlInviteCode ? `
+        <p class="hint-text" style="margin-bottom:4px">You were invited — this should already have your code:</p>
+        <div class="field"><label>Your invite code</label><input type="text" id="redeem-code" value="${esc(state.urlInviteCode)}" style="text-transform:uppercase"></div>
+        <button class="btn btn-primary" id="btn-redeem">Join with code</button>
+        <div class="divider"></div>
+        <button class="btn btn-ghost" id="btn-make-invite">Or generate your own invite code instead</button>
+        ` : `
         <button class="btn btn-primary" id="btn-make-invite">Generate an invite code</button>
         <div id="invite-code-area"></div>
         <div class="divider"></div>
         <div class="field"><label>Have a code from your partner?</label><input type="text" id="redeem-code" placeholder="e.g. A1B2C3" style="text-transform:uppercase"></div>
         <button class="btn btn-ghost" id="btn-redeem">Join with code</button>
+        `}
         ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
       </div>
     </div>
@@ -1208,7 +1221,15 @@ function renderAwaitingPartner() {
     <div class="center-screen">
       <div class="auth-hero"><h1>Waiting on your partner</h1><p>Share this code with them — it stays here until they join.</p></div>
       ${state.pendingInviteCode
-        ? `<div class="code-display">${esc(state.pendingInviteCode)}</div>`
+        ? `<div class="code-display">${esc(state.pendingInviteCode)}</div>
+           <p class="hint-text" style="margin:10px 0 4px">Or send this link — it fills the code in for them automatically:</p>
+           <div class="field"><input type="text" id="invite-link-display" value="${esc(buildInviteUrl(state.pendingInviteCode))}" readonly></div>
+           <button class="btn btn-ghost" id="btn-copy-invite-link" style="margin-top:8px">Copy link</button>
+           <div class="divider" style="margin:20px 0"></div>
+           <p class="hint-text" style="margin-bottom:10px">Or copy a proper invitation email, ready to paste straight into Mail:</p>
+           <div class="field"><label>Their name (optional)</label><input type="text" id="invite-email-name" placeholder="e.g. Jacki"></div>
+           <button class="btn btn-gold" id="btn-copy-invite-email" style="margin-top:8px; width:100%">Copy email</button>
+           <p class="hint-text" style="margin-top:6px">Paste into a new message in Mail — it'll come in fully formatted, link included.</p>`
         : `<p class="hint-text" style="margin-bottom:16px">No active code found — it may have expired.</p>`
       }
       <button class="btn btn-ghost" id="btn-new-code" style="margin-top:16px">Generate a new code</button>
@@ -1217,6 +1238,39 @@ function renderAwaitingPartner() {
     </div>
   `;
 }
+function buildInviteUrl(code) {
+  return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(code)}`;
+}
+
+function buildInviteEmailHtml(name, url) {
+  const greeting = name ? esc(name) + ',' : 'Hey,';
+  return `<!DOCTYPE html><html><body style="margin:0; padding:0; background-color:#2B1620;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#2B1620;">
+<tr><td align="center" style="padding:56px 20px;">
+<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%;">
+<tr><td style="padding-bottom:28px;"><div style="width:36px; height:2px; background-color:#C9A15C;"></div></td></tr>
+<tr><td style="font-family:Georgia,'Times New Roman',serif; font-size:29px; line-height:1.3; color:#F0E6DC; padding-bottom:26px;">${greeting}</td></tr>
+<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:20px;">Martin has arranged something for you. Not really a link — more of an invitation.</td></tr>
+<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:20px;">It's private. It's just the two of you. And once you step inside, there's no pretending you don't know what's there.</td></tr>
+<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:36px;">He isn't going to tell you what it is. That's rather the point.</td></tr>
+<tr><td align="center" style="padding-bottom:36px;"><a href="${esc(url)}" style="display:inline-block; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; letter-spacing:0.3px; color:#2B1620; background-color:#C9A15C; padding:15px 38px; border-radius:3px; text-decoration:none;">Step inside</a></td></tr>
+<tr><td style="font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:15px; line-height:1.6; color:#B89C8E; padding-bottom:4px;">Whatever you find, it stays between the two of you.</td></tr>
+<tr><td style="padding-top:28px;"><div style="width:36px; height:2px; background-color:#C9A15C;"></div></td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
+async function copyRichEmailToClipboard(html) {
+  const plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const item = new ClipboardItem({
+    'text/html': new Blob([html], { type: 'text/html' }),
+    'text/plain': new Blob([plain], { type: 'text/plain' })
+  });
+  await navigator.clipboard.write([item]);
+}
+
 function attachAwaitingPartnerHandlers() {
   document.getElementById('btn-new-code').onclick = async () => {
     state.authError = '';
@@ -1226,6 +1280,29 @@ function attachAwaitingPartnerHandlers() {
     render();
   };
   document.getElementById('btn-refresh-status').onclick = async () => { await loadEverything(); };
+  const copyBtn = document.getElementById('btn-copy-invite-link');
+  if (copyBtn) copyBtn.onclick = async () => {
+    const linkInput = document.getElementById('invite-link-display');
+    try {
+      await navigator.clipboard.writeText(linkInput.value);
+      showToast('Link copied.');
+    } catch {
+      linkInput.select();
+      showToast('Copy failed — select the text and copy manually.');
+    }
+  };
+  const copyEmailBtn = document.getElementById('btn-copy-invite-email');
+  if (copyEmailBtn) copyEmailBtn.onclick = async () => {
+    const name = document.getElementById('invite-email-name').value.trim();
+    const url = buildInviteUrl(state.pendingInviteCode);
+    const html = buildInviteEmailHtml(name, url);
+    try {
+      await copyRichEmailToClipboard(html);
+      showToast('Email copied — paste into a new message in Mail.');
+    } catch {
+      showToast('Copy failed — your browser may not support rich copy here.');
+    }
+  };
 }
 
 /* ==========================================================================
