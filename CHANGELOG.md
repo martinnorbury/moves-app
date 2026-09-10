@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.46.0 — remove a partner and re-pair fresh
+
+- New Admin danger-zone action: removes your current partner from the
+  couple entirely, wipes all gameplay data tied to that pairing (same
+  scope as Start Again), and frees the couple back up for a new invite
+  code — the existing "Waiting on your partner" screen already handles
+  generating and displaying that code, so nothing new was needed there.
+- Requires typing your partner's name exactly to confirm, same
+  seriousness as the RESET confirmation. Tested directly: Jacki's own
+  account is correctly rejected from removing herself.
+- This is exactly what you need for testing the startup flow properly —
+  remove the test pairing, generate a fresh code, sign up a new test
+  account under a different alias of your own email, and walk through
+  the whole thing from a genuinely blank slate.
+
+## 1.45.0 — a real welcome before the wizard begins
+
+- Found something worth acting on: the screenshot text you sent doesn't
+  match any string in the current codebase — meaning it was almost
+  certainly a stale cached copy of the PWA, not what's actually been
+  shipped. Worth ruling this out for the earlier "still not working"
+  reports too (forfeit modal, CSV export) — try removing the app from
+  your home screen and re-adding it fresh.
+- Added an actual welcome moment before question 1: a one-time screen
+  (shown once ever, re-armed by "Start again" like the Step 1
+  celebration) explaining what's about to happen and why, with a preview
+  of the gauge you're about to use, before diving into the six questions
+  cold.
+
 ## 1.44.0 — "Start again" — a proper gameplay reset in Admin
 
 - New danger-zone section at the bottom of Admin: wipes every answer,

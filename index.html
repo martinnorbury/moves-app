@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.44.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.46.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.44.0';
+const APP_VERSION = '1.46.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -881,6 +881,34 @@ function renderAnswerControl(q, currentAnswer, attrsFor) {
   `;
 }
 
+function renderWizardIntro() {
+  const name = state.profile ? state.profile.display_name : '';
+  return `
+    <div class="center-screen">
+      <div class="auth-hero">
+        <h1>Welcome to TwoPlay${name ? ', ' + esc(name) : ''}</h1>
+        <p>This starts with six quick questions — one for each Temptation. Nothing detailed, just a general sense of where you stand.</p>
+      </div>
+      <div class="gauge-track" style="margin-bottom:8px"></div>
+      <div class="gauge-row" style="margin-bottom:28px">
+        ${GAUGE_ORDER.map(a => `<div class="gauge-stop" style="cursor:default">${GAUGE_ICONS[a]}</div>`).join('')}
+      </div>
+      <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:28px">
+        Once you've both answered, everything opens up — dares matched to exactly where the two of you are, together. Nothing pushed too far, nothing held back too much. This is where it starts.
+      </p>
+      <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%">Let's begin →</button>
+    </div>
+  `;
+}
+function attachWizardIntroHandlers() {
+  const btn = document.getElementById('btn-wizard-intro-start');
+  if (btn) btn.onclick = async () => {
+    state.profile.seen_wizard_intro = true;
+    render();
+    await sb.from('profiles').update({ seen_wizard_intro: true }).eq('id', state.session.user.id);
+  };
+}
+
 function renderPartnerTeaser() {
   const partnerName = state.partner ? state.partner.display_name : 'Your partner';
   const total = getWizardQuestions().length;
@@ -986,6 +1014,9 @@ function render() {
   if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
 
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
+  if (wizardQueue.length > 0 && state.profile && !state.profile.seen_wizard_intro) {
+    $app.innerHTML = renderWizardIntro(); attachWizardIntroHandlers(); return;
+  }
   if (wizardQueue.length > 0 && state.partnerTeaser.length > 0 && !state.viewedTeaser) {
     $app.innerHTML = renderPartnerTeaser(); attachPartnerTeaserHandlers(); return;
   }
@@ -1640,6 +1671,11 @@ function renderSetupArea() {
       <div class="section-head" style="margin-top:0"><h2 style="color:var(--wine-bright)">Start again</h2></div>
       <p class="hint-text" style="margin-bottom:14px">Wipes all gameplay data — every answer, dare, notification, weekly result, and Heat Meter progress. Does not touch your pairing, your accounts, or any content you've built (headings, cards, dares, forfeits, rewards).</p>
       <button class="btn btn-ghost" id="btn-start-again" style="width:100%; border-color:var(--wine-bright); color:var(--wine-bright)">Reset all gameplay data</button>
+      ${state.partner ? `
+        <div class="divider" style="margin:16px 0"></div>
+        <p class="hint-text" style="margin-bottom:14px">Removes ${esc(state.partner.display_name)} from this couple entirely, wipes all gameplay data the same way, and frees up a fresh invite code so someone else can pair with you instead.</p>
+        <button class="btn btn-ghost" id="btn-remove-partner" style="width:100%; border-color:var(--wine-bright); color:var(--wine-bright)">Remove ${esc(state.partner.display_name)} and start a new pairing</button>
+      ` : ''}
     </div>
   `;
 }
@@ -2252,6 +2288,40 @@ function openLibraryRewardModal(existing) {
   };
 }
 
+function openRemovePartnerConfirmModal() {
+  const partnerName = state.partner ? state.partner.display_name : '';
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2 style="color:var(--wine-bright)">This can't be undone</h2>
+        <p class="hint-text" style="margin-bottom:14px">${esc(partnerName)} will be removed from this couple entirely, and all gameplay data tied to this pairing — every answer, dare, notification, weekly result, and Heat Meter progress, for both of you — will be gone. Your headings, cards, dares, forfeits, and reward definitions are untouched.</p>
+        <p class="hint-text" style="margin-bottom:10px">Type <b>${esc(partnerName.toUpperCase())}</b> to confirm.</p>
+        <div class="field"><input type="text" id="remove-partner-confirm-input" autocomplete="off"></div>
+        <div id="remove-partner-confirm-error" class="error-text" style="margin-top:8px"></div>
+        <div class="btn-row" style="margin-top:16px">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+          <button type="button" class="btn" style="background:var(--wine-bright); color:#fff;" id="btn-confirm-remove-partner">Remove ${esc(partnerName)}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('btn-confirm-remove-partner').onclick = async () => {
+    const errEl = document.getElementById('remove-partner-confirm-error');
+    const typed = document.getElementById('remove-partner-confirm-input').value.trim().toUpperCase();
+    if (typed !== partnerName.toUpperCase()) { errEl.textContent = `Type ${partnerName.toUpperCase()} exactly to confirm.`; return; }
+    const { error } = await sb.rpc('remove_partner');
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    state.tab = 'home';
+    state.wizardSkipped = new Set();
+    state.viewedTeaser = false;
+    await loadEverything();
+    showToast(`${partnerName} removed. Generate a new invite code to pair with someone else.`);
+  };
+}
+
 function openResetConfirmModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -2401,6 +2471,8 @@ function attachMainHandlers() {
   };
   const startAgainBtn = document.getElementById('btn-start-again');
   if (startAgainBtn) startAgainBtn.onclick = openResetConfirmModal;
+  const removePartnerBtn = document.getElementById('btn-remove-partner');
+  if (removePartnerBtn) removePartnerBtn.onclick = openRemovePartnerConfirmModal;
   const questionsSearchInput = document.getElementById('questions-search');
   if (questionsSearchInput) {
     questionsSearchInput.oninput = () => { state.questionsSearch = questionsSearchInput.value; state.lastFocusedSearch = 'questions-search'; render(); };
