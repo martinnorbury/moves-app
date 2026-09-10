@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.44.0 — "Start again" — a proper gameplay reset in Admin
+
+- New danger-zone section at the bottom of Admin: wipes every answer,
+  dare, notification, weekly settlement, and Heat Meter progress for
+  both accounts, and re-arms the Step 1 completion celebration so it can
+  be seen fresh again. Never touches pairing, accounts, or anything
+  you've curated — headings, cards, the dare library, forfeits, and
+  reward definitions are all untouched (reward *claims* reset, but the
+  rewards themselves stay).
+- Requires typing "RESET" to confirm — not just a tap-through dialog,
+  given how destructive this is. Tested the access control directly:
+  Jacki's account is correctly rejected from triggering it at all.
+- Also clears two session-only flags (skipped wizard questions, whether
+  you've seen the partner teaser) that would otherwise carry over from
+  before the reset and interfere with a genuinely fresh simulation.
+
+## 1.43.1 — "Surprise me" for dares too, same as forfeits
+
+- Real fairness gap: whoever's creating a dare could browse every
+  library suggestion for a Temptation and cherry-pick whichever one
+  benefited them, with nothing forcing genuine unpredictability. Added
+  "🎲 Surprise me — pick one at random," positioned above the browsable
+  list so using it never requires seeing what else was available —
+  mirrors the same mechanic already built for forfeits. Browsing and
+  picking intentionally, or writing your own, are both still there for
+  when that's genuinely what you want to do.
+
 ## 1.43.0 — Rewards into Admin, Dares search/collapse, calendar fix, sender-side waiting status
 
 - **Rewards moved fully into Admin**, matching Questions/Dares/Forfeits

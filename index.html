@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.43.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.44.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.43.0';
+const APP_VERSION = '1.44.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1635,6 +1635,12 @@ function renderSetupArea() {
     ${renderForfeitsSection()}
     <div class="divider"></div>
     ${renderRewardsSection()}
+    <div class="divider"></div>
+    <div style="border:1.5px solid var(--wine-bright); border-radius:var(--radius-m); padding:16px; margin-top:6px">
+      <div class="section-head" style="margin-top:0"><h2 style="color:var(--wine-bright)">Start again</h2></div>
+      <p class="hint-text" style="margin-bottom:14px">Wipes all gameplay data — every answer, dare, notification, weekly result, and Heat Meter progress. Does not touch your pairing, your accounts, or any content you've built (headings, cards, dares, forfeits, rewards).</p>
+      <button class="btn btn-ghost" id="btn-start-again" style="width:100%; border-color:var(--wine-bright); color:var(--wine-bright)">Reset all gameplay data</button>
+    </div>
   `;
 }
 
@@ -1997,6 +2003,8 @@ function openCreateDareModal() {
             ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
           </select>
         </div>
+        <button type="button" class="btn btn-gold" id="btn-surprise-dare" style="width:100%; margin-bottom:10px">🎲 Surprise me — pick one at random</button>
+        <p class="hint-text" style="margin-bottom:10px">Or browse and choose one yourself:</p>
         <div id="d-suggestions" style="margin:14px 0"></div>
         <button type="button" class="btn btn-ghost" id="btn-write-own" style="margin-bottom:14px">Write my own instead</button>
         <form id="dare-form" class="stack" style="display:none">
@@ -2045,11 +2053,33 @@ function openCreateDareModal() {
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
     intensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]} — ${INTENSITY_POINTS[i]} pts</option>`).join('');
   }
-  function renderSuggestions() {
+  async function applyLibraryDareToForm(d) {
+    document.getElementById('d-title').value = d.title;
+    document.getElementById('d-teaser').value = d.teaser || '';
+    document.getElementById('d-instructions').value = d.instructions;
+    populateIntensityOptions();
+    intensitySelect.value = d.intensity;
+    pickedImagePath = d.image_path || null;
+    const previewEl = document.getElementById('d-image-preview');
+    if (d.image_path) {
+      if (!state.imageUrls[d.image_path]) await fetchSignedImageUrl(d.image_path, 'dare-images');
+      previewEl.innerHTML = state.imageUrls[d.image_path] ? `<img src="${esc(state.imageUrls[d.image_path])}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : '';
+    } else {
+      previewEl.innerHTML = '';
+    }
+    form.style.display = '';
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function eligibleLibraryDares() {
     const cat = categorySelect.value;
     const max = currentMaxIntensity();
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
-    const matches = state.dareLibrary.filter(d => d.category === cat && allowed.includes(d.intensity));
+    return state.dareLibrary.filter(d => d.category === cat && allowed.includes(d.intensity));
+  }
+
+  function renderSuggestions() {
+    const matches = eligibleLibraryDares();
     const box = document.getElementById('d-suggestions');
     if (!matches.length) {
       box.innerHTML = `<p class="hint-text">No library dares for this temptation yet.</p>`;
@@ -2064,25 +2094,19 @@ function openCreateDareModal() {
         <div class="cat-arrow">›</div>
       </div>
     `).join('');
-    box.querySelectorAll('[data-pick-library]').forEach(el => el.onclick = async () => {
+    box.querySelectorAll('[data-pick-library]').forEach(el => el.onclick = () => {
       const d = matches.find(x => x.id === el.dataset.pickLibrary);
-      document.getElementById('d-title').value = d.title;
-      document.getElementById('d-teaser').value = d.teaser || '';
-      document.getElementById('d-instructions').value = d.instructions;
-      populateIntensityOptions();
-      intensitySelect.value = d.intensity;
-      pickedImagePath = d.image_path || null;
-      const previewEl = document.getElementById('d-image-preview');
-      if (d.image_path) {
-        if (!state.imageUrls[d.image_path]) await fetchSignedImageUrl(d.image_path, 'dare-images');
-        previewEl.innerHTML = state.imageUrls[d.image_path] ? `<img src="${esc(state.imageUrls[d.image_path])}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : '';
-      } else {
-        previewEl.innerHTML = '';
-      }
-      form.style.display = '';
-      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      applyLibraryDareToForm(d);
     });
   }
+
+  const surpriseBtn = document.getElementById('btn-surprise-dare');
+  if (surpriseBtn) surpriseBtn.onclick = () => {
+    const matches = eligibleLibraryDares();
+    if (!matches.length) { showToast('No library dares for this temptation yet.'); return; }
+    const picked = matches[Math.floor(Math.random() * matches.length)];
+    applyLibraryDareToForm(picked);
+  };
 
   categorySelect.onchange = () => { populateIntensityOptions(); renderSuggestions(); };
   writeOwnBtn.onclick = () => {
@@ -2228,6 +2252,39 @@ function openLibraryRewardModal(existing) {
   };
 }
 
+function openResetConfirmModal() {
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2 style="color:var(--wine-bright)">This can't be undone</h2>
+        <p class="hint-text" style="margin-bottom:14px">Every answer, every dare, every notification, every weekly result, and all Heat Meter progress will be gone for both accounts. Your headings, cards, dares, forfeits, and reward definitions are untouched — this is purely gameplay data.</p>
+        <p class="hint-text" style="margin-bottom:10px">Type <b>RESET</b> to confirm.</p>
+        <div class="field"><input type="text" id="reset-confirm-input" autocomplete="off"></div>
+        <div id="reset-confirm-error" class="error-text" style="margin-top:8px"></div>
+        <div class="btn-row" style="margin-top:16px">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+          <button type="button" class="btn" style="background:var(--wine-bright); color:#fff;" id="btn-confirm-reset">Reset everything</button>
+        </div>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('btn-confirm-reset').onclick = async () => {
+    const errEl = document.getElementById('reset-confirm-error');
+    const typed = document.getElementById('reset-confirm-input').value.trim();
+    if (typed !== 'RESET') { errEl.textContent = 'Type RESET exactly to confirm.'; return; }
+    const { error } = await sb.rpc('reset_couple_gameplay');
+    if (error) { errEl.textContent = error.message; return; }
+    closeModal();
+    state.tab = 'home';
+    state.wizardSkipped = new Set();
+    state.viewedTeaser = false;
+    await loadEverything();
+    showToast('Gameplay data reset. Starting fresh.');
+  };
+}
+
 function openVersionModal() {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -2342,6 +2399,8 @@ function attachMainHandlers() {
     render();
     showToast('Rewards cleared.');
   };
+  const startAgainBtn = document.getElementById('btn-start-again');
+  if (startAgainBtn) startAgainBtn.onclick = openResetConfirmModal;
   const questionsSearchInput = document.getElementById('questions-search');
   if (questionsSearchInput) {
     questionsSearchInput.oninput = () => { state.questionsSearch = questionsSearchInput.value; state.lastFocusedSearch = 'questions-search'; render(); };
