@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.61.0 — Kinks gets a persistent indicator, not just a live pop-up
+
+- Checked directly: Jacki genuinely does have a pending comparison
+  question sitting there ("Candle Position") — the underlying logic is
+  correct, but the only way she'd find out was catching a live realtime
+  event at the exact right moment, or refreshing. That's inherently
+  fragile — a dropped connection, a backgrounded tab, anything, and it's
+  silently missed with nothing left behind to show for it.
+- Added the reload-independent fallback: the same dot the Dares tab
+  already uses for new dares now also appears on Kinks when something's
+  pending, refreshed on every load regardless of whether any realtime
+  event fired. And since a dot alone doesn't actually get you to the
+  question, added a tappable callout right at the top of Kinks —
+  "New from Martin — N questions waiting for your take" — that opens
+  the same modal directly. Both stay in sync automatically once
+  answered, since the existing code already refreshes this list after
+  every answer and skip.
+
 ## 1.60.0 — the next-reward bug, and rewards become genuinely mutual
 
 - Found the actual cause of the 50%-instead-of-25% bug: rewards were

@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.60.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.61.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.60.0';
+const APP_VERSION = '1.61.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -467,6 +467,7 @@ let state = {
   loading: true,
   authMode: 'signin',
   urlInviteCode: null,          // invite code captured from a ?invite= link, if any
+  pendingComparisonCards: [],   // refreshed on every load via runEngagementChecks — backs the Kinks tab badge
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
   authError: '',
   toast: null,
@@ -598,7 +599,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.dareEvidence = [];
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.dareEvidence = [];
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -702,8 +703,10 @@ async function checkForCompletionReveal() {
 // so the chain naturally continues until nothing's left to show.
 async function runEngagementChecks() {
   const { data, error } = await sb.rpc('get_pending_comparison_cards');
-  if (!error && data && data.length) { openComparisonQuestionModal(data[0]); return; }
+  state.pendingComparisonCards = (!error && data) ? data : [];
+  if (state.pendingComparisonCards.length) { openComparisonQuestionModal(state.pendingComparisonCards[0]); return; }
   await checkForPendingForfeit();
+  render();
 }
 
 async function checkForPendingForfeit() {
@@ -1859,8 +1862,18 @@ function renderBoundariesTab(unanswered) {
 
   const generalQuestions = getWizardQuestions();
   const partnerName = state.partner ? state.partner.display_name : 'your partner';
+  const pendingCount = state.pendingComparisonCards.length;
 
   return `
+    ${pendingCount ? `
+      <div class="category-row" id="btn-open-pending-comparison" style="cursor:pointer; border:1.5px solid var(--gold); margin-bottom:18px">
+        <div>
+          <div class="cat-name">New from ${esc(partnerName)}</div>
+          <div class="cat-count">${pendingCount} question${pendingCount===1?'':'s'} waiting for your take — tap to weigh in</div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    ` : ''}
     <div class="section-head" style="margin-top:0"><h2>Your answers</h2></div>
     <p class="hint-text" style="margin-bottom:14px">Change any of these any time — you don't need to wait for ${esc(partnerName)}, and changing yours never shows ${esc(partnerName)} which way you moved it, only the mutual result below.</p>
     ${generalQuestions.map(q => `
@@ -2218,6 +2231,7 @@ function renderSettlementHistory() {
    ========================================================================== */
 function renderTabbar() {
   const pending = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent').length;
+  const pendingComparisons = state.pendingComparisonCards.length;
   const isAdmin = state.profile && state.profile.is_admin;
   const tabs = [
     ['home','Playroom'], ['boundaries','Kinks'], ['dares','Dares'], ['rewards','Rewards'], ['history','History']
@@ -2226,7 +2240,7 @@ function renderTabbar() {
   return `<div class="tabbar">
     ${tabs.map(([id,label]) => `
       <button class="tab ${state.tab===id?'active':''}" data-tab="${id}" style="position:relative">
-        ${label}${id==='dares' && pending ? '<span class="dot"></span>' : ''}
+        ${label}${(id==='dares' && pending) || (id==='boundaries' && pendingComparisons) ? '<span class="dot"></span>' : ''}
       </button>
     `).join('')}
   </div>`;
@@ -2807,6 +2821,10 @@ function attachMainHandlers() {
     if (q) openEditCardModal(q);
   });
 
+  const openPendingBtn = document.getElementById('btn-open-pending-comparison');
+  if (openPendingBtn) openPendingBtn.onclick = () => {
+    if (state.pendingComparisonCards.length) openComparisonQuestionModal(state.pendingComparisonCards[0]);
+  };
   $app.querySelectorAll('[data-answer-q]').forEach(el => el.onclick = async () => {
     const qId = el.dataset.answerQ, val = el.dataset.answerV;
     state.answers[qId] = val;
