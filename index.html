@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.55.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.57.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.55.0';
+const APP_VERSION = '1.57.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -437,6 +437,7 @@ let state = {
   deckFilter: '',         // search text filtering the list view
   wizardSkipped: new Set(),  // question ids skipped this session — a safety valve so the guided wizard never truly traps anyone
   expandedHeadings: new Set(),  // which headings are expanded in the Kinks tab accordion
+  expandedCardLists: new Set(), // which expanded headings have their full card list shown, rather than capped
   headingAccess: [],          // per-heading tier unlock, from get_heading_access()
   cardReport: [],              // per-card joint tiers, from get_card_report()
   dareLibrary: [],              // admin-written dare templates, browsable by both partners
@@ -596,7 +597,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.dareEvidence = [];
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.dareEvidence = [];
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -665,7 +666,8 @@ async function checkForCompletionReveal() {
   } else if (notif.message === 'Your dare was accepted.' && notif.dare_id) {
     await loadDares();
     const dare = state.dares.find(d => d.id === notif.dare_id);
-    showToast(`🎉 ${state.partner ? state.partner.display_name : 'Your partner'} accepted "${dare ? dare.title : 'your dare'}"!`);
+    const label = dare && !dare.blind_sent ? `"${dare.title}"` : 'your dare';
+    showToast(`🎉 ${state.partner ? state.partner.display_name : 'Your partner'} accepted ${label}!`);
   } else if (notif.message === 'Your dare got a reaction.' && notif.dare_id) {
     await loadDares();
     const dare = state.dares.find(d => d.id === notif.dare_id);
@@ -831,6 +833,7 @@ async function loadNotifications() {
 let realtimeChannel = null;
 function subscribeRealtime() {
   if (realtimeChannel) return;
+  const partnerId = state.partner ? state.partner.id : '00000000-0000-0000-0000-000000000000';
   realtimeChannel = sb.channel('couple-' + state.coupleId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
       async () => { await loadDares(); await loadScoreboard(); await loadHeat(); render(); })
@@ -838,6 +841,8 @@ function subscribeRealtime() {
       async () => { await loadNotifications(); render(); if (isOnboardingComplete()) await checkForCompletionReveal(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards', filter: `couple_id=eq.${state.coupleId}` },
       () => { loadRewards(); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'boundary_answers', filter: `user_id=eq.${partnerId}` },
+      async () => { if (isOnboardingComplete()) await runEngagementChecks(); })
     .subscribe();
 }
 
@@ -1424,13 +1429,15 @@ function renderInPlayHero() {
   });
   const d = sorted[0];
   const isRecipient = d.recipient_id === state.session.user.id;
+  const isMine = d.creator_id === state.session.user.id;
+  const stillBlindForSender = d.blind_sent && isMine;
   const countdown = fmtCountdown(d.deadline);
   const more = active.length - 1;
 
   return `
     <div class="inplay-hero">
       <div class="inplay-hero-label"><span class="inplay-hero-dot"></span>Dare In Play</div>
-      <div class="inplay-hero-title">${esc(d.title)}</div>
+      <div class="inplay-hero-title">${stillBlindForSender ? '🙈 Blind dare' : esc(d.title)}</div>
       ${countdown
         ? `<div class="inplay-hero-countdown ${countdown.overdue ? 'overdue' : ''}">${esc(countdown.text)}</div>`
         : `<div class="inplay-hero-sub">No deadline set</div>`}
@@ -1584,16 +1591,17 @@ function renderHeatBlock(nextReward) {
 function renderDareCard(d, actionable, compact) {
   const isMine = d.creator_id === state.session.user.id;
   const isRecipient = d.recipient_id === state.session.user.id;
-  const revealed = d.status !== 'sent' || (isMine && !d.blind_sent);
+  const stillBlindForSender = d.blind_sent && isMine && ['sent', 'accepted', 'in_progress', 'countered'].includes(d.status);
+  const revealed = !stillBlindForSender && (d.status !== 'sent' || isMine);
   const canReveal = isRecipient && d.status === 'sent';
 
   let body;
-  if (revealed && !canReveal) {
+  if (stillBlindForSender) {
+    body = `<div class="dare-body">🙈 Sent blind — you'll find out together once it's completed.</div>`;
+  } else if (revealed && !canReveal) {
     if (d.image_path && !state.imageUrls[d.image_path]) fetchSignedImageUrl(d.image_path, 'dare-images');
     const imgUrl = d.image_path ? state.imageUrls[d.image_path] : null;
     body = `${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:10px;">` : ''}<div class="dare-instructions">${esc(d.instructions)}</div>`;
-  } else if (isMine && d.blind_sent) {
-    body = `<div class="dare-body">🙈 Sent blind — you'll find out together once they respond.</div>`;
   } else {
     body = `<div class="dare-body">${d.teaser ? esc(d.teaser) : 'Details hidden until you reveal it.'}</div>`;
   }
@@ -1611,7 +1619,9 @@ function renderDareCard(d, actionable, compact) {
       <button class="btn btn-primary btn-small" data-dare-action="complete" data-dare-id="${d.id}">Mark complete</button>
     </div>`;
   } else if (d.status === 'countered' && isMine) {
-    actions = `<div class="hint-text" style="margin-top:6px">They countered — check the updated details above.</div>`;
+    actions = stillBlindForSender
+      ? `<div class="hint-text" style="margin-top:6px">They adjusted the terms — still hidden from you until it's done.</div>`
+      : `<div class="hint-text" style="margin-top:6px">They countered — check the updated details above.</div>`;
   } else if (d.status === 'completed' && isMine) {
     let pieces = '';
     if (!d.quality_reaction) {
@@ -1642,7 +1652,7 @@ function renderDareCard(d, actionable, compact) {
       ${countdown ? `<div class="countdown-text ${countdown.overdue ? 'overdue' : ''}">${esc(countdown.text)}</div>` : ''}
       ${inPlay && state.partner && state.partner.signal_phone ? `<a class="link-btn" href="https://signal.me/#p/${encodeURIComponent(state.partner.signal_phone)}" target="_blank" rel="noopener" style="display:inline-block; margin-bottom:8px">Message on Signal →</a><br>` : ''}
       <div class="dare-top">
-        <div class="dare-title">${esc(d.title)}</div>
+        <div class="dare-title">${stillBlindForSender ? '🙈 Blind dare' : esc(d.title)}</div>
         ${totalPoints != null ? `<div class="dare-points">${totalPoints} pts${d.quality_bonus_points ? ` <span class="hint-text">(+${d.quality_bonus_points} bonus)</span>` : ''}</div>` : ''}
       </div>
       <div class="dare-meta">
@@ -1771,9 +1781,16 @@ function renderHeadingExpansion(category) {
     return `<div class="empty-state" style="padding:10px 0">Nothing answered by both of you in this temptation yet.</div>`;
   }
 
+  const CAP = 6;
+  const showAll = state.expandedCardLists.has(category);
+  const toDisplay = showAll ? shown : shown.slice(0, CAP);
+  const remaining = shown.length - toDisplay.length;
+
   return `
     <div style="padding:4px 0 10px 0">
-      ${shown.map(c => renderScoredCardRow(c, false)).join('')}
+      ${toDisplay.map(c => renderScoredCardRow(c, false)).join('')}
+      ${remaining > 0 ? `<button class="link-btn" data-show-all-cards="${esc(category)}" style="margin-top:6px">Show all ${shown.length} →</button>` : ''}
+      ${showAll && shown.length > CAP ? `<button class="link-btn" data-show-all-cards="${esc(category)}" style="margin-top:6px">Show fewer</button>` : ''}
       ${offTableCount ? `<p class="hint-text" style="margin-top:8px">${offTableCount} other question${offTableCount===1?'':'s'} answered here ${offTableCount===1?"isn't":"aren't"} on the table — not listed, since who said no isn't shown either.</p>` : ''}
     </div>
   `;
@@ -2722,6 +2739,11 @@ function attachMainHandlers() {
   $app.querySelectorAll('[data-toggle-heading]').forEach(el => el.onclick = () => {
     const cat = el.dataset.toggleHeading;
     if (state.expandedHeadings.has(cat)) state.expandedHeadings.delete(cat); else state.expandedHeadings.add(cat);
+    render();
+  });
+  $app.querySelectorAll('[data-show-all-cards]').forEach(el => el.onclick = () => {
+    const cat = el.dataset.showAllCards;
+    if (state.expandedCardLists.has(cat)) state.expandedCardLists.delete(cat); else state.expandedCardLists.add(cat);
     render();
   });
 

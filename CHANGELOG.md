@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.57.0 — blind means blind through the whole thing, not just until accepted
+
+- Real gap in what "blind send" actually did: it only hid content while
+  status was still 'sent' — the moment the recipient accepted, the
+  sender could immediately go check "Sent by you" and read everything,
+  well before the dare was actually done. Extended concealment through
+  accepted, in_progress, and countered — a blind dare now only reveals
+  itself to the sender once it's genuinely completed (or declined,
+  since there's nothing left to protect at that point).
+- Found and fixed three separate places the title itself was leaking
+  even with that fixed — the dare card's title was never gated by reveal
+  status at all, the Playroom "Dare In Play" banner (the single most
+  prominent thing in the app, shown the moment you open it) had the same
+  gap, and the "accepted" notification toast printed the title directly.
+  Titles can be spoilers on their own — swept every place a dare's
+  title or instructions get displayed to make sure nothing else leaks
+  the same way.
+
+## 1.56.0 — comparison questions now arrive live, and Kinks stays readable at scale
+
+- Found and fixed the actual cause of "only shows up on refresh": the
+  `boundary_answers` table was never added to the realtime publication,
+  and nothing subscribed to it either — same class of bug as the
+  dares/notifications/rewards realtime issue from earlier, just in a
+  table that got missed. When your partner answers a follow-up or
+  comparison question, you should now get prompted live, without needing
+  to reload.
+- Kinks was already collapsed at the top level (six Temptations,
+  nothing expanded by default), but once you expanded one, every single
+  answered card showed with no limit at all — that's the part that would
+  genuinely become unreadable after enough dares. Capped it to 6 by
+  default with a "Show all N" toggle, so it stays scannable regardless
+  of how much history builds up underneath.
+
 ## 1.55.0 — genuinely blind, no alternative, plus sender picks intensity
 
 - Removed browsing and "pick one at random but let me see it" entirely —
