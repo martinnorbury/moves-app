@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.58.0 — the actual cause of the missing comparison prompt, and answers finally collapse by Temptation
+
+- Checked the database directly rather than guessing again, and found
+  it: Jacki's `seen_wizard_intro` flag was stuck false — almost
+  certainly left over from directly testing "Preview my onboarding
+  again" against her account a few versions back, without her fully
+  re-walking the flow afterward — even though she'd genuinely finished
+  everything (all six answered, explainer seen, Step 1 seen). My
+  onboarding-complete check required that flag specifically, so it
+  silently blocked every live comparison-question check for her ever
+  since. Repaired her data directly, and — more importantly — rewrote
+  the check itself to stop depending on that flag at all. It's now based
+  on the actual condition that controls whether an onboarding screen can
+  show (no pending general questions), which can't drift out of sync the
+  way a sticky flag can.
+- "Review & edit all your answers" was a flat, ever-growing list with
+  no way to collapse anything — asked for a few times now and never
+  properly fixed. Rebuilt it to match the accordion already used on
+  Kinks: collapsed by Temptation by default, tap to expand and edit
+  what's inside. Searching still works as before, falling back to a
+  flat filtered list since collapsing doesn't help once you're
+  specifically looking for something.
+
 ## 1.57.0 — blind means blind through the whole thing, not just until accepted
 
 - Real gap in what "blind send" actually did: it only hid content while
