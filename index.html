@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.49.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.51.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.49.2';
+const APP_VERSION = '1.51.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -457,6 +457,7 @@ let state = {
   loading: true,
   authMode: 'signin',
   urlInviteCode: null,          // invite code captured from a ?invite= link, if any
+  wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
   authError: '',
   toast: null,
 };
@@ -889,7 +890,7 @@ function renderAnswerControl(q, currentAnswer, attrsFor) {
 function renderWizardIntro() {
   const name = state.profile ? state.profile.display_name : '';
   return `
-    <div class="screen" style="padding-top:48px">
+    <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
         <h1>Welcome to TwoPlay${name ? ', ' + esc(name) : ''}</h1>
         <p style="font-style:italic; font-size:13.5px; color:var(--text-faint); margin-bottom:14px">(yes — as in foreplay. That's rather the idea.)</p>
@@ -913,12 +914,44 @@ function renderWizardIntro() {
   `;
 }
 function attachWizardIntroHandlers() {
-  const btn = document.getElementById('btn-wizard-intro-start');
-  if (btn) btn.onclick = async () => {
+  const step1Btn = document.getElementById('btn-wizard-intro-start');
+  if (step1Btn) step1Btn.onclick = () => { state.wizardIntroStep = 2; render(); };
+
+  const step2Btn = document.getElementById('btn-temptations-preview-start');
+  if (step2Btn) step2Btn.onclick = async () => {
     state.profile.seen_wizard_intro = true;
+    state.wizardIntroStep = 1; // reset for next time (e.g. after a future Start Again)
     render();
     await sb.from('profiles').update({ seen_wizard_intro: true }).eq('id', state.session.user.id);
   };
+}
+
+function renderTemptationsPreview() {
+  const descriptions = {
+    'Teasing & Dirty Talk': 'The build-up — words, hints, anticipation.',
+    'Touch & Sensation': 'How you like to be touched, and how you like to touch.',
+    'Positions & Core Acts': "What happens once things get physical.",
+    'Dominance & Surrender': "Who's leading, who's letting go.",
+    'Roleplay & Fantasy': 'Stepping outside yourselves for a while.',
+    'Risk, Public & Exhibition': 'A little thrill, a little risk, a little being seen.'
+  };
+  return `
+    <div class="screen" style="padding-top:76px">
+      <div class="auth-hero">
+        <h1>Six things to explore</h1>
+        <p>Each of these gets its own general question first, then more specific ones later as you both get further in.</p>
+      </div>
+      ${state.categories.map(c => `
+        <div class="category-row" style="cursor:default">
+          <div>
+            <div class="cat-name">${esc(c.name)}</div>
+            <div class="cat-count">${esc(descriptions[c.name] || '')}</div>
+          </div>
+        </div>
+      `).join('')}
+      <button class="btn btn-gold" id="btn-temptations-preview-start" style="width:100%; margin-top:24px">Let's begin →</button>
+    </div>
+  `;
 }
 
 function renderPartnerTeaser() {
@@ -950,6 +983,42 @@ function renderPartnerTeaser() {
 function attachPartnerTeaserHandlers() {
   const btn = document.getElementById('btn-teaser-start');
   if (btn) btn.onclick = () => { state.viewedTeaser = true; render(); };
+}
+
+function renderAppExplainer() {
+  return `
+    <div class="screen" style="padding-top:76px">
+      <div class="auth-hero">
+        <h1>One more thing before we're in</h1>
+        <p>The quick version — where everything lives, and how a move actually works.</p>
+      </div>
+
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">Playroom</div><div class="cat-count">Home base — what's happening right now, our scores, the Heat Meter.</div></div></div>
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">Kinks</div><div class="cat-count">Where our answers live, and how we compare, area by area.</div></div></div>
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">Dares</div><div class="cat-count">The actual game — dares sent, waiting on us, and done.</div></div></div>
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">Rewards</div><div class="cat-count">What unlocks together as we go.</div></div></div>
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">History</div><div class="cat-count">A running record of everything.</div></div></div>
+
+      <div class="divider" style="margin:24px 0"></div>
+
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
+        <b style="color:var(--text)">How a move actually works:</b> one of us sends a dare — pick one from the library, or write our own. The other accepts, declines, or counters it, always their call. Complete it, and points land — the Heat Meter rises a little. Cross a threshold, a reward unlocks.
+      </p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
+        <b style="color:var(--text)">Forfeits:</b> each week, whoever's behind on points picks their own — never chosen for them.
+      </p>
+
+      <button class="btn btn-gold" id="btn-app-explainer-done" style="width:100%">Into the app →</button>
+    </div>
+  `;
+}
+function attachAppExplainerHandlers() {
+  const btn = document.getElementById('btn-app-explainer-done');
+  if (btn) btn.onclick = async () => {
+    state.profile.seen_app_explainer = true;
+    render();
+    await sb.from('profiles').update({ seen_app_explainer: true }).eq('id', state.session.user.id);
+  };
 }
 
 function renderStep1Complete() {
@@ -994,6 +1063,7 @@ function renderWizard(q, remaining) {
           <div class="hint-text" style="margin-bottom:6px">${esc(q.category)}</div>
           <div class="deck-card-title">${esc(q.title)}</div>
           ${q.explanation ? `<div class="deck-card-explain">${esc(q.explanation)}</div>` : ''}
+          <p class="hint-text" style="margin:14px 0 4px">Tap wherever feels right — from "not for me" on the left, to "count me in" on the right.</p>
           ${renderAnswerControl(q, null, (a) => `data-wizard-answer="${a}"`)}
         </div>
       </div>
@@ -1027,12 +1097,17 @@ function render() {
 
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
   if (wizardQueue.length > 0 && state.profile && !state.profile.seen_wizard_intro) {
-    $app.innerHTML = renderWizardIntro(); attachWizardIntroHandlers(); return;
+    $app.innerHTML = state.wizardIntroStep === 1 ? renderWizardIntro() : renderTemptationsPreview();
+    attachWizardIntroHandlers();
+    return;
   }
   if (wizardQueue.length > 0 && state.partnerTeaser.length > 0 && !state.viewedTeaser) {
     $app.innerHTML = renderPartnerTeaser(); attachPartnerTeaserHandlers(); return;
   }
   if (wizardQueue.length > 0) { $app.innerHTML = renderWizard(wizardQueue[0], wizardQueue.length); attachWizardHandlers(wizardQueue[0]); return; }
+  if (state.profile && !state.profile.seen_app_explainer) {
+    $app.innerHTML = renderAppExplainer(); attachAppExplainerHandlers(); return;
+  }
 
   const step1Complete = state.headingAccess.length > 0 && state.headingAccess.every(h => h.access !== 'pending');
   if (step1Complete && state.profile && !state.profile.seen_step1_complete) {
@@ -2412,7 +2487,7 @@ function openRemovePartnerConfirmModal() {
     if (error) { errEl.textContent = error.message; return; }
     closeModal();
     state.tab = 'home';
-    state.wizardSkipped = new Set();
+    state.wizardSkipped = new Set(); state.wizardIntroStep = 1;
     state.viewedTeaser = false;
     await loadEverything();
     showToast(`${partnerName} removed. Generate a new invite code to pair with someone else.`);
@@ -2445,7 +2520,7 @@ function openResetConfirmModal() {
     if (error) { errEl.textContent = error.message; return; }
     closeModal();
     state.tab = 'home';
-    state.wizardSkipped = new Set();
+    state.wizardSkipped = new Set(); state.wizardIntroStep = 1;
     state.viewedTeaser = false;
     await loadEverything();
     showToast('Gameplay data reset. Starting fresh.');

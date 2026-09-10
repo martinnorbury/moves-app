@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.51.0 — one page explaining the app, seen once, never again
+
+- Scaled back from a multi-screen guided tour to exactly what was asked
+  for: a single page, right after finishing the six questions, covering
+  all five tabs in one line each, the actual mechanics of how a move
+  works (send, respond, complete, points, Heat Meter, rewards), and how
+  forfeits work. Shown once ever, then gone for good — same one-time
+  pattern as the welcome screen and Step 1 celebration, re-armed by
+  Start Again for testing.
+- This fills a real, previously-total gap — before this, nothing in the
+  app explained the tabs, the dare flow, or what any of the terminology
+  meant. It was all assumed.
+
+## 1.50.0 — genuinely more top spacing, gauge explained, a broken question fixed, six-areas preview
+
+- Increased the welcome screen's top padding substantially (48px wasn't
+  enough) — should read as clearly more breathing room this time.
+- Every wizard question now explains the gauge before you hit it — what
+  the scale means and that it's tappable. Previously five icons just
+  appeared with zero explanation of what to do with them.
+- Fixed a real content bug: the Dominance & Surrender general question
+  asked "taking control, giving it up, or switching between the two" —
+  a multiple-choice question forced onto a cold-to-hot enthusiasm scale,
+  which never fit. Rewrote it to ask how the *idea* of power dynamics
+  sounds, which the scale actually measures correctly. The specific
+  "which role" question belongs to a specific card later, not the
+  general scale.
+- Added a genuine new step: after the welcome screen, a preview of all
+  six Temptations with a one-line feel for each, before question 1 ever
+  appears — so there's a real sense of what's coming rather than being
+  dropped straight into it.
+
 ## 1.49.2 — the TwoPlay/foreplay wordplay is now actually visible
 
 - Added a short italic line under the title: "(yes — as in foreplay.
