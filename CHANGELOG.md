@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.55.0 — genuinely blind, no alternative, plus sender picks intensity
+
+- Removed browsing and "pick one at random but let me see it" entirely —
+  those defeated the whole point. Drawing a library dare is now blind,
+  full stop; the only other option is writing your own from scratch,
+  which is a different thing entirely since you obviously know what you
+  wrote.
+- Added intensity as a choice on the blind draw — the sender picks the
+  Temptation, type, and intensity (still capped by what that Temptation
+  currently allows), and the specific dare within that combination is
+  what stays hidden. This is safe to let the sender choose because the
+  recipient always has the counter as a safety valve if it's not quite
+  right once they see it.
+- Cleaned up all the now-dead code from the removed browse/peek paths —
+  nothing left pointing at elements or functions that no longer exist.
+
+## 1.54.1 — the full dare list no longer dumps itself on screen automatically
+
+- "Or browse and choose one yourself" now actually does what it says —
+  it's a real link you tap to reveal the list, rather than the entire
+  list already sitting there regardless. This predates the blind-send
+  work, but became a real problem once there were three options stacked
+  above it — the modal was showing everything at once with no reason to.
+  Changing Temptation still refreshes the list live, but only once
+  you've actually opened it.
+
 ## 1.54.0 — genuine blind sending, so the sender loses their unfair edge too
 
 - Real structural gap, not a content problem: the sender always got to

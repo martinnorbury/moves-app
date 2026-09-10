@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.54.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.55.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.54.0';
+const APP_VERSION = '1.55.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -2221,18 +2221,17 @@ function openCreateDareModal() {
             ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
           </select>
         </div>
-
-        <p class="hint-text" style="margin-bottom:8px"><b style="color:var(--text)">Send it fully blind</b> — you won't see which one it is either, not until they respond. No cherry-picking, real surprise on both sides.</p>
         <div class="field"><label>Type</label>
           <select id="d-blind-type">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
         </div>
-        <div class="field" style="margin-bottom:10px"><label>Deadline (optional)</label><input type="datetime-local" id="d-blind-deadline"></div>
-        <button type="button" class="btn btn-gold" id="btn-blind-send" style="width:100%; margin-bottom:20px">🙈 Surprise them — send blind</button>
+        <div class="field"><label>Intensity</label>
+          <select id="d-blind-intensity"></select>
+        </div>
+        <div class="field" style="margin-bottom:14px"><label>Deadline (optional)</label><input type="datetime-local" id="d-blind-deadline"></div>
+        <button type="button" class="btn btn-gold" id="btn-blind-send" style="width:100%; margin-bottom:10px">🙈 Blind draw — send it</button>
+        <p class="hint-text" style="margin-bottom:20px">Every dare is drawn blind — nobody sees which one it is except whoever's doing it, not even you. If it's not quite right, they can always counter it once they see it.</p>
 
         <div class="divider" style="margin-bottom:16px"></div>
-        <button type="button" class="btn btn-ghost" id="btn-surprise-dare" style="width:100%; margin-bottom:10px">🎲 Pick one at random, but let me see it first</button>
-        <p class="hint-text" style="margin-bottom:10px">Or browse and choose one yourself:</p>
-        <div id="d-suggestions" style="margin:14px 0"></div>
         <button type="button" class="btn btn-ghost" id="btn-write-own" style="margin-bottom:14px">Write my own instead</button>
         <form id="dare-form" class="stack" style="display:none">
           <div class="field"><label>Title</label><input type="text" id="d-title" required></div>
@@ -2270,6 +2269,7 @@ function openCreateDareModal() {
   const intensitySelect = document.getElementById('d-intensity');
   const writeOwnBtn = document.getElementById('btn-write-own');
   const form = document.getElementById('dare-form');
+  const blindIntensitySelect = document.getElementById('d-blind-intensity');
   let pickedImagePath = null;
 
   function currentMaxIntensity() {
@@ -2280,66 +2280,18 @@ function openCreateDareModal() {
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
     intensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]} — ${INTENSITY_POINTS[i]} pts</option>`).join('');
   }
-  async function applyLibraryDareToForm(d) {
-    document.getElementById('d-title').value = d.title;
-    document.getElementById('d-teaser').value = d.teaser || '';
-    document.getElementById('d-instructions').value = d.instructions;
-    populateIntensityOptions();
-    intensitySelect.value = d.intensity;
-    pickedImagePath = d.image_path || null;
-    const previewEl = document.getElementById('d-image-preview');
-    if (d.image_path) {
-      if (!state.imageUrls[d.image_path]) await fetchSignedImageUrl(d.image_path, 'dare-images');
-      previewEl.innerHTML = state.imageUrls[d.image_path] ? `<img src="${esc(state.imageUrls[d.image_path])}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : '';
-    } else {
-      previewEl.innerHTML = '';
-    }
-    form.style.display = '';
-    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  function eligibleLibraryDares() {
-    const cat = categorySelect.value;
+  function populateBlindIntensityOptions() {
     const max = currentMaxIntensity();
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
-    return state.dareLibrary.filter(d => d.category === cat && allowed.includes(d.intensity));
+    blindIntensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]}</option>`).join('');
   }
-
-  function renderSuggestions() {
-    const matches = eligibleLibraryDares();
-    const box = document.getElementById('d-suggestions');
-    if (!matches.length) {
-      box.innerHTML = `<p class="hint-text">No library dares for this temptation yet.</p>`;
-      return;
-    }
-    box.innerHTML = `<p class="hint-text" style="margin-bottom:8px">Suggested for you:</p>` + matches.map(d => `
-      <div class="category-row" data-pick-library="${d.id}" style="cursor:pointer">
-        <div>
-          <div class="cat-name" style="font-size:14.5px">${esc(d.title)}</div>
-          <div class="cat-count"><span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span></div>
-        </div>
-        <div class="cat-arrow">›</div>
-      </div>
-    `).join('');
-    box.querySelectorAll('[data-pick-library]').forEach(el => el.onclick = () => {
-      const d = matches.find(x => x.id === el.dataset.pickLibrary);
-      applyLibraryDareToForm(d);
-    });
-  }
-
-  const surpriseBtn = document.getElementById('btn-surprise-dare');
-  if (surpriseBtn) surpriseBtn.onclick = () => {
-    const matches = eligibleLibraryDares();
-    if (!matches.length) { showToast('No library dares for this temptation yet.'); return; }
-    const picked = matches[Math.floor(Math.random() * matches.length)];
-    applyLibraryDareToForm(picked);
-  };
 
   const blindSendBtn = document.getElementById('btn-blind-send');
   if (blindSendBtn) blindSendBtn.onclick = async () => {
-    const matches = eligibleLibraryDares();
-    if (!matches.length) { showToast('No library dares for this temptation yet.'); return; }
-    if (!confirm("You won't see which one this is until they respond. Send it blind?")) return;
+    const chosenIntensity = blindIntensitySelect.value;
+    const matches = state.dareLibrary.filter(d => d.category === categorySelect.value && d.intensity === chosenIntensity);
+    if (!matches.length) { showToast(`No library dares at ${INTENSITY_LABELS[chosenIntensity]} for this temptation yet — try a different intensity.`); return; }
+    if (!confirm("Nobody will see which one this is except whoever's doing it — not even you. Send it blind?")) return;
     const picked = matches[Math.floor(Math.random() * matches.length)];
     const deadlineVal = document.getElementById('d-blind-deadline').value;
     const { error } = await sb.rpc('create_dare', {
@@ -2363,7 +2315,7 @@ function openCreateDareModal() {
     showToast('🙈 Sent blind — you\'ll find out together.');
   };
 
-  categorySelect.onchange = () => { populateIntensityOptions(); renderSuggestions(); };
+  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); };
   writeOwnBtn.onclick = () => {
     populateIntensityOptions();
     document.getElementById('d-title').value = '';
@@ -2375,7 +2327,7 @@ function openCreateDareModal() {
     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
   populateIntensityOptions();
-  renderSuggestions();
+  populateBlindIntensityOptions();
 
   form.onsubmit = async (e) => {
     e.preventDefault();
