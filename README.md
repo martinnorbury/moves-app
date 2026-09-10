@@ -1,28 +1,46 @@
-# Moves (working name: "The Game")
+# TwoPlay (working name: "The Game")
 
-A private, two-player boundary-and-dare game for Martin and Jacki. Single-file
-mobile web app, backed by Supabase. Completely separate from Lily's app —
-different repo, different Supabase project, no shared data or credentials.
+A private, two-player kinks-and-dare game for Martin and Jacki — yes, as in
+foreplay, that's deliberate. Single-file mobile web app, backed by Supabase.
+Completely separate from Lily's app — different repo, different Supabase
+project, no shared data or credentials.
 
 Current version and full change history: see `CHANGELOG.md`, or tap the
 version number in the app itself.
 
 ## How it works, in short
 
-1. Each of you creates an account, picks a colour theme, and pairs via a
-   one-time invite code.
-2. Under **Boundaries**, you build your own set of headings (Teasing &
-   Dirty Talk, Touch & Sensation, Positions & Core Acts, Dominance &
-   Surrender, Roleplay & Fantasy, Risk, Public & Exhibition, or whatever
-   else you add) and
-   your own cards under each one — a title, a description, and optionally a
+1. Each of you creates an account, picks a colour theme, and pairs — either
+   by entering a one-time invite code, or by tapping a shareable link that
+   fills the code in automatically. The app can also generate a ready-to-copy
+   invitation email (fully formatted, paste straight into Mail) with that
+   link already embedded.
+2. First time in, there's a real onboarding sequence rather than being
+   dropped in cold: a welcome screen explaining what this actually is, a
+   preview of the six Temptations, six gentle general questions (one per
+   Temptation), and a one-page explainer covering the tabs and mechanics —
+   each shown once, never again.
+3. Under **Kinks**, you build out your own cards under each Temptation
+   (Teasing & Dirty Talk, Touch & Sensation, Positions & Core Acts,
+   Dominance & Surrender, Roleplay & Fantasy, Risk/Public & Exhibition, or
+   whatever else you add) — a title, a description, and optionally a
    private photo. Add them one at a time, or import many at once from a CSV.
-3. Each of you privately answers each card: Full Spark, Warming Up, Blushing
-   Yes, Just For You, or Cold Card. Your partner never sees your individual
-   answers — only the mutual result.
-4. You send each other "moves" (dares) within your shared boundary.
-5. Accepting and completing moves earns points and raises a shared Heat
-   Meter, which unlocks rewards you've set up.
+4. Each of you privately answers each card: All In, Keen, Curious, If You're
+   Up For It, or Not For Me. Your partner never sees your individual
+   answers — only the mutual result. Once a Temptation has 3+ specific cards
+   mutually answered, the original general answer stops counting toward
+   that Temptation's score — the specifics take over.
+5. Either of you can send a **dare** within whatever a Temptation currently
+   allows. Dares are drawn blind — you pick the Temptation, type, and
+   intensity, but not the specific dare, and you don't see it either, not
+   even after it's accepted — only once it's actually completed (or
+   declined). No cherry-picking, and the sender keeps some real surprise too.
+6. Completing a dare earns points and raises a shared Heat Meter, which
+   unlocks **rewards** — these are mutual and either of you can set them up,
+   unlike the dare/forfeit libraries and boundary cards, which stay
+   single-curator content.
+7. Each week, whoever's behind on points picks their own forfeit from a
+   list you've both built — never chosen for them.
 
 ## Current live setup
 
@@ -93,8 +111,13 @@ level rather than just hidden in the interface.
    password. Do this once for Martin and once for Jacki.
 3. On the first account, tap **Generate an invite code** — a 6-character
    code appears, and stays visible on a "waiting on your partner" screen
-   until it's used (regenerate it from that same screen if it expires).
-4. On the second account, enter that code under "Join with code."
+   until it's used (regenerate it from that same screen if it expires). The
+   same screen also shows a shareable link with the code already embedded,
+   and a "Copy email" button that generates a fully-formatted, ready-to-paste
+   invitation email (paste into Mail as rich text, not plain text).
+4. On the second account, either enter the code under "Join with code," or
+   open the link — visiting it pre-fills the code automatically, one tap to
+   join.
 
 ## Install on an iPhone home screen
 
