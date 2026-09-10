@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.49.0 — onboarding actually explains itself now
+
+- Found the real source of the generic screenshot text from a few
+  messages back: it wasn't stale code, it was database content — all
+  six general questions shared one identical, generic explanation
+  ("the other cards in this heading get more particular"), which is why
+  searching the app's own code for it turned up nothing. Rewrote all six
+  individually, each genuinely tailored to its own Temptation, warm
+  rather than clinical, and fixed the leftover "heading" wording while
+  at it.
+- Rewrote the welcome screen with the arc it was missing: acknowledges
+  the mysterious email and link she just followed, actually explains
+  what TwoPlay is before asking anything of her, then introduces the six
+  gentle questions as a first step rather than assuming she already
+  knows what any of this means. Previously it jumped straight to
+  mechanics ("six quick questions, one for each Temptation") with zero
+  context for someone arriving cold.
+
+## 1.48.1 — subject line was missing
+
+- Real gap: pasting into Mail's body never carries a subject line over,
+  and I hadn't surfaced one anywhere. Added a suggested subject ("A
+  little something's waiting for you…") shown with its own "Copy
+  subject" button, right above "Copy email" — copy that into Mail's
+  Subject field first, then paste the email into the body.
+
 ## 1.48.0 — the app generates and copies the invite email itself
 
 - "Waiting on your partner" now has a "Copy email" button, right below

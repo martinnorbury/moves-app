@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.48.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.49.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.48.0';
+const APP_VERSION = '1.49.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -892,14 +892,20 @@ function renderWizardIntro() {
     <div class="center-screen">
       <div class="auth-hero">
         <h1>Welcome to TwoPlay${name ? ', ' + esc(name) : ''}</h1>
-        <p>This starts with six quick questions — one for each Temptation. Nothing detailed, just a general sense of where you stand.</p>
+        <p>You got an email. It didn't say much. You clicked it anyway — that was rather the point.</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">
+        Here's what it actually is: a private game, just for the two of you. It learns where you both stand — what excites you, what doesn't, how far is fun rather than too far — then plays accordingly. Nothing forced. Nothing either of you doesn't want.
+      </p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
+        It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where you overlap.
+      </p>
       <div class="gauge-track" style="margin-bottom:8px"></div>
       <div class="gauge-row" style="margin-bottom:28px">
         ${GAUGE_ORDER.map(a => `<div class="gauge-stop" style="cursor:default">${GAUGE_ICONS[a]}</div>`).join('')}
       </div>
       <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:28px">
-        Once you've both answered, everything opens up — dares matched to exactly where the two of you are, together. Nothing pushed too far, nothing held back too much. This is where it starts.
+        Once you've both answered, everything opens up — dares tailored to exactly where the two of you are, together.
       </p>
       <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%">Let's begin →</button>
     </div>
@@ -1228,8 +1234,10 @@ function renderAwaitingPartner() {
            <div class="divider" style="margin:20px 0"></div>
            <p class="hint-text" style="margin-bottom:10px">Or copy a proper invitation email, ready to paste straight into Mail:</p>
            <div class="field"><label>Their name (optional)</label><input type="text" id="invite-email-name" placeholder="e.g. Jacki"></div>
-           <button class="btn btn-gold" id="btn-copy-invite-email" style="margin-top:8px; width:100%">Copy email</button>
-           <p class="hint-text" style="margin-top:6px">Paste into a new message in Mail — it'll come in fully formatted, link included.</p>`
+           <div class="field" style="margin-top:10px"><label>Subject line</label><input type="text" id="invite-email-subject" value="${esc(INVITE_EMAIL_SUBJECT)}" readonly></div>
+           <button class="link-btn" id="btn-copy-invite-subject" style="padding:0; margin-top:4px">Copy subject</button>
+           <button class="btn btn-gold" id="btn-copy-invite-email" style="margin-top:14px; width:100%">Copy email</button>
+           <p class="hint-text" style="margin-top:6px">Paste doesn't carry the subject line over — copy it separately into Mail's Subject field, then paste the email into the body.</p>`
         : `<p class="hint-text" style="margin-bottom:16px">No active code found — it may have expired.</p>`
       }
       <button class="btn btn-ghost" id="btn-new-code" style="margin-top:16px">Generate a new code</button>
@@ -1241,6 +1249,8 @@ function renderAwaitingPartner() {
 function buildInviteUrl(code) {
   return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(code)}`;
 }
+
+const INVITE_EMAIL_SUBJECT = "A little something's waiting for you…";
 
 function buildInviteEmailHtml(name, url) {
   const greeting = name ? esc(name) + ',' : 'Hey,';
@@ -1288,6 +1298,15 @@ function attachAwaitingPartnerHandlers() {
       showToast('Link copied.');
     } catch {
       linkInput.select();
+      showToast('Copy failed — select the text and copy manually.');
+    }
+  };
+  const copySubjectBtn = document.getElementById('btn-copy-invite-subject');
+  if (copySubjectBtn) copySubjectBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(INVITE_EMAIL_SUBJECT);
+      showToast('Subject copied.');
+    } catch {
       showToast('Copy failed — select the text and copy manually.');
     }
   };
