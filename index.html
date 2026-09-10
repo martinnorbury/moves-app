@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.53.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.54.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.53.0';
+const APP_VERSION = '1.54.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1584,7 +1584,7 @@ function renderHeatBlock(nextReward) {
 function renderDareCard(d, actionable, compact) {
   const isMine = d.creator_id === state.session.user.id;
   const isRecipient = d.recipient_id === state.session.user.id;
-  const revealed = isMine || d.status !== 'sent'; // sender always sees own; recipient must accept/reveal first for "sent"
+  const revealed = d.status !== 'sent' || (isMine && !d.blind_sent);
   const canReveal = isRecipient && d.status === 'sent';
 
   let body;
@@ -1592,6 +1592,8 @@ function renderDareCard(d, actionable, compact) {
     if (d.image_path && !state.imageUrls[d.image_path]) fetchSignedImageUrl(d.image_path, 'dare-images');
     const imgUrl = d.image_path ? state.imageUrls[d.image_path] : null;
     body = `${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:10px;">` : ''}<div class="dare-instructions">${esc(d.instructions)}</div>`;
+  } else if (isMine && d.blind_sent) {
+    body = `<div class="dare-body">🙈 Sent blind — you'll find out together once they respond.</div>`;
   } else {
     body = `<div class="dare-body">${d.teaser ? esc(d.teaser) : 'Details hidden until you reveal it.'}</div>`;
   }
@@ -2219,7 +2221,16 @@ function openCreateDareModal() {
             ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
           </select>
         </div>
-        <button type="button" class="btn btn-gold" id="btn-surprise-dare" style="width:100%; margin-bottom:10px">🎲 Surprise me — pick one at random</button>
+
+        <p class="hint-text" style="margin-bottom:8px"><b style="color:var(--text)">Send it fully blind</b> — you won't see which one it is either, not until they respond. No cherry-picking, real surprise on both sides.</p>
+        <div class="field"><label>Type</label>
+          <select id="d-blind-type">${Object.keys(TYPE_LABELS).map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('')}</select>
+        </div>
+        <div class="field" style="margin-bottom:10px"><label>Deadline (optional)</label><input type="datetime-local" id="d-blind-deadline"></div>
+        <button type="button" class="btn btn-gold" id="btn-blind-send" style="width:100%; margin-bottom:20px">🙈 Surprise them — send blind</button>
+
+        <div class="divider" style="margin-bottom:16px"></div>
+        <button type="button" class="btn btn-ghost" id="btn-surprise-dare" style="width:100%; margin-bottom:10px">🎲 Pick one at random, but let me see it first</button>
         <p class="hint-text" style="margin-bottom:10px">Or browse and choose one yourself:</p>
         <div id="d-suggestions" style="margin:14px 0"></div>
         <button type="button" class="btn btn-ghost" id="btn-write-own" style="margin-bottom:14px">Write my own instead</button>
@@ -2322,6 +2333,34 @@ function openCreateDareModal() {
     if (!matches.length) { showToast('No library dares for this temptation yet.'); return; }
     const picked = matches[Math.floor(Math.random() * matches.length)];
     applyLibraryDareToForm(picked);
+  };
+
+  const blindSendBtn = document.getElementById('btn-blind-send');
+  if (blindSendBtn) blindSendBtn.onclick = async () => {
+    const matches = eligibleLibraryDares();
+    if (!matches.length) { showToast('No library dares for this temptation yet.'); return; }
+    if (!confirm("You won't see which one this is until they respond. Send it blind?")) return;
+    const picked = matches[Math.floor(Math.random() * matches.length)];
+    const deadlineVal = document.getElementById('d-blind-deadline').value;
+    const { error } = await sb.rpc('create_dare', {
+      p_category: categorySelect.value,
+      p_title: picked.title,
+      p_instructions: picked.instructions,
+      p_teaser: picked.teaser || null,
+      p_dare_type: document.getElementById('d-blind-type').value,
+      p_intensity: picked.intensity,
+      p_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
+      p_requires_confirmation: false,
+      p_reward_text: null,
+      p_reusable: false,
+      p_question_id: null,
+      p_image_path: picked.image_path || null,
+      p_blind_sent: true
+    });
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadDares();
+    showToast('🙈 Sent blind — you\'ll find out together.');
   };
 
   categorySelect.onchange = () => { populateIntensityOptions(); renderSuggestions(); };

@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.54.0 — genuine blind sending, so the sender loses their unfair edge too
+
+- Real structural gap, not a content problem: the sender always got to
+  read a dare's exact content before deciding to send it, meaning they
+  could cherry-pick whichever one suited them, and always knew exactly
+  what was coming — even for random-drawn picks, since "Surprise me"
+  still showed the result before sending.
+- Added a genuine blind send: pick a Temptation, type, and deadline,
+  then "🙈 Surprise them" draws randomly from every eligible dare at
+  every intensity the Temptation currently allows, and sends it without
+  ever showing you which one it was.
+- This required fixing something deeper than the UI — the sender could
+  already see their own sent dares in full immediately, regardless of
+  blind sending, since the reveal logic never distinguished the two
+  cases. Fixed the actual reveal rule so a blind-sent dare stays hidden
+  from the sender too, until the recipient responds — at which point it
+  reveals for both of you together. Tested this directly end to end:
+  created a blind dare, confirmed it stored correctly, confirmed the
+  sender-visibility fix works as intended.
+- The safety guarantees don't change — every draw is still constrained
+  by the Temptation's current match tier and intensity cap, and only
+  ever pulls from the admin-curated library, exactly as before. This
+  only removes the sender's ability to pick a specific one, not any of
+  the underlying limits.
+
 ## 1.53.0 — the actual root cause of the unresponsive popup, fixed properly
 
 - Traced this all the way through rather than patching the one modal:
