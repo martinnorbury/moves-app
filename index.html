@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.61.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.62.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.61.0';
+const APP_VERSION = '1.62.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -411,14 +411,6 @@ const GAUGE_ICONS = { full_spark: '❤️', warming_up: '🧡', blushing_yes: '�
 const INTENSITY_LABELS = { tease: 'Tease', risque: 'Risqué', bold: 'Bold', wild: 'Wild' };
 const INTENSITY_POINTS = { tease: 10, risque: 25, bold: 50, wild: 100 };
 const TYPE_LABELS = { apart: 'Apart', together: 'Together', either: 'Either', reunion: 'Reunion' };
-// Some Temptations are physically impossible to do apart — Apart isn't offered for these.
-const CATEGORIES_REQUIRING_TOGETHER = ['Touch & Sensation', 'Positions & Core Acts'];
-function availableTypesFor(category) {
-  const keys = CATEGORIES_REQUIRING_TOGETHER.includes(category)
-    ? Object.keys(TYPE_LABELS).filter(t => t !== 'apart')
-    : Object.keys(TYPE_LABELS);
-  return keys;
-}
 const HEAT_THRESHOLDS = [25, 50, 75, 100];
 
 let state = {
@@ -1668,7 +1660,6 @@ function renderDareCard(d, actionable, compact) {
         ${totalPoints != null ? `<div class="dare-points">${totalPoints} pts${d.quality_bonus_points ? ` <span class="hint-text">(+${d.quality_bonus_points} bonus)</span>` : ''}</div>` : ''}
       </div>
       <div class="dare-meta">
-        <span class="pill">${TYPE_LABELS[d.dare_type]}</span>
         <span class="pill intensity-${d.intensity}">${INTENSITY_LABELS[d.intensity]}</span>
         <span class="pill">${d.status.replace(/_/g,' ')}</span>
         ${d.deadline ? `<span class="pill">by ${fmtDate(d.deadline)}</span>` : ''}
@@ -2263,9 +2254,6 @@ function openCreateDareModal() {
             ${eligible.map(h => `<option value="${esc(h.category)}" data-max="${TIER_MAX_INTENSITY[h.access]}">${esc(h.category)} — ${esc(ACCESS_LABELS[h.access])}</option>`).join('')}
           </select>
         </div>
-        <div class="field"><label>Type</label>
-          <select id="d-blind-type"></select>
-        </div>
         <div class="field"><label>Intensity</label>
           <select id="d-blind-intensity"></select>
         </div>
@@ -2279,9 +2267,6 @@ function openCreateDareModal() {
           <div class="field"><label>Title</label><input type="text" id="d-title" required></div>
           <div class="field"><label>Teaser (shown before they reveal it)</label><input type="text" id="d-teaser"></div>
           <div class="field"><label>Full instructions</label><textarea id="d-instructions" required></textarea></div>
-          <div class="field"><label>Type</label>
-            <select id="d-type"></select>
-          </div>
           <div class="field"><label>Intensity</label>
             <select id="d-intensity"></select>
           </div>
@@ -2312,8 +2297,6 @@ function openCreateDareModal() {
   const writeOwnBtn = document.getElementById('btn-write-own');
   const form = document.getElementById('dare-form');
   const blindIntensitySelect = document.getElementById('d-blind-intensity');
-  const typeSelect = document.getElementById('d-type');
-  const blindTypeSelect = document.getElementById('d-blind-type');
   let pickedImagePath = null;
 
   function currentMaxIntensity() {
@@ -2329,14 +2312,6 @@ function openCreateDareModal() {
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
     blindIntensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]}</option>`).join('');
   }
-  function populateTypeOptions() {
-    const types = availableTypesFor(categorySelect.value);
-    typeSelect.innerHTML = types.map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('');
-  }
-  function populateBlindTypeOptions() {
-    const types = availableTypesFor(categorySelect.value);
-    blindTypeSelect.innerHTML = types.map(t => `<option value="${t}">${TYPE_LABELS[t]}</option>`).join('');
-  }
 
   const blindSendBtn = document.getElementById('btn-blind-send');
   if (blindSendBtn) blindSendBtn.onclick = async () => {
@@ -2351,7 +2326,6 @@ function openCreateDareModal() {
       p_title: picked.title,
       p_instructions: picked.instructions,
       p_teaser: picked.teaser || null,
-      p_dare_type: document.getElementById('d-blind-type').value,
       p_intensity: picked.intensity,
       p_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
       p_requires_confirmation: false,
@@ -2367,10 +2341,9 @@ function openCreateDareModal() {
     showToast('🙈 Sent blind — you\'ll find out together.');
   };
 
-  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); populateTypeOptions(); populateBlindTypeOptions(); };
+  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); };
   writeOwnBtn.onclick = () => {
     populateIntensityOptions();
-    populateTypeOptions();
     document.getElementById('d-title').value = '';
     document.getElementById('d-teaser').value = '';
     document.getElementById('d-instructions').value = '';
@@ -2381,8 +2354,6 @@ function openCreateDareModal() {
   };
   populateIntensityOptions();
   populateBlindIntensityOptions();
-  populateTypeOptions();
-  populateBlindTypeOptions();
 
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -2402,7 +2373,6 @@ function openCreateDareModal() {
       p_title: document.getElementById('d-title').value.trim(),
       p_instructions: document.getElementById('d-instructions').value.trim(),
       p_teaser: document.getElementById('d-teaser').value.trim() || null,
-      p_dare_type: document.getElementById('d-type').value,
       p_intensity: intensitySelect.value,
       p_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
       p_requires_confirmation: document.getElementById('d-confirm').checked,

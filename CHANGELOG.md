@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.62.0 — Type removed entirely from dare creation
+
+- Clarified first: Type was never removed in the earlier fix — that fix
+  added validation to it (which apparently read as removal). This time
+  it's genuinely gone: both Type dropdowns removed from the create-dare
+  screen, the parameter dropped from create_dare() itself (tested
+  end-to-end — grants verified, no duplicate function versions), and the
+  now-pointless Type pill removed from every dare card.
+- Reunion's special scoring formula went with it, since there's no way
+  left to mark a dare as Reunion — every dare now uses the standard
+  speed-tier multiplier. The database column stays (existing dares keep
+  their history) with a default of 'either' for anything new.
+- Left one thing alone on purpose: boundary question cards (the Kinks
+  content itself) have their own separate "suitable for" field that
+  happens to reuse the same four labels — that's authoring metadata for
+  cards, a different concept from what's sent as a dare, and wasn't
+  part of what was asked.
+
 ## 1.61.0 — Kinks gets a persistent indicator, not just a live pop-up
 
 - Checked directly: Jacki genuinely does have a pending comparison
