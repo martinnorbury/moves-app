@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.66.1 — a real regression from the polling fix, now guarded properly
+
+- The 45-second poll and visibility/focus refresh added a couple of
+  versions back could fire while a modal was genuinely open and being
+  interacted with — a background render re-inserts the same modal HTML
+  but never re-attaches its button handlers, since only the function
+  that originally opened it does that. The modal looks completely
+  normal but stops responding to anything except clicking outside it —
+  exactly what happened with the follow-up question. The doer-feedback
+  chain added last version made this more likely just by keeping a
+  modal open longer.
+- The pre-existing 30-second countdown timer already guarded against
+  this correctly (`!state.modal`) — this was a known, established
+  pattern I just didn't apply consistently to the newer polling or to
+  the realtime subscription handlers, which had the identical
+  vulnerability already. Fixed all of them the same way: skip the
+  render while a modal's open, but keep loading fresh data in the
+  background regardless, so it's all there the moment the modal closes.
+
+## 1.66.0 — a real content-feedback loop, feeding into Grok
+
+- New, separate mechanic from the existing sender-rates-performance
+  reaction (that one's untouched, still awards bonus points): right
+  after completing a dare, whoever did it now gets asked "How did that
+  feel?" — meh, good, or loved it — purely informational, no points,
+  specifically about the dare's content rather than the completion
+  itself. Shown proactively as part of the celebration, not buried in
+  History.
+- Sent dares now trace back to which library entry they came from
+  (blind draws only — write-your-own has no library origin to link to),
+  which is what makes the export actually useful rather than a flat
+  list of one-off completions.
+- New "Export feedback (for Grok)" button in Admin, next to the existing
+  dare-library export: one row per library dare, with how many times
+  it's been sent and the meh/good/loved-it breakdown from everyone who's
+  done it — exactly the shape needed to hand to Grok for the next batch.
+- Tested every permission path directly, using transactions rolled back
+  afterward so nothing was left behind: the creator is correctly
+  rejected from giving doer feedback on their own dare, the recipient
+  can, and the export is correctly admin-only.
+
 ## 1.65.0 — reward alerts, and explaining the general-question lock properly
 
 - Checked the lock mechanic directly rather than assuming: it's working

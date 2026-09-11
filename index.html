@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.65.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.66.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.65.0';
+const APP_VERSION = '1.66.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -494,6 +494,18 @@ function exportDaresCsv() {
     category: d.category, title: d.title, teaser: d.teaser || '', instructions: d.instructions, intensity: d.intensity
   }));
   downloadCsv('dares-export.csv', rows);
+}
+
+async function exportDareFeedbackCsv() {
+  const { data, error } = await sb.rpc('get_dare_feedback_summary');
+  if (error) { showToast(error.message); return; }
+  if (!data || !data.length) { showToast('No dares in the library yet.'); return; }
+  const rows = data.map(r => ({
+    category: r.category, title: r.title, intensity: r.intensity, instructions: r.instructions,
+    times_sent: r.times_sent, meh: r.meh_count, good: r.good_count, loved_it: r.loved_it_count,
+    completed_awaiting_feedback: r.awaiting_feedback_count
+  }));
+  downloadCsv('dare-feedback-export.csv', rows);
 }
 
 function exportForfeitsCsv() {
@@ -687,6 +699,13 @@ async function loadEverything() {
 // again, where the person is already looking at real content.
 async function silentRefresh() {
   if (!state.session) return;
+  // A background render while a modal is open re-inserts the same modal
+  // HTML but never re-attaches its button handlers — only the function
+  // that originally opened it does that. The modal looks identical but
+  // stops responding to anything except clicking outside it. Skip
+  // entirely while one's open; it'll catch up on the next trigger once
+  // it closes.
+  if (state.modal) return;
   await loadAllData();
   render();
   if (isOnboardingComplete()) checkForCompletionReveal();
@@ -903,11 +922,11 @@ function subscribeRealtime() {
   if (realtimeChannel) return;
   realtimeChannel = sb.channel('couple-' + state.coupleId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
-      async () => { await loadDares(); await loadScoreboard(); await loadHeat(); render(); })
+      async () => { await loadDares(); await loadScoreboard(); await loadHeat(); if (!state.modal) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `couple_id=eq.${state.coupleId}` },
-      async () => { await loadNotifications(); render(); if (isOnboardingComplete()) await checkForCompletionReveal(); })
+      async () => { await loadNotifications(); if (state.modal) return; render(); if (isOnboardingComplete()) await checkForCompletionReveal(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards', filter: `couple_id=eq.${state.coupleId}` },
-      () => { loadRewards(); render(); })
+      async () => { await loadRewards(); if (!state.modal) render(); })
     .subscribe();
 }
 
@@ -2087,6 +2106,7 @@ function renderDaresColumn() {
       <button class="btn btn-ghost" id="btn-import-dares-csv">Import from CSV</button>
     </div>
     ${state.dareLibrary.length ? `<button class="link-btn" id="btn-export-dares-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
+    <button class="link-btn" id="btn-export-dare-feedback" style="margin-bottom:14px">Export feedback (for Grok) →</button>
 
     ${state.categories.map(c => {
       const total = countByCategory[c.name] || 0;
@@ -2400,7 +2420,8 @@ function openCreateDareModal() {
       p_reusable: false,
       p_question_id: null,
       p_image_path: picked.image_path || null,
-      p_blind_sent: true
+      p_blind_sent: true,
+      p_library_dare_id: picked.id
     });
     if (error) { showToast(error.message); return; }
     closeModal();
@@ -2696,6 +2717,8 @@ function attachMainHandlers() {
   if (exportQuestionsBtn) exportQuestionsBtn.onclick = exportQuestionsCsv;
   const exportDaresBtn = document.getElementById('btn-export-dares-csv');
   if (exportDaresBtn) exportDaresBtn.onclick = exportDaresCsv;
+  const exportFeedbackBtn = document.getElementById('btn-export-dare-feedback');
+  if (exportFeedbackBtn) exportFeedbackBtn.onclick = exportDareFeedbackCsv;
   const exportForfeitsBtn = document.getElementById('btn-export-forfeits-csv');
   if (exportForfeitsBtn) exportForfeitsBtn.onclick = exportForfeitsCsv;
   const addForfeitBtn = document.getElementById('btn-add-forfeit');
@@ -3716,7 +3739,7 @@ function openCompleteModal(dareId) {
       points: updatedDare ? updatedDare.points_awarded : 0,
       bonusPoints: updatedDare ? updatedDare.quality_bonus_points : 0,
       heatGain,
-      onContinue: () => { if (followUp) openFollowUpQuestionModal(followUp); }
+      onContinue: () => openDoerFeedbackModal(updatedDare, () => { if (followUp) openFollowUpQuestionModal(followUp); })
     });
   });
 }
@@ -3830,6 +3853,31 @@ async function confirmForfeitPick(settlement, forfeitId) {
   await loadCurrentSettlement();
   closeModal();
   showToast('Forfeit picked.');
+}
+
+function openDoerFeedbackModal(dare, onContinue) {
+  if (!dare) { onContinue(); return; }
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>How did that feel?</h2>
+        <p class="hint-text" style="margin-bottom:18px">Just for you two — this doesn't affect scoring, it just helps shape what gets picked in future.</p>
+        <div class="btn-row">
+          <button class="btn btn-ghost" data-doer-reaction="meh">Meh</button>
+          <button class="btn btn-ghost" data-doer-reaction="good">Good</button>
+          <button class="btn btn-ghost" data-doer-reaction="loved_it">Loved it</button>
+        </div>
+        <button class="link-btn" id="btn-skip-doer-feedback" style="margin-top:16px">Skip</button>
+      </div>
+    </div>
+  `;
+  render();
+  const finish = () => { closeModal(); onContinue(); };
+  document.getElementById('btn-skip-doer-feedback').onclick = finish;
+  $app.querySelectorAll('[data-doer-reaction]').forEach(el => el.onclick = async () => {
+    await sb.rpc('react_as_doer', { p_dare_id: dare.id, p_reaction: el.dataset.doerReaction });
+    finish();
+  });
 }
 
 function openFollowUpQuestionModal(q) {
