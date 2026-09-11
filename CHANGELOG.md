@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.64.0 — the actual root cause: RLS silently blocks Realtime, not connection reliability
+
+- This was never a connection-reliability problem. Confirmed directly:
+  `boundary_answers` RLS correctly restricts each person to SELECT only
+  their own rows — necessary for privacy — but Supabase Realtime checks
+  RLS before delivering any change to a subscriber. Since Jacki is never
+  allowed to SELECT Martin's answer row, her subscription to that table
+  could never receive that event, regardless of the filter, the
+  connection, or anything else. Every previous fix in this area was
+  correctly built but aimed at the wrong layer.
+- Fixed properly this time, the same way dares already solves the same
+  category of problem: a database trigger now inserts a notification
+  (which the recipient genuinely can see under RLS) whenever someone
+  answers a new question, and the existing, already-reliable
+  notifications subscription picks it up and runs the same comparison
+  check. Tested the trigger directly inside a transaction that was then
+  rolled back, so nothing committed or broadcast live — confirmed the
+  notification is created correctly, addressed to the right person, then
+  confirmed the rollback left no trace at all.
+- Removed the direct `boundary_answers` subscription entirely, since
+  it's now confirmed structurally incapable of ever firing — dead code,
+  fully superseded by the trigger. The periodic poll and foreground
+  refresh from the last two versions stay as a general safety net, but
+  the live path should now work properly on its own for this.
+
+## 1.63.1 — a genuinely universal fallback, not a mobile-specific one
+
+- The previous fix only refreshed on visibilitychange/focus — a real
+  gap for two windows on separate screens that just stay open and
+  visible the whole session, since neither event ever fires in that
+  case. Added a straightforward 45-second periodic check, independent
+  of visibility entirely, as the actual universal guarantee — covers
+  mobile backgrounding, tabs that never lose focus, anything.
+
+## 1.63.0 — the real fix: refresh on foreground, not just on live events
+
+- Every realtime fix so far assumed the WebSocket connection stays alive
+  continuously. On a phone, it doesn't — locking the screen, switching
+  apps, a brief signal drop can silently kill it, and anything that
+  happened while disconnected is never retroactively delivered even
+  once it reconnects. That's not a bug to patch, it's a fundamental
+  limit of push-based realtime on mobile — no amount of hardening the
+  live-event path was going to fully solve it.
+- Added what actually solves it: the app now does a full quiet data
+  refresh whenever it becomes active again — switching back to it,
+  unlocking the phone, anything that makes the tab visible — completely
+  independent of whether the realtime connection survived. This doesn't
+  show the "Opening…" screen (that would be its own annoyance, flashing
+  every time someone glances at their phone) — a new silentRefresh()
+  path reuses the same data-loading logic without the loading-screen
+  blank-out, then runs the same engagement checks that would show the
+  comparison-question modal if something's pending.
+- This is the actual reliability guarantee going forward: realtime is
+  now a nice-to-have for near-instant updates while the app is open, and
+  foreground-refresh is what guarantees correctness regardless of what
+  the connection did in between.
+
 ## 1.62.0 — Type removed entirely from dare creation
 
 - Clarified first: Type was never removed in the earlier fix — that fix

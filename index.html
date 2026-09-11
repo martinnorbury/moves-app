@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.62.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.64.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.62.0';
+const APP_VERSION = '1.64.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -583,6 +583,36 @@ async function boot() {
   });
   if (session) await loadEverything(); else state.loading = false;
   render();
+
+  // Realtime is best-effort on mobile — locking the screen, switching
+  // apps, or a brief signal drop can silently kill the WebSocket, and
+  // anything that happened while disconnected is never retroactively
+  // delivered even once it reconnects. This is the actual reliability
+  // guarantee: whenever the app becomes visible again, pull fresh data
+  // regardless of what the live connection did or didn't deliver.
+  let lastVisibilityRefresh = Date.now();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !state.session) return;
+    if (Date.now() - lastVisibilityRefresh < 4000) return; // avoid double-firing alongside focus
+    lastVisibilityRefresh = Date.now();
+    silentRefresh();
+  });
+  window.addEventListener('focus', () => {
+    if (!state.session) return;
+    if (Date.now() - lastVisibilityRefresh < 4000) return;
+    lastVisibilityRefresh = Date.now();
+    silentRefresh();
+  });
+
+  // visibilitychange/focus only fire on a transition — a tab that just
+  // sits open and visible the whole session (e.g. a second monitor)
+  // never triggers either, so realtime would be the only mechanism left
+  // for it, which isn't reliable enough on its own. This periodic check
+  // is the actual universal guarantee, independent of visibility state
+  // entirely.
+  setInterval(() => {
+    if (state.session) silentRefresh();
+  }, 45000);
 }
 
 function resetState() {
@@ -605,8 +635,7 @@ function applyTheme(gender) {
   if (gender === 'female') document.body.classList.add('theme-female');
 }
 
-async function loadEverything() {
-  state.loading = true; render();
+async function loadAllData() {
   try {
     await loadProfile();
     applyTheme(state.profile ? state.profile.gender : null);
@@ -625,7 +654,22 @@ async function loadEverything() {
   } catch (e) {
     console.error(e);
   }
+}
+
+async function loadEverything() {
+  state.loading = true; render();
+  await loadAllData();
   state.loading = false;
+  render();
+  if (isOnboardingComplete()) checkForCompletionReveal();
+}
+
+// Same data refresh as loadEverything, but without the full-screen
+// loading flash — for re-syncing quietly when the app becomes active
+// again, where the person is already looking at real content.
+async function silentRefresh() {
+  if (!state.session) return;
+  await loadAllData();
   render();
   if (isOnboardingComplete()) checkForCompletionReveal();
 }
@@ -677,6 +721,8 @@ async function checkForCompletionReveal() {
       const reactionLabel = { meh: 'Meh', good: 'Good', loved_it: 'Loved it' }[dare.quality_reaction] || dare.quality_reaction;
       showToast(`${state.partner ? state.partner.display_name : 'Your partner'} reacted "${reactionLabel}" to "${dare.title}"${dare.quality_bonus_points ? ` (+${dare.quality_bonus_points} bonus)` : ''}`);
     }
+  } else if (notif.message === 'Your partner answered something new.') {
+    await runEngagementChecks(); // may open the comparison modal directly; no toast needed either way
   } else if (notif.message !== 'You have a new dare waiting.') {
     // Already covered live by the Playroom hero banner, so skip it silently.
     // Anything else unrecognized still gets shown rather than silently
@@ -837,7 +883,6 @@ async function loadNotifications() {
 let realtimeChannel = null;
 function subscribeRealtime() {
   if (realtimeChannel) return;
-  const partnerId = state.partner ? state.partner.id : '00000000-0000-0000-0000-000000000000';
   realtimeChannel = sb.channel('couple-' + state.coupleId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dares', filter: `couple_id=eq.${state.coupleId}` },
       async () => { await loadDares(); await loadScoreboard(); await loadHeat(); render(); })
@@ -845,8 +890,6 @@ function subscribeRealtime() {
       async () => { await loadNotifications(); render(); if (isOnboardingComplete()) await checkForCompletionReveal(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards', filter: `couple_id=eq.${state.coupleId}` },
       () => { loadRewards(); render(); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'boundary_answers', filter: `user_id=eq.${partnerId}` },
-      async () => { if (isOnboardingComplete()) await runEngagementChecks(); })
     .subscribe();
 }
 
