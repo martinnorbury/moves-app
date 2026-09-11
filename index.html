@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.64.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.65.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.64.0';
+const APP_VERSION = '1.65.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -460,6 +460,7 @@ let state = {
   authMode: 'signin',
   urlInviteCode: null,          // invite code captured from a ?invite= link, if any
   pendingComparisonCards: [],   // refreshed on every load via runEngagementChecks — backs the Kinks tab badge
+  seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
   authError: '',
   toast: null,
@@ -621,7 +622,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.dareEvidence = [];
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = [];
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -646,6 +647,7 @@ async function loadAllData() {
           loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
+        checkForNewlyRevealedRewards();
         await sb.rpc('settle_past_weeks');
         await Promise.all([loadCurrentSettlement(), loadSettlementHistory()]);
         subscribeRealtime();
@@ -654,6 +656,22 @@ async function loadAllData() {
   } catch (e) {
     console.error(e);
   }
+}
+
+function checkForNewlyRevealedRewards() {
+  const currentlyRevealed = state.rewards
+    .filter(r => !r.completed && (r.heat_threshold === null || state.heat >= r.heat_threshold))
+    .map(r => r.id);
+  if (state.seenRevealedRewardIds === null) {
+    // First load this session — seed silently, nothing here is "new."
+    state.seenRevealedRewardIds = new Set(currentlyRevealed);
+    return;
+  }
+  const newlyRevealed = state.rewards.filter(r => currentlyRevealed.includes(r.id) && !state.seenRevealedRewardIds.has(r.id));
+  newlyRevealed.forEach(r => {
+    state.seenRevealedRewardIds.add(r.id);
+    showToast(`🎁 A reward just unlocked: "${r.title}"`);
+  });
 }
 
 async function loadEverything() {
@@ -1910,12 +1928,17 @@ function renderBoundariesTab(unanswered) {
     ` : ''}
     <div class="section-head" style="margin-top:0"><h2>Your answers</h2></div>
     <p class="hint-text" style="margin-bottom:14px">Change any of these any time — you don't need to wait for ${esc(partnerName)}, and changing yours never shows ${esc(partnerName)} which way you moved it, only the mutual result below.</p>
-    ${generalQuestions.map(q => `
+    ${generalQuestions.map(q => {
+      const mutualSpecifics = state.cardReport.filter(c => c.category === q.category && c.title !== q.title).length;
+      const locked = mutualSpecifics >= 3;
+      return `
       <div style="margin-bottom:18px">
         <div class="cat" style="margin-bottom:4px">${esc(q.category)}</div>
+        ${locked ? `<p class="hint-text" style="margin-bottom:8px">You've both answered ${mutualSpecifics} specific questions here now, so this general one no longer affects the score — it's just your own record. Changing it won't move anything below.</p>` : ''}
         ${renderAnswerControl(q, state.answers[q.id], (a) => `data-answer-q="${q.id}" data-answer-v="${a}"`)}
       </div>
-    `).join('')}
+    `;
+    }).join('')}
 
     <div class="divider"></div>
     <div class="section-head"><h2>Temptation access</h2></div>
@@ -2266,6 +2289,7 @@ function renderSettlementHistory() {
 function renderTabbar() {
   const pending = state.dares.filter(d => d.recipient_id === state.session.user.id && d.status === 'sent').length;
   const pendingComparisons = state.pendingComparisonCards.length;
+  const pendingRewards = state.rewards.filter(r => !r.completed && (r.heat_threshold === null || state.heat >= r.heat_threshold)).length;
   const isAdmin = state.profile && state.profile.is_admin;
   const tabs = [
     ['home','Playroom'], ['boundaries','Kinks'], ['dares','Dares'], ['rewards','Rewards'], ['history','History']
@@ -2274,7 +2298,7 @@ function renderTabbar() {
   return `<div class="tabbar">
     ${tabs.map(([id,label]) => `
       <button class="tab ${state.tab===id?'active':''}" data-tab="${id}" style="position:relative">
-        ${label}${(id==='dares' && pending) || (id==='boundaries' && pendingComparisons) ? '<span class="dot"></span>' : ''}
+        ${label}${(id==='dares' && pending) || (id==='boundaries' && pendingComparisons) || (id==='rewards' && pendingRewards) ? '<span class="dot"></span>' : ''}
       </button>
     `).join('')}
   </div>`;

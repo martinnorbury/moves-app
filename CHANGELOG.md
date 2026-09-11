@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.65.0 — reward alerts, and explaining the general-question lock properly
+
+- Checked the lock mechanic directly rather than assuming: it's working
+  correctly (4 mutual specifics in Positions & Core Acts, general
+  question genuinely excluded from the score). The real issue was that
+  the slider stays interactive — correctly, you should always be able to
+  see and change your own answer — but nothing told you it had stopped
+  affecting the score, so moving it and seeing nothing happen looked
+  like a bug rather than confirmation the lock was working. Added a
+  clear note directly on the slider once a temptation passes the
+  threshold.
+- Rewards had no proactive signal at all — crossing a threshold gave no
+  dot, no message, nothing. Fixed both ways: the same tab-bar dot
+  pattern already used for dares and comparisons now covers Rewards too
+  (any revealed, unclaimed reward), and a toast fires the moment a
+  reward newly crosses its threshold, seeded on first load so it never
+  fires retroactively for something already unlocked before this
+  session started.
+
 ## 1.64.0 — the actual root cause: RLS silently blocks Realtime, not connection reliability
 
 - This was never a connection-reliability problem. Confirmed directly:
