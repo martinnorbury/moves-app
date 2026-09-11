@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.67.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.68.2)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.67.0';
+const APP_VERSION = '1.68.2';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -463,6 +463,7 @@ let state = {
   urlInviteCode: null,          // invite code captured from a ?invite= link, if any
   pendingComparisonCards: [],   // refreshed on every load via runEngagementChecks — backs the Kinks tab badge
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
+  passwordRecoveryMode: false,  // set when arriving via a password-reset link — shows a dedicated set-new-password screen
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
   authError: '',
   toast: null,
@@ -588,12 +589,13 @@ function fmtCountdown(iso) {
 async function boot() {
   const urlParams = new URLSearchParams(window.location.search);
   const inviteFromUrl = urlParams.get('invite');
-  if (inviteFromUrl) state.urlInviteCode = inviteFromUrl.trim().toUpperCase();
+  if (inviteFromUrl) { state.urlInviteCode = inviteFromUrl.trim().toUpperCase(); state.authMode = 'signup'; }
 
   const { data: { session } } = await sb.auth.getSession();
   state.session = session;
   sb.auth.onAuthStateChange((_event, session) => {
     state.session = session;
+    if (_event === 'PASSWORD_RECOVERY') { state.passwordRecoveryMode = true; render(); return; }
     if (session) loadEverything(); else { resetState(); render(); }
   });
   if (session) await loadEverything(); else state.loading = false;
@@ -1097,13 +1099,16 @@ function renderAppExplainer() {
       <div class="divider" style="margin:24px 0"></div>
 
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">How a dare actually works:</b> one of us sends a dare — pick one from the library, or write our own. The other accepts, declines, or counters it, always their call. Complete it, and points land.
+        <b style="color:var(--text)">How a dare actually works:</b> one of us picks a Temptation and an intensity, then sends it blind — neither of us sees which specific dare it is until it's actually done, or writes one from scratch instead. The other accepts, declines, or counters it, always their call. Complete it, and points land.
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
         <b style="color:var(--text)">The Heat Meter:</b> a shared bar on Playroom that fills up a little every time we complete a dare together. Fill it past a threshold, and a reward unlocks.
       </p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
         <b style="color:var(--text)">Forfeits:</b> each week, whoever's behind on points picks their own — never chosen for them.
+      </p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
+        <b style="color:var(--text)">Your account:</b> tap your name up top any time to add a photo, change your name, or add your Signal number — that's how we can message each other securely, one tap, while a dare's in play.
       </p>
 
       <button class="btn btn-gold" id="btn-app-explainer-done" style="width:100%">Into the app →</button>
@@ -1188,6 +1193,7 @@ function attachWizardHandlers(q) {
 function render() {
   document.body.classList.toggle('admin-wide', state.tab === 'admin');
   if (state.loading) { $app.innerHTML = `<div class="loading">Opening… <span style="opacity:0.5">(build ${APP_VERSION})</span></div>`; return; }
+  if (state.passwordRecoveryMode) { $app.innerHTML = renderPasswordRecovery(); attachPasswordRecoveryHandlers(); return; }
   if (!state.session) { $app.innerHTML = renderAuth(); attachAuthHandlers(); return; }
   if (!state.profile) { $app.innerHTML = renderCreateProfile(); attachCreateProfileHandlers(); return; }
   if (!state.profile.gender) { $app.innerHTML = renderChooseTheme(); attachChooseThemeHandlers(); return; }
@@ -1248,6 +1254,35 @@ function render() {
 /* ==========================================================================
    AUTH
    ========================================================================== */
+function renderPasswordRecovery() {
+  return `
+    <div class="center-screen">
+      <div class="auth-hero">
+        <h1>Set a new password</h1>
+        <p>Choose a new password for this account.</p>
+      </div>
+      <form id="recovery-form" class="stack">
+        <div class="field"><label>New password</label><input type="password" id="recovery-password" minlength="8" required></div>
+        ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
+        <button type="submit" class="btn btn-primary">Set password</button>
+      </form>
+    </div>
+  `;
+}
+function attachPasswordRecoveryHandlers() {
+  const form = document.getElementById('recovery-form');
+  if (form) form.onsubmit = async (e) => {
+    e.preventDefault();
+    state.authError = '';
+    const password = document.getElementById('recovery-password').value;
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) { state.authError = error.message; render(); return; }
+    state.passwordRecoveryMode = false;
+    await loadEverything();
+    showToast('Password updated.');
+  };
+}
+
 function renderAuth() {
   return `
     <div class="center-screen">
@@ -1255,6 +1290,7 @@ function renderAuth() {
         <h1>TwoPlay</h1>
         <p>A private, two-player game. Just for the two of you.</p>
       </div>
+      ${state.urlInviteCode ? `<p class="hint-text" style="margin-bottom:14px">You've been invited — create an account below, and the invite will carry through automatically.</p>` : ''}
       <div class="auth-tabs">
         <button class="auth-tab ${state.authMode==='signin'?'active':''}" data-authmode="signin">Sign in</button>
         <button class="auth-tab ${state.authMode==='signup'?'active':''}" data-authmode="signup">Create account</button>
@@ -1272,6 +1308,7 @@ function renderAuth() {
         <div class="field"><label>Password</label><input type="password" id="auth-password" minlength="8" required></div>
         ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
         <button type="submit" class="btn btn-primary">${state.authMode==='signin' ? 'Sign in' : 'Create account'}</button>
+        ${state.authMode==='signin' ? `<button type="button" class="link-btn" id="btn-forgot-password" style="margin-top:4px">Forgot password?</button>` : ''}
       </form>
     </div>
   `;
@@ -1280,6 +1317,8 @@ function attachAuthHandlers() {
   $app.querySelectorAll('[data-authmode]').forEach(b => b.onclick = () => {
     state.authMode = b.dataset.authmode; state.authError = ''; render();
   });
+  const forgotBtn = document.getElementById('btn-forgot-password');
+  if (forgotBtn) forgotBtn.onclick = () => openForgotPasswordModal();
   const form = document.getElementById('auth-form');
   if (form) form.onsubmit = async (e) => {
     e.preventDefault();
@@ -2675,6 +2714,39 @@ function openResetConfirmModal() {
     state.viewedTeaser = false;
     await loadEverything();
     showToast('Gameplay data reset. Starting fresh.');
+  };
+}
+
+function openForgotPasswordModal() {
+  const prefill = document.getElementById('auth-email') ? document.getElementById('auth-email').value.trim() : '';
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>Reset your password</h2>
+        <p class="hint-text" style="margin-bottom:14px">We'll send a link to reset it — it'll bring you right back here to set a new one.</p>
+        <div class="field"><label>Email</label><input type="email" id="forgot-email" value="${esc(prefill)}"></div>
+        <div id="forgot-password-error" class="error-text" style="margin-top:8px"></div>
+        <div id="forgot-password-sent" class="hint-text" style="margin-top:8px"></div>
+        <div class="btn-row" style="margin-top:16px">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Close</button>
+          <button type="button" class="btn btn-primary" id="btn-send-reset">Send reset link</button>
+        </div>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('btn-send-reset').onclick = async () => {
+    const errEl = document.getElementById('forgot-password-error');
+    const sentEl = document.getElementById('forgot-password-sent');
+    const email = document.getElementById('forgot-email').value.trim();
+    if (!email) { errEl.textContent = 'Enter your email first.'; return; }
+    errEl.textContent = '';
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) { errEl.textContent = error.message; return; }
+    sentEl.textContent = 'Sent — check that inbox for the link.';
   };
 }
 

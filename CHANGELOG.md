@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.68.2 — account setup and Signal now mentioned in onboarding
+
+- Neither was mentioned anywhere in the one-page explainer — someone
+  could go through the whole onboarding flow and never learn a photo,
+  name, or Signal number were things they could add, or that Signal
+  exists as a feature at all. Added one more short paragraph covering
+  both together, kept to the same "one page, don't overdo it" scope as
+  the rest of it — not a new step, not a persistent nag, just the same
+  passing-mention treatment as the tabs and mechanics above it.
+
+## 1.68.1 — app explainer's dare description was stale
+
+- Still described the old browse/pick-from-library flow, from before
+  dare creation became fully blind. Rewrote to accurately describe the
+  current mechanic — pick a Temptation and intensity, send it blind,
+  neither side sees which specific dare it is until it's actually done.
+  Swept for other leftovers from the same era — the only other
+  browse/surprise-me references left are for Forfeits, which is
+  correctly unchanged, since the person picking a forfeit and the person
+  doing it are the same person, so there's no blindness concern there.
+
+## 1.68.0 — self-service password reset, and the invite screen no longer defaults wrong
+
+- Traced the full invite-link-to-pairing flow to answer the question
+  properly: the mechanism itself was already correct — the invite code
+  is captured in memory before any session check and survives the whole
+  signup process untouched, since nothing causes a page reload along the
+  way. What was actually wrong: the auth screen defaulted to "Sign in"
+  even for someone arriving fresh off an invite link, who by definition
+  has no account yet, with nothing acknowledging they'd been invited at
+  all. Fixed both — defaults to Create Account when a code's present in
+  the URL, plus a line confirming the invite will carry through.
+- Added real self-service password reset: "Forgot password?" on the
+  sign-in tab sends a reset link via Supabase's standard flow, and
+  clicking it brings you back to a dedicated "set a new password"
+  screen rather than the normal app.
+- One thing I can't verify from here: the reset email's actual delivery
+  depends on this project's Auth email configuration in Supabase, which
+  isn't something I have access to inspect or confirm — the code side is
+  correct and calling the standard API, but this needs a real
+  end-to-end test to be sure the email itself arrives.
+
 ## 1.67.0 — Forfeits gets search and grouping, matching Questions and Dares
 
 - Was a completely flat, ungrouped list — same gap Questions and Dares
