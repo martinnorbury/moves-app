@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.67.0 — Forfeits gets search and grouping, matching Questions and Dares
+
+- Was a completely flat, ungrouped list — same gap Questions and Dares
+  used to have. Added a search box (same pattern: type to filter, tap a
+  result to jump straight to editing it). When not searching, forfeits
+  now group into collapsed sections — Non-intimate as one group, then
+  each intimate Temptation as its own — tap to expand instead of
+  scrolling through everything at once.
+
 ## 1.66.1 — a real regression from the polling fix, now guarded properly
 
 - The 45-second poll and visibility/focus refresh added a couple of

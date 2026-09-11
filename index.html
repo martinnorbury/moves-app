@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.66.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.67.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.66.1';
+const APP_VERSION = '1.67.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -429,6 +429,8 @@ let state = {
   openDareCategory: null,  // heading currently drilled into on the Dares side of Admin
   questionsSearch: '',      // Admin: search across every card's title
   daresSearch: '',           // Admin: search across every dare's title
+  forfeitsSearch: '',        // Admin: search across every forfeit's title
+  expandedForfeitGroups: new Set(), // which forfeit groups are expanded in Admin
   lastFocusedSearch: null,   // which search box to restore focus to after re-render (Admin or Dares tab)
   sentByYouExpanded: false, sentByYouSearch: '',
   doneByYouExpanded: false, doneByYouSearch: '',
@@ -2000,15 +2002,13 @@ function renderSetupArea() {
 }
 
 function renderForfeitsSection() {
-  return `
-    <div class="section-head" style="margin-top:0"><h2>Forfeits</h2></div>
-    <p class="hint-text" style="margin-bottom:14px">Picked by whoever loses the week — never imposed by the winner. Intimate ones are capped by that Temptation's current intensity, same as dares.</p>
-    <div class="btn-row" style="margin-bottom:8px">
-      <button class="btn btn-ghost" id="btn-add-forfeit">Add a forfeit</button>
-      <button class="btn btn-ghost" id="btn-import-forfeits-csv">Import from CSV</button>
-    </div>
-    ${state.forfeitLibrary.length ? `<button class="link-btn" id="btn-export-forfeits-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
-    ${state.forfeitLibrary.length ? state.forfeitLibrary.map(f => `
+  const searchText = state.forfeitsSearch.trim().toLowerCase();
+  const searchResults = searchText ? state.forfeitLibrary.filter(f =>
+    f.title.toLowerCase().includes(searchText) || (f.category && f.category.toLowerCase().includes(searchText)) || (f.intensity && f.intensity.includes(searchText))
+  ) : null;
+
+  function renderForfeitRow(f) {
+    return `
       <div class="category-row" data-edit-forfeit="${f.id}" style="cursor:pointer">
         <div>
           <div class="cat-name" style="font-size:14.5px">${esc(f.title)}</div>
@@ -2016,7 +2016,46 @@ function renderForfeitsSection() {
         </div>
         <div class="cat-arrow">›</div>
       </div>
-    `).join('') : `<div class="empty-state">No forfeits yet.</div>`}
+    `;
+  }
+
+  let body;
+  if (searchResults) {
+    body = searchResults.length ? searchResults.map(renderForfeitRow).join('') : `<div class="empty-state">No forfeits match "${esc(state.forfeitsSearch)}".</div>`;
+  } else if (!state.forfeitLibrary.length) {
+    body = `<div class="empty-state">No forfeits yet.</div>`;
+  } else {
+    const nonIntimate = state.forfeitLibrary.filter(f => !f.is_intimate);
+    const intimateCategories = [...new Set(state.forfeitLibrary.filter(f => f.is_intimate).map(f => f.category))];
+    const groups = [
+      ...(nonIntimate.length ? [['Non-intimate', nonIntimate]] : []),
+      ...intimateCategories.map(cat => [cat, state.forfeitLibrary.filter(f => f.is_intimate && f.category === cat)])
+    ];
+    body = groups.map(([label, items]) => {
+      const expanded = state.expandedForfeitGroups.has(label);
+      return `
+        <div class="category-row" data-toggle-forfeit-group="${esc(label)}" style="cursor:pointer">
+          <div>
+            <div class="cat-name">${esc(label)}</div>
+            <div class="cat-count">${items.length} forfeit${items.length===1?'':'s'}</div>
+          </div>
+          <span class="hint-text" style="margin-left:8px">${expanded ? '▲' : '▼'}</span>
+        </div>
+        ${expanded ? `<div style="padding:6px 0 4px">${items.map(renderForfeitRow).join('')}</div>` : ''}
+      `;
+    }).join('');
+  }
+
+  return `
+    <div class="section-head" style="margin-top:0"><h2>Forfeits</h2></div>
+    <p class="hint-text" style="margin-bottom:14px">Picked by whoever loses the week — never imposed by the winner. Intimate ones are capped by that Temptation's current intensity, same as dares.</p>
+    <div class="field" style="margin-bottom:14px"><input type="text" id="forfeits-search" placeholder="Search every forfeit by title…" value="${esc(state.forfeitsSearch)}"></div>
+    <div class="btn-row" style="margin-bottom:8px">
+      <button class="btn btn-ghost" id="btn-add-forfeit">Add a forfeit</button>
+      <button class="btn btn-ghost" id="btn-import-forfeits-csv">Import from CSV</button>
+    </div>
+    ${state.forfeitLibrary.length ? `<button class="link-btn" id="btn-export-forfeits-csv" style="margin-bottom:14px">Export to CSV →</button>` : ''}
+    ${body}
     ${state.forfeitLibrary.length ? `<button class="link-btn" id="btn-delete-all-forfeits" style="margin-top:14px; color:var(--wine-bright)">Delete all ${state.forfeitLibrary.length} forfeits</button>` : ''}
   `;
 }
@@ -2754,6 +2793,15 @@ function attachMainHandlers() {
   if (daresSearchInput) {
     daresSearchInput.oninput = () => { state.daresSearch = daresSearchInput.value; state.lastFocusedSearch = 'dares-search'; render(); };
   }
+  const forfeitsSearchInput = document.getElementById('forfeits-search');
+  if (forfeitsSearchInput) {
+    forfeitsSearchInput.oninput = () => { state.forfeitsSearch = forfeitsSearchInput.value; state.lastFocusedSearch = 'forfeits-search'; render(); };
+  }
+  $app.querySelectorAll('[data-toggle-forfeit-group]').forEach(el => el.onclick = () => {
+    const label = el.dataset.toggleForfeitGroup;
+    if (state.expandedForfeitGroups.has(label)) state.expandedForfeitGroups.delete(label); else state.expandedForfeitGroups.add(label);
+    render();
+  });
   const sentSearchInput = document.getElementById('sent-search');
   if (sentSearchInput) {
     sentSearchInput.oninput = () => { state.sentByYouSearch = sentSearchInput.value; state.lastFocusedSearch = 'sent-search'; render(); };
