@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.71.0 — gender targeting for dares and forfeits
+
+- Reuses the existing gender field from your profiles (already used for
+  theme selection) rather than a new concept. Added "Who's this for?"
+  (Either / Him specifically / Her specifically) to both the dare and
+  forfeit library forms, and to both CSV exports and imports —
+  `suitable_gender` column, tell Grok to use exactly that name.
+- The blind draw for dares now filters by the recipient's gender
+  automatically — a "her specifically" dare will never get drawn for
+  Martin, and vice versa. The forfeit picker filters the same way
+  against your own gender, since you're picking a forfeit for yourself.
+- `get_partner_profile()` didn't expose gender before — needed it for
+  this filtering, so it's included now.
+- Tested the admin gate directly: Jacki's account is correctly rejected
+  from adding library content, matching every other content-management
+  function. Existing CSVs without the new column still import fine —
+  anything missing or invalid defaults to "either," nothing breaks.
+
+## 1.70.0 — forfeits reach parity with dares on evidence
+
+- Forfeit completion was a single tap with no evidence option at all —
+  genuine gap compared to dares, which already had a photo upload plus
+  four ways to mark something done, including "proof sent separately"
+  for exactly the away-from-each-other case. Mirrored the whole thing:
+  a new `forfeit_evidence` table and storage bucket, the same
+  completion-kind choices on the forfeit detail screen, and a "View
+  evidence" link in History once something's been uploaded — reusing
+  the same evidence viewer as dares rather than building a second one.
+- Tested the actual RPC against a real (temporary) settlement and
+  confirmed it recorded the completion kind correctly. Worth being
+  direct about how that test went: the rollback I intended to use
+  didn't apply the way I expected, and it briefly committed for real —
+  cleaned up immediately and confirmed gone. This table was never wired
+  into realtime, so it's unlikely this broadcast live to either of you,
+  but it was still a genuine lapse in how I verified something, not a
+  clean test.
+
+## 1.69.1 — the Signal link now has a reason attached to it
+
+- Was a bare link with zero context. Added a line explaining why — "Rather
+  ease in somewhere familiar first?" — kept deliberately light on
+  specifics, matching the same quiet, mysterious voice as the rest of
+  the email, rather than spelling out what Signal would actually be used
+  for later and spoiling the reveal.
+
+## 1.69.0 — invite email can now include a Signal link too
+
+- Checked properly rather than guessing at Signal's link format: the
+  in-app "scan to add contact" QR code is specifically for pairing two
+  devices in person, not useful here. The right mechanism is a
+  `signal.me/#p/+number` link, which opens a chat with that person
+  directly — works fine embedded in an email, unlike the QR code.
+- The generated invite email now includes a quiet secondary link — "Or
+  say hello first, on Signal" — using the inviter's own Signal number
+  from their profile, if they've set one. Added a note on the invite
+  screen itself clarifying whether it'll be included, and where to add
+  the number if not.
+
 ## 1.68.2 — account setup and Signal now mentioned in onboarding
 
 - Neither was mentioned anywhere in the one-page explainer — someone

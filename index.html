@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.68.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.71.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.68.2';
+const APP_VERSION = '1.71.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -445,6 +445,7 @@ let state = {
   cardReport: [],              // per-card joint tiers, from get_card_report()
   dareLibrary: [],              // admin-written dare templates, browsable by both partners
   dareEvidence: [],              // evidence photo records, keyed by dare_id
+  forfeitEvidence: [],            // evidence photo records, keyed by settlement_id
   weeklyScore: [],                 // this week's live scores, resets naturally each week
   currentSettlement: null,         // most recent settled week, if any
   settlementHistory: [],            // every settled week, most recent first
@@ -494,7 +495,7 @@ function exportQuestionsCsv() {
 
 function exportDaresCsv() {
   const rows = state.dareLibrary.map(d => ({
-    category: d.category, title: d.title, teaser: d.teaser || '', instructions: d.instructions, intensity: d.intensity
+    category: d.category, title: d.title, teaser: d.teaser || '', instructions: d.instructions, intensity: d.intensity, suitable_gender: d.suitable_gender || 'either'
   }));
   downloadCsv('dares-export.csv', rows);
 }
@@ -514,7 +515,7 @@ async function exportDareFeedbackCsv() {
 function exportForfeitsCsv() {
   const rows = state.forfeitLibrary.map(f => ({
     title: f.title, teaser: f.teaser || '', instructions: f.instructions,
-    is_intimate: f.is_intimate ? 'true' : 'false', category: f.category || '', intensity: f.intensity || ''
+    is_intimate: f.is_intimate ? 'true' : 'false', category: f.category || '', intensity: f.intensity || '', suitable_gender: f.suitable_gender || 'either'
   }));
   downloadCsv('forfeits-export.csv', rows);
 }
@@ -638,7 +639,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = [];
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = [];
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -660,7 +661,7 @@ async function loadAllData() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
         checkForNewlyRevealedRewards();
@@ -879,6 +880,10 @@ async function loadDareLibrary() {
 async function loadDareEvidence() {
   const { data, error } = await sb.from('dare_evidence').select('*');
   state.dareEvidence = error ? [] : (data || []);
+}
+async function loadForfeitEvidence() {
+  const { data, error } = await sb.from('forfeit_evidence').select('*');
+  state.forfeitEvidence = error ? [] : (data || []);
 }
 async function loadWeeklyScore() {
   const { data, error } = await sb.rpc('get_weekly_score');
@@ -1451,7 +1456,10 @@ function renderAwaitingPartner() {
            <div class="field" style="margin-top:10px"><label>Subject line</label><input type="text" id="invite-email-subject" value="${esc(INVITE_EMAIL_SUBJECT)}" readonly></div>
            <button class="link-btn" id="btn-copy-invite-subject" style="padding:0; margin-top:4px">Copy subject</button>
            <button class="btn btn-gold" id="btn-copy-invite-email" style="margin-top:14px; width:100%">Copy email</button>
-           <p class="hint-text" style="margin-top:6px">Paste doesn't carry the subject line over — copy it separately into Mail's Subject field, then paste the email into the body.</p>`
+           <p class="hint-text" style="margin-top:6px">Paste doesn't carry the subject line over — copy it separately into Mail's Subject field, then paste the email into the body.</p>
+           ${state.profile && state.profile.signal_phone
+             ? `<p class="hint-text" style="margin-top:6px">Includes a Signal link to your number, so they can say hello there first if they'd rather.</p>`
+             : `<p class="hint-text" style="margin-top:6px">Add your Signal number under Account to have a Signal link included in this email automatically.</p>`}`
         : `<p class="hint-text" style="margin-bottom:16px">No active code found — it may have expired.</p>`
       }
       <button class="btn btn-ghost" id="btn-new-code" style="margin-top:16px">Generate a new code</button>
@@ -1466,8 +1474,9 @@ function buildInviteUrl(code) {
 
 const INVITE_EMAIL_SUBJECT = "A little something's waiting for you…";
 
-function buildInviteEmailHtml(name, url) {
+function buildInviteEmailHtml(name, url, signalPhone) {
   const greeting = name ? esc(name) + ',' : 'Hey,';
+  const signalLink = signalPhone ? `https://signal.me/#p/${encodeURIComponent(signalPhone)}` : null;
   return `<!DOCTYPE html><html><body style="margin:0; padding:0; background-color:#2B1620;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#2B1620;">
 <tr><td align="center" style="padding:56px 20px;">
@@ -1477,7 +1486,8 @@ function buildInviteEmailHtml(name, url) {
 <tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:20px;">Martin has arranged something for you. Not really a link — more of an invitation.</td></tr>
 <tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:20px;">It's private. It's just the two of you. And once you step inside, there's no pretending you don't know what's there.</td></tr>
 <tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:36px;">He isn't going to tell you what it is. That's rather the point.</td></tr>
-<tr><td align="center" style="padding-bottom:36px;"><a href="${esc(url)}" style="display:inline-block; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; letter-spacing:0.3px; color:#2B1620; background-color:#C9A15C; padding:15px 38px; border-radius:3px; text-decoration:none;">Step inside</a></td></tr>
+<tr><td align="center" style="padding-bottom:${signalLink ? '18px' : '36px'};"><a href="${esc(url)}" style="display:inline-block; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; letter-spacing:0.3px; color:#2B1620; background-color:#C9A15C; padding:15px 38px; border-radius:3px; text-decoration:none;">Step inside</a></td></tr>
+${signalLink ? `<tr><td align="center" style="font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:13.5px; line-height:1.6; color:#B89C8E; padding-bottom:36px;">Rather ease in somewhere familiar first? <a href="${esc(signalLink)}" style="color:#B89C8E; text-decoration:underline;">Say hello on Signal</a> — just as private as everything else here.</td></tr>` : ''}
 <tr><td style="font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:15px; line-height:1.6; color:#B89C8E; padding-bottom:4px;">Whatever you find, it stays between the two of you.</td></tr>
 <tr><td style="padding-top:28px;"><div style="width:36px; height:2px; background-color:#C9A15C;"></div></td></tr>
 </table>
@@ -1528,7 +1538,8 @@ function attachAwaitingPartnerHandlers() {
   if (copyEmailBtn) copyEmailBtn.onclick = async () => {
     const name = document.getElementById('invite-email-name').value.trim();
     const url = buildInviteUrl(state.pendingInviteCode);
-    const html = buildInviteEmailHtml(name, url);
+    const signalPhone = state.profile ? state.profile.signal_phone : null;
+    const html = buildInviteEmailHtml(name, url, signalPhone);
     try {
       await copyRichEmailToClipboard(html);
       showToast('Email copied — paste into a new message in Mail.');
@@ -1663,7 +1674,17 @@ function openForfeitDetailModal(settlement) {
         <h2>${esc(settlement.forfeit_title)}</h2>
         <p class="hint-text" style="margin-bottom:14px">${esc(loserName)} lost the week ${settlement.loser_points} to ${settlement.winner_points}.</p>
         <div class="dare-instructions" style="margin-bottom:16px">${esc(settlement.forfeit_instructions)}</div>
-        ${isLoser ? `<button type="button" class="btn btn-gold" data-forfeit-modal-action="complete" style="width:100%; margin-bottom:10px">Mark it done</button>` : ''}
+        ${isLoser ? `
+        <div class="field" style="margin-bottom:16px">
+          <label>Evidence photo (optional)</label>
+          <input type="file" id="forfeit-evidence-file" accept="image/*">
+        </div>
+        <div class="stack" style="margin-bottom:10px">
+          <button type="button" class="btn btn-primary" data-forfeit-modal-action="complete" data-completion-kind="no_proof">Completed</button>
+          <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="proof_in_person">Completed — proof shown in person</button>
+          <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="proof_sent_externally">Completed — proof sent separately</button>
+          <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="confirmed_by_partner">Completed — confirmed by partner</button>
+        </div>` : ''}
         <button type="button" class="btn btn-ghost" data-forfeit-modal-action="close" style="width:100%">Close</button>
       </div>
     </div>
@@ -1676,8 +1697,19 @@ function openForfeitDetailModal(settlement) {
       if (!actionEl) return;
       if (actionEl.dataset.forfeitModalAction === 'close') { closeModal(); return; }
       if (actionEl.dataset.forfeitModalAction === 'complete') {
-        const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: settlement.id });
+        const kind = actionEl.dataset.completionKind || 'no_proof';
+        const evidenceFileInput = document.getElementById('forfeit-evidence-file');
+        const evidenceFile = evidenceFileInput ? evidenceFileInput.files[0] : null;
+        const { error } = await sb.rpc('complete_forfeit', { p_settlement_id: settlement.id, p_completion_kind: kind });
         if (error) { showToast(error.message); return; }
+        if (evidenceFile) {
+          const ext = evidenceFile.name.split('.').pop();
+          const path = `${state.coupleId}/${settlement.id}/${crypto.randomUUID()}.${ext}`;
+          const { error: uploadError } = await sb.storage.from('forfeit-evidence').upload(path, evidenceFile);
+          if (!uploadError) {
+            await sb.from('forfeit_evidence').insert({ settlement_id: settlement.id, couple_id: state.coupleId, uploaded_by: state.session.user.id, path });
+          }
+        }
         await loadCurrentSettlement();
         closeModal();
         showToast('Forfeit marked complete.');
@@ -2371,11 +2403,13 @@ function renderSettlementHistory() {
     if (!s.forfeit_title) forfeitLine = `${loserName} hasn't picked a forfeit yet.`;
     else if (!s.forfeit_completed_at) forfeitLine = `Forfeit: ${esc(s.forfeit_title)} — not yet done.`;
     else forfeitLine = `Forfeit: ${esc(s.forfeit_title)} — done.`;
+    const evidenceCount = state.forfeitEvidence.filter(e => e.settlement_id === s.id).length;
     return `
       <div class="category-row" style="cursor:default">
         <div>
           <div class="cat-name" style="font-size:14.5px">${weekLabel} — ${esc(winnerName)} won (${s.winner_points} to ${s.loser_points})</div>
           <div class="cat-count">${forfeitLine}</div>
+          ${evidenceCount ? `<button class="link-btn" data-view-forfeit-evidence="${s.id}" style="margin-top:4px">View evidence (${evidenceCount})</button>` : ''}
         </div>
       </div>
     `;
@@ -2481,7 +2515,9 @@ function openCreateDareModal() {
   const blindSendBtn = document.getElementById('btn-blind-send');
   if (blindSendBtn) blindSendBtn.onclick = async () => {
     const chosenIntensity = blindIntensitySelect.value;
-    const matches = state.dareLibrary.filter(d => d.category === categorySelect.value && d.intensity === chosenIntensity);
+    const partnerGender = state.partner ? state.partner.gender : null;
+    const matches = state.dareLibrary.filter(d => d.category === categorySelect.value && d.intensity === chosenIntensity
+      && (d.suitable_gender === 'either' || d.suitable_gender === partnerGender));
     if (!matches.length) { showToast(`No library dares at ${INTENSITY_LABELS[chosenIntensity]} for this temptation yet — try a different intensity.`); return; }
     if (!confirm("Nobody will see which one this is except whoever's doing it — not even you. Send it blind?")) return;
     const picked = matches[Math.floor(Math.random() * matches.length)];
@@ -3046,6 +3082,7 @@ function attachMainHandlers() {
   });
 
   $app.querySelectorAll('[data-view-evidence]').forEach(el => el.onclick = () => openEvidenceModal(el.dataset.viewEvidence));
+  $app.querySelectorAll('[data-view-forfeit-evidence]').forEach(el => el.onclick = () => openEvidenceModal(el.dataset.viewForfeitEvidence, 'forfeit'));
 
   $app.querySelectorAll('[data-reward-complete]').forEach(el => el.onclick = async (e) => {
     e.stopPropagation();
@@ -3537,6 +3574,13 @@ function openLibraryForfeitModal(existing) {
               <select id="lf-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${existing && existing.intensity===i ? 'selected' : ''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
             </div>
           </div>
+          <div class="field"><label>Who's this for?</label>
+            <select id="lf-gender">
+              <option value="either" ${!existing || existing.suitable_gender==='either' ? 'selected' : ''}>Either of us</option>
+              <option value="male" ${existing && existing.suitable_gender==='male' ? 'selected' : ''}>Him specifically</option>
+              <option value="female" ${existing && existing.suitable_gender==='female' ? 'selected' : ''}>Her specifically</option>
+            </select>
+          </div>
           <div id="forfeit-error" class="error-text"></div>
           <div class="btn-row">
             <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
@@ -3564,7 +3608,8 @@ function openLibraryForfeitModal(existing) {
       p_teaser: document.getElementById('lf-teaser').value.trim() || null,
       p_instructions: document.getElementById('lf-instructions').value.trim(),
       p_is_intimate: isIntimate,
-      p_intensity: isIntimate ? document.getElementById('lf-intensity').value : null
+      p_intensity: isIntimate ? document.getElementById('lf-intensity').value : null,
+      p_suitable_gender: document.getElementById('lf-gender').value
     };
     const { error } = existing
       ? await sb.rpc('update_library_forfeit', { p_id: existing.id, ...payload })
@@ -3609,6 +3654,13 @@ function openLibraryDareModal(existing, defaultCategory) {
           <div class="field"><label>Intensity</label>
             <select id="ld-intensity">${Object.keys(INTENSITY_LABELS).map(i => `<option value="${i}" ${existing && existing.intensity===i ? 'selected' : ''}>${INTENSITY_LABELS[i]}</option>`).join('')}</select>
           </div>
+          <div class="field"><label>Who's this for?</label>
+            <select id="ld-gender">
+              <option value="either" ${!existing || existing.suitable_gender==='either' ? 'selected' : ''}>Either of us</option>
+              <option value="male" ${existing && existing.suitable_gender==='male' ? 'selected' : ''}>Him specifically</option>
+              <option value="female" ${existing && existing.suitable_gender==='female' ? 'selected' : ''}>Her specifically</option>
+            </select>
+          </div>
           <div class="field"><label>Image (optional — carries through to the actual dare if it's picked)</label>
             ${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : ''}
             <input type="file" id="ld-image" accept="image/*">
@@ -3634,7 +3686,8 @@ function openLibraryDareModal(existing, defaultCategory) {
       p_title: document.getElementById('ld-title').value.trim(),
       p_teaser: document.getElementById('ld-teaser').value.trim() || null,
       p_instructions: document.getElementById('ld-instructions').value.trim(),
-      p_intensity: document.getElementById('ld-intensity').value
+      p_intensity: document.getElementById('ld-intensity').value,
+      p_suitable_gender: document.getElementById('ld-gender').value
     };
     const { data, error } = existing
       ? await sb.rpc('update_library_dare', { p_id: existing.id, ...payload })
@@ -3710,6 +3763,8 @@ async function runDaresCsvImport(rows) {
     const teaser = (row.teaser || '').trim() || null;
     const instructions = (row.instructions || '').trim();
     const intensity = normalize(row.intensity);
+    const rawGender = normalize(row.suitable_gender);
+    const suitableGender = ['male', 'female', 'either'].includes(rawGender) ? rawGender : 'either';
 
     if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
 
@@ -3724,7 +3779,7 @@ async function runDaresCsvImport(rows) {
     }
 
     const { error } = await sb.rpc('add_library_dare', {
-      p_category: category, p_title: title, p_teaser: teaser, p_instructions: instructions, p_intensity: intensity
+      p_category: category, p_title: title, p_teaser: teaser, p_instructions: instructions, p_intensity: intensity, p_suitable_gender: suitableGender
     });
     if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
     added++;
@@ -3782,6 +3837,8 @@ async function runForfeitsCsvImport(rows) {
     const isIntimate = ['true', 'yes', '1'].includes(normalize(row.is_intimate));
     const category = (row.category || '').trim() || null;
     const intensity = normalize(row.intensity) || null;
+    const rawGender = normalize(row.suitable_gender);
+    const suitableGender = ['male', 'female', 'either'].includes(rawGender) ? rawGender : 'either';
 
     if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
 
@@ -3799,7 +3856,7 @@ async function runForfeitsCsvImport(rows) {
 
     const { error } = await sb.rpc('add_library_forfeit', {
       p_category: isIntimate ? category : null, p_title: title, p_teaser: teaser, p_instructions: instructions,
-      p_is_intimate: isIntimate, p_intensity: isIntimate ? intensity : null
+      p_is_intimate: isIntimate, p_intensity: isIntimate ? intensity : null, p_suitable_gender: suitableGender
     });
     if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
     added++;
@@ -3864,8 +3921,11 @@ function openCompleteModal(dareId) {
   });
 }
 
-async function openEvidenceModal(dareId) {
-  const items = state.dareEvidence.filter(e => e.dare_id === dareId);
+async function openEvidenceModal(id, type = 'dare') {
+  const items = type === 'forfeit'
+    ? state.forfeitEvidence.filter(e => e.settlement_id === id)
+    : state.dareEvidence.filter(e => e.dare_id === id);
+  const bucket = type === 'forfeit' ? 'forfeit-evidence' : 'dare-evidence';
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
@@ -3879,7 +3939,7 @@ async function openEvidenceModal(dareId) {
   document.getElementById('modal-cancel').onclick = closeModal;
 
   const urls = await Promise.all(items.map(async (e) => {
-    const { data } = await sb.storage.from('dare-evidence').createSignedUrl(e.path, 3600);
+    const { data } = await sb.storage.from(bucket).createSignedUrl(e.path, 3600);
     return data ? data.signedUrl : null;
   }));
   const box = document.getElementById('evidence-images');
@@ -3890,7 +3950,9 @@ async function openEvidenceModal(dareId) {
 }
 
 function openForfeitPickerModal(settlement) {
+  const myGender = state.profile ? state.profile.gender : null;
   const eligible = state.forfeitLibrary.filter(f => {
+    if (f.suitable_gender !== 'either' && f.suitable_gender !== myGender) return false;
     if (!f.is_intimate) return true;
     const access = state.headingAccess.find(h => h.category === f.category);
     if (!access || access.access === 'off_table' || access.access === 'pending') return false;
