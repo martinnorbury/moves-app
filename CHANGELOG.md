@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.73.0 — forfeits can now nudge toward lower-confidence territory
+
+- The forfeit picker now computes each person's lowest-tier-but-still-
+  open Temptation (never off the table, never still pending) and
+  surfaces a "Suggested for you" option above the existing Everyday/
+  Risqué choice when there's content available there — framed as a
+  gentle nudge, not a requirement, since the full pool stays browsable
+  regardless.
+- Checked against real current data before shipping: correctly
+  identified Teasing & Dirty Talk as the lowest open tier right now, but
+  there's zero forfeit content at that specific category+intensity yet,
+  so the suggestion correctly stays hidden rather than showing empty.
+  This won't actually surface anything meaningful until Grok fills in
+  lower-tier intimate forfeit content — worth having that in mind when
+  briefing it, since the feature and the content need each other here.
+
+## 1.72.0 — Dominance & Surrender now derives a real dom/surrender lean
+
+- Two new specific cards added: "How does taking the lead appeal to
+  you?" and "How does letting go of control appeal to you?" — answered
+  on the same enthusiasm scale as everything else, separate from the
+  general question which stays purely "are you into this at all."
+- The app now computes each person's own lean (dom / surrender /
+  switch / unknown) directly from those two answers, exposed only as
+  the derived direction — never the raw scores — respecting the same
+  privacy boundary as every other partner-facing computed value here.
+  Tested the actual scoring logic with a simulated clear dom-leaning
+  answer set inside a transaction that was then rolled back, confirmed
+  correct, confirmed nothing persisted.
+- Dares in this Temptation can now be tagged dom / surrender / either,
+  in both the admin form (only shown when the Temptation is Dominance &
+  Surrender) and the CSV. The blind draw filters by the recipient's
+  lean automatically — but only once it's confident (switch or unknown
+  leaves everything eligible, so nobody gets needlessly restricted
+  before there's a real signal).
+- Same treatment as gender: added to the live export, the standalone
+  template (with a role-tagged example row), and the Grok scope
+  document, spelled out as `suitable_role`, explicitly scoped to this
+  one Temptation only — meaningless everywhere else.
+
 ## 1.71.0 — gender targeting for dares and forfeits
 
 - Reuses the existing gender field from your profiles (already used for

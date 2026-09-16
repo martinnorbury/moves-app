@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.71.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.73.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.71.0';
+const APP_VERSION = '1.73.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -463,6 +463,7 @@ let state = {
   authMode: 'signin',
   urlInviteCode: null,          // invite code captured from a ?invite= link, if any
   pendingComparisonCards: [],   // refreshed on every load via runEngagementChecks — backs the Kinks tab badge
+  partnerRoleLean: 'unknown',   // dom / surrender / switch / unknown — from get_partner_role_lean(), only meaningful for Dominance & Surrender
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
   passwordRecoveryMode: false,  // set when arriving via a password-reset link — shows a dedicated set-new-password screen
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
@@ -495,7 +496,7 @@ function exportQuestionsCsv() {
 
 function exportDaresCsv() {
   const rows = state.dareLibrary.map(d => ({
-    category: d.category, title: d.title, teaser: d.teaser || '', instructions: d.instructions, intensity: d.intensity, suitable_gender: d.suitable_gender || 'either'
+    category: d.category, title: d.title, teaser: d.teaser || '', instructions: d.instructions, intensity: d.intensity, suitable_gender: d.suitable_gender || 'either', suitable_role: d.suitable_role || 'either'
   }));
   downloadCsv('dares-export.csv', rows);
 }
@@ -639,7 +640,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = [];
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown';
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -661,7 +662,7 @@ async function loadAllData() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(), loadPartnerRoleLean(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
         checkForNewlyRevealedRewards();
@@ -884,6 +885,10 @@ async function loadDareEvidence() {
 async function loadForfeitEvidence() {
   const { data, error } = await sb.from('forfeit_evidence').select('*');
   state.forfeitEvidence = error ? [] : (data || []);
+}
+async function loadPartnerRoleLean() {
+  const { data, error } = await sb.rpc('get_partner_role_lean');
+  state.partnerRoleLean = error ? 'unknown' : (data || 'unknown');
 }
 async function loadWeeklyScore() {
   const { data, error } = await sb.rpc('get_weekly_score');
@@ -2515,9 +2520,12 @@ function openCreateDareModal() {
   const blindSendBtn = document.getElementById('btn-blind-send');
   if (blindSendBtn) blindSendBtn.onclick = async () => {
     const chosenIntensity = blindIntensitySelect.value;
+    const chosenCategory = categorySelect.value;
     const partnerGender = state.partner ? state.partner.gender : null;
-    const matches = state.dareLibrary.filter(d => d.category === categorySelect.value && d.intensity === chosenIntensity
-      && (d.suitable_gender === 'either' || d.suitable_gender === partnerGender));
+    const restrictByRole = chosenCategory === 'Dominance & Surrender' && ['dom', 'surrender'].includes(state.partnerRoleLean);
+    const matches = state.dareLibrary.filter(d => d.category === chosenCategory && d.intensity === chosenIntensity
+      && (d.suitable_gender === 'either' || d.suitable_gender === partnerGender)
+      && (!restrictByRole || d.suitable_role === 'either' || d.suitable_role === state.partnerRoleLean));
     if (!matches.length) { showToast(`No library dares at ${INTENSITY_LABELS[chosenIntensity]} for this temptation yet — try a different intensity.`); return; }
     if (!confirm("Nobody will see which one this is except whoever's doing it — not even you. Send it blind?")) return;
     const picked = matches[Math.floor(Math.random() * matches.length)];
@@ -3661,6 +3669,14 @@ function openLibraryDareModal(existing, defaultCategory) {
               <option value="female" ${existing && existing.suitable_gender==='female' ? 'selected' : ''}>Her specifically</option>
             </select>
           </div>
+          <div id="ld-role-field" class="field" style="display:${(existing ? existing.category : defaultCategory) === 'Dominance & Surrender' ? '' : 'none'}">
+            <label>Which role is this for?</label>
+            <select id="ld-role">
+              <option value="either" ${!existing || existing.suitable_role==='either' ? 'selected' : ''}>Either role</option>
+              <option value="dom" ${existing && existing.suitable_role==='dom' ? 'selected' : ''}>Taking the lead</option>
+              <option value="surrender" ${existing && existing.suitable_role==='surrender' ? 'selected' : ''}>Letting go of control</option>
+            </select>
+          </div>
           <div class="field"><label>Image (optional — carries through to the actual dare if it's picked)</label>
             ${imgUrl ? `<img src="${esc(imgUrl)}" style="width:100%; border-radius:var(--radius-s); margin-bottom:8px;">` : ''}
             <input type="file" id="ld-image" accept="image/*">
@@ -3677,6 +3693,9 @@ function openLibraryDareModal(existing, defaultCategory) {
   `;
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('ld-category').onchange = (e) => {
+    document.getElementById('ld-role-field').style.display = e.target.value === 'Dominance & Surrender' ? '' : 'none';
+  };
 
   document.getElementById('library-dare-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -3687,7 +3706,8 @@ function openLibraryDareModal(existing, defaultCategory) {
       p_teaser: document.getElementById('ld-teaser').value.trim() || null,
       p_instructions: document.getElementById('ld-instructions').value.trim(),
       p_intensity: document.getElementById('ld-intensity').value,
-      p_suitable_gender: document.getElementById('ld-gender').value
+      p_suitable_gender: document.getElementById('ld-gender').value,
+      p_suitable_role: document.getElementById('ld-role').value
     };
     const { data, error } = existing
       ? await sb.rpc('update_library_dare', { p_id: existing.id, ...payload })
@@ -3765,6 +3785,8 @@ async function runDaresCsvImport(rows) {
     const intensity = normalize(row.intensity);
     const rawGender = normalize(row.suitable_gender);
     const suitableGender = ['male', 'female', 'either'].includes(rawGender) ? rawGender : 'either';
+    const rawRole = normalize(row.suitable_role);
+    const suitableRole = ['dom', 'surrender', 'either'].includes(rawRole) ? rawRole : 'either';
 
     if (progressEl) progressEl.textContent = `Importing row ${i + 1} of ${rows.length}…`;
 
@@ -3779,7 +3801,7 @@ async function runDaresCsvImport(rows) {
     }
 
     const { error } = await sb.rpc('add_library_dare', {
-      p_category: category, p_title: title, p_teaser: teaser, p_instructions: instructions, p_intensity: intensity, p_suitable_gender: suitableGender
+      p_category: category, p_title: title, p_teaser: teaser, p_instructions: instructions, p_intensity: intensity, p_suitable_gender: suitableGender, p_suitable_role: suitableRole
     });
     if (error) { skipped++; errors.push(`Row ${lineNum}: ${error.message}`); continue; }
     added++;
@@ -3963,11 +3985,30 @@ function openForfeitPickerModal(settlement) {
   const risque = eligible.filter(f => f.is_intimate);
   const winnerName = state.partner ? state.partner.display_name : 'They';
 
+  // The lowest tier that's still genuinely open (not off the table, not
+  // still pending) — a gentle nudge toward least-confident-but-willing
+  // territory, never toward something already off limits or already a
+  // favourite (no nudge needed there).
+  const openTiers = state.headingAccess.filter(h => TIER_ORDER.includes(h.access));
+  const lowestOpen = openTiers.length
+    ? openTiers.reduce((worst, h) => TIER_ORDER.indexOf(h.access) > TIER_ORDER.indexOf(worst.access) ? h : worst)
+    : null;
+  const suggested = lowestOpen ? risque.filter(f => f.category === lowestOpen.category) : [];
+
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
         <h2>This week goes to ${esc(winnerName)}</h2>
         <p class="hint-text" style="margin-bottom:18px">${settlement.loser_points} to ${settlement.winner_points} — pick your own forfeit. Nobody's choosing this for you. First: which pool are you drawing from?</p>
+        ${suggested.length ? `
+        <div class="category-row" data-choose-pool="suggested" style="cursor:pointer; border:1.5px solid var(--gold); margin-bottom:14px">
+          <div>
+            <div class="cat-name">Suggested for you</div>
+            <div class="cat-count">${suggested.length} in ${esc(lowestOpen.category)} — you're just getting started there, so this nudges gently in that direction</div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+        ` : ''}
         <div class="category-row" data-choose-pool="everyday" style="cursor:pointer">
           <div>
             <div class="cat-name">Everyday</div>
@@ -3989,8 +4030,10 @@ function openForfeitPickerModal(settlement) {
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
   $app.querySelectorAll('[data-choose-pool]').forEach(el => el.onclick = () => {
-    const pool = el.dataset.choosePool === 'everyday' ? everyday : risque;
-    openForfeitPoolModal(settlement, pool, el.dataset.choosePool);
+    const poolKey = el.dataset.choosePool;
+    const pool = poolKey === 'everyday' ? everyday : poolKey === 'suggested' ? suggested : risque;
+    const poolLabel = poolKey === 'everyday' ? 'everyday' : poolKey === 'suggested' ? 'suggested' : 'risque';
+    openForfeitPoolModal(settlement, pool, poolLabel);
   });
 }
 
@@ -3999,7 +4042,7 @@ function openForfeitPoolModal(settlement, pool, poolName) {
   state.modal = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-sheet">
-        <h2>${poolName === 'everyday' ? 'Everyday' : 'Risqué'} pool</h2>
+        <h2>${poolName === 'everyday' ? 'Everyday' : poolName === 'suggested' ? 'Suggested' : 'Risqué'} pool</h2>
         ${pool.length ? `
           <button class="btn btn-gold" id="btn-surprise-forfeit" style="width:100%; margin-bottom:14px">🎲 Surprise me — draw one at random</button>
           <p class="hint-text" style="margin-bottom:10px">Or browse and pick one yourself:</p>
