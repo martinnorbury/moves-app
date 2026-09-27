@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.74.1 — replaced impersonal "partner"/"them" with the actual name, throughout
+
+- Swept the app for user-facing copy that said "your partner," "they,"
+  or "them" where the actual paired partner's name was already known
+  at render time, and substituted it in — the create-dare blind/
+  wishlist hints and confirm dialogs, both "confirmed by partner"
+  completion buttons, the Step 1 wishlist invite, the wishlist
+  add-entry label, and the account-modal preview-onboarding copy.
+  Left the pre-pairing screens (account creation, invite/redeem,
+  "waiting on your partner") generic on purpose, since no partner
+  exists yet at that point to name.
+
+## 1.74.0 — wishlist dares, and the veto/onboarding copy pass
+
+- New: a private "My Wishlist" per person — each partner can jot down
+  things they'd love to receive, tagged by Temptation. Entirely
+  private; the other partner never sees the list itself, only ever a
+  category name via `get_partner_wishlist_categories()` (content never
+  exposed). Reachable from the Account modal any time, and offered
+  once at the end of Step 1 onboarding.
+- `create_dare()` gained a `p_wishlist_draw` option: when set, it draws
+  one random active entry blind from the *recipient's own* wishlist in
+  that category (instead of the shared library), marks the dare
+  `blind_sent` exactly like a library draw, and tags it
+  `from_wishlist = true` for future feedback-loop analysis. The point:
+  the content is guaranteed to be something the recipient genuinely
+  wanted, not a guess — a stronger version of the existing
+  doer-agency rule, not a departure from it.
+- Off-the-table respected end to end: `add_wishlist_entry()` refuses
+  to add to a genuinely closed Temptation server-side, and
+  `create_dare()`'s existing off_table/pending check (unchanged) gates
+  the wishlist draw the same as every other dare source.
+- New "🎁 Draw from their wishlist" option in the create-dare modal,
+  shown only for temptations where the partner actually has entries.
+- Onboarding/veto copy pass, across the welcome screen, the six-
+  Temptations preview, and the pre-app explainer: made explicit,
+  warm (not clinical) language that a genuine no is respected
+  completely and permanently, with nothing pushed and no explanation
+  ever required. Added a companion line to the Forfeits explainer
+  inviting an occasional, fully self-initiated revisit of an area —
+  deliberately kept separate from the veto promise, and worded so it
+  never implies the system itself will resurface a closed answer.
+- Not yet built (raised, not agreed): a periodic, skippable re-ask of
+  one random general question every so often, so answers can drift in
+  either direction over time, not just via self-initiated revisits.
+  Proposed cadence: every ~10 combined dares/forfeits, capped at once
+  a week, general questions only. Holding off until explicitly
+  confirmed, since it would soften the "never asks again" promise
+  above and deserves its own sign-off.
+
 ## 1.73.0 — forfeits can now nudge toward lower-confidence territory
 
 - The forfeit picker now computes each person's lowest-tier-but-still-

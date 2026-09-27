@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.73.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.74.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.73.0';
+const APP_VERSION = '1.74.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -464,6 +464,8 @@ let state = {
   urlInviteCode: null,          // invite code captured from a ?invite= link, if any
   pendingComparisonCards: [],   // refreshed on every load via runEngagementChecks — backs the Kinks tab badge
   partnerRoleLean: 'unknown',   // dom / surrender / switch / unknown — from get_partner_role_lean(), only meaningful for Dominance & Surrender
+  myWishlist: [],                // my own private wishlist entries — from dare_wishlist, own rows only
+  partnerWishlistCategories: [], // which categories the partner has wishlist entries in — content never exposed, from get_partner_wishlist_categories()
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
   passwordRecoveryMode: false,  // set when arriving via a password-reset link — shows a dedicated set-new-password screen
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
@@ -640,7 +642,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown';
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = [];
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -662,7 +664,7 @@ async function loadAllData() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(), loadPartnerRoleLean(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(), loadPartnerRoleLean(), loadMyWishlist(), loadPartnerWishlistCategories(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
         checkForNewlyRevealedRewards();
@@ -890,6 +892,14 @@ async function loadPartnerRoleLean() {
   const { data, error } = await sb.rpc('get_partner_role_lean');
   state.partnerRoleLean = error ? 'unknown' : (data || 'unknown');
 }
+async function loadMyWishlist() {
+  const { data, error } = await sb.from('dare_wishlist').select('*').eq('active', true).order('created_at', { ascending: false });
+  state.myWishlist = error ? [] : (data || []);
+}
+async function loadPartnerWishlistCategories() {
+  const { data, error } = await sb.rpc('get_partner_wishlist_categories');
+  state.partnerWishlistCategories = error ? [] : (data || []).map(r => r.category);
+}
 async function loadWeeklyScore() {
   const { data, error } = await sb.rpc('get_weekly_score');
   state.weeklyScore = error ? [] : (data || []);
@@ -1009,6 +1019,9 @@ function renderWizardIntro() {
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
         It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where we overlap.
       </p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
+        One thing that matters before anything else: if something's genuinely not for you, just say so. That's the end of it — it won't come up again, won't get suggested, and I'll never see it or ask why. This only ever plays in the space we both actually want to be in, nothing more.
+      </p>
       <div class="gauge-track" style="margin-bottom:8px"></div>
       <div class="gauge-row" style="margin-bottom:28px">
         ${GAUGE_ORDER.map(a => `<div class="gauge-stop" style="cursor:default">${GAUGE_ICONS[a]}</div>`).join('')}
@@ -1047,6 +1060,7 @@ function renderTemptationsPreview() {
       <div class="auth-hero">
         <h1>Six things to explore</h1>
         <p>Each of these gets its own general question first, then more specific ones later as you both get further in.</p>
+        <p>However you answer, it's just for finding where we overlap — and if something's a real no, that's respected completely and quietly, no explaining needed to each other.</p>
       </div>
       ${state.categories.map(c => `
         <div class="category-row" style="cursor:default">
@@ -1115,7 +1129,10 @@ function renderAppExplainer() {
         <b style="color:var(--text)">The Heat Meter:</b> a shared bar on Playroom that fills up a little every time we complete a dare together. Fill it past a threshold, and a reward unlocks.
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">Forfeits:</b> each week, whoever's behind on points picks their own — never chosen for them.
+        <b style="color:var(--text)">A genuine no stays a no:</b> anything either of us closes off is gone for good — never suggested, never brought up, never something the other person even sees. Everything the game offers is already something we've both said yes to.
+      </p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
+        <b style="color:var(--text)">Forfeits:</b> each week, whoever's behind on points picks their own — never chosen for them. Worth remembering: nothing here is fixed forever, and nothing's ever asked of you twice — you're always free to go back and see if an area still feels the way it did. A forfeit nearby can be a gentle nudge to check, since a little real experience often shifts things more than imagining it does. And even if a door does open, you're still fully in charge of what comes through it — accept it, counter it, or just let it pass.
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
         <b style="color:var(--text)">Your account:</b> tap your name up top any time to add a photo, change your name, or add your Signal number — that's how we can message each other securely, one tap, while a dare's in play.
@@ -1149,6 +1166,12 @@ function renderStep1Complete() {
         <h1 style="font-size:22px">Step 2: your first dare</h1>
         <p>Next up is actually sending each other a dare. We'll figure out together how that gets suggested to you — for now, head into the app and take a look around.</p>
       </div>
+      <div class="divider"></div>
+      <div class="auth-hero" style="margin-top:0">
+        <h1 style="font-size:20px">While we're here</h1>
+        <p>Want to jot down a few things you'd love ${esc(state.partner ? state.partner.display_name : 'your partner')} to try on you sometime? ${esc(state.partner ? state.partner.display_name : 'They')}'ll never see the list — only ever get one at random, blind, and only for a Temptation you've already said yes to.</p>
+      </div>
+      <button class="btn btn-ghost" id="btn-step1-wishlist" style="width:100%; margin-bottom:14px">Add to my wishlist</button>
       <button class="btn btn-gold" id="btn-step1-continue" style="width:100%">Let's go</button>
     </div>
   `;
@@ -1160,6 +1183,8 @@ function attachStep1CompleteHandlers() {
     render();
     await sb.from('profiles').update({ seen_step1_complete: true }).eq('id', state.session.user.id);
   };
+  const wlBtn = document.getElementById('btn-step1-wishlist');
+  if (wlBtn) wlBtn.onclick = openWishlistModal;
 }
 
 function renderWizard(q, remaining) {
@@ -1618,7 +1643,7 @@ function renderHome(unanswered) {
       <div class="inplay-hero" style="background:linear-gradient(135deg, var(--gold), var(--wine))">
         <div class="inplay-hero-label"><span class="inplay-hero-dot"></span>Waiting On ${esc(state.partner ? state.partner.display_name : 'Them')}</div>
         <div class="inplay-hero-title">${pendingFromMe.length} dare${pendingFromMe.length===1?'':'s'} still to be answered</div>
-        <div class="inplay-hero-sub">Nothing to do — just sitting with them for now.</div>
+        <div class="inplay-hero-sub">Nothing to do — just sitting with ${esc(state.partner ? state.partner.display_name : 'them')} for now.</div>
       </div>
     ` : ''}
     ${!inPlayHtml && !pendingForMe.length && !pendingFromMe.length && !unanswered ? `<div class="empty-state" style="margin-bottom:18px">You're all caught up.</div>` : ''}
@@ -1688,7 +1713,7 @@ function openForfeitDetailModal(settlement) {
           <button type="button" class="btn btn-primary" data-forfeit-modal-action="complete" data-completion-kind="no_proof">Completed</button>
           <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="proof_in_person">Completed — proof shown in person</button>
           <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="proof_sent_externally">Completed — proof sent separately</button>
-          <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="confirmed_by_partner">Completed — confirmed by partner</button>
+          <button type="button" class="btn btn-ghost" data-forfeit-modal-action="complete" data-completion-kind="confirmed_by_partner">Completed — confirmed by ${esc(state.partner ? state.partner.display_name : 'partner')}</button>
         </div>` : ''}
         <button type="button" class="btn btn-ghost" data-forfeit-modal-action="close" style="width:100%">Close</button>
       </div>
@@ -2463,13 +2488,16 @@ function openCreateDareModal() {
         </div>
         <div class="field" style="margin-bottom:14px"><label>Deadline (optional)</label><input type="datetime-local" id="d-blind-deadline"></div>
         <button type="button" class="btn btn-gold" id="btn-blind-send" style="width:100%; margin-bottom:10px">🙈 Blind draw — send it</button>
-        <p class="hint-text" style="margin-bottom:20px">Every dare is drawn blind — nobody sees which one it is except whoever's doing it, not even you. If it's not quite right, they can always counter it once they see it.</p>
+        <p class="hint-text" style="margin-bottom:14px">Every dare is drawn blind — nobody sees which one it is except whoever's doing it, not even you. If it's not quite right, ${esc(state.partner ? state.partner.display_name : 'they')} can always counter it once they see it.</p>
+
+        <button type="button" class="btn btn-ghost" id="btn-wishlist-send" style="width:100%; margin-bottom:10px; display:none">🎁 Draw from ${esc(state.partner ? state.partner.display_name : 'their')}'s wishlist</button>
+        <p class="hint-text" id="wishlist-send-hint" style="margin-bottom:20px; display:none">${esc(state.partner ? state.partner.display_name : 'They')} added things to this temptation's wishlist themselves — this draws one blind, so it's something ${esc(state.partner ? state.partner.display_name : 'they')} genuinely wished for, not a guess.</p>
 
         <div class="divider" style="margin-bottom:16px"></div>
         <button type="button" class="btn btn-ghost" id="btn-write-own" style="margin-bottom:14px">Write my own instead</button>
         <form id="dare-form" class="stack" style="display:none">
           <div class="field"><label>Title</label><input type="text" id="d-title" required></div>
-          <div class="field"><label>Teaser (shown before they reveal it)</label><input type="text" id="d-teaser"></div>
+          <div class="field"><label>Teaser (shown before ${esc(state.partner ? state.partner.display_name : 'they')} reveal it)</label><input type="text" id="d-teaser"></div>
           <div class="field"><label>Full instructions</label><textarea id="d-instructions" required></textarea></div>
           <div class="field"><label>Intensity</label>
             <select id="d-intensity"></select>
@@ -2516,6 +2544,14 @@ function openCreateDareModal() {
     const allowed = VALID_INTENSITIES.slice(0, VALID_INTENSITIES.indexOf(max) + 1);
     blindIntensitySelect.innerHTML = allowed.map(i => `<option value="${i}">${INTENSITY_LABELS[i]}</option>`).join('');
   }
+  function updateWishlistOptionVisibility() {
+    const wlBtn = document.getElementById('btn-wishlist-send');
+    const wlHint = document.getElementById('wishlist-send-hint');
+    if (!wlBtn) return;
+    const show = state.partnerWishlistCategories.includes(categorySelect.value);
+    wlBtn.style.display = show ? '' : 'none';
+    wlHint.style.display = show ? '' : 'none';
+  }
 
   const blindSendBtn = document.getElementById('btn-blind-send');
   if (blindSendBtn) blindSendBtn.onclick = async () => {
@@ -2551,7 +2587,33 @@ function openCreateDareModal() {
     showToast('🙈 Sent blind — you\'ll find out together.');
   };
 
-  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); };
+  categorySelect.onchange = () => { populateIntensityOptions(); populateBlindIntensityOptions(); updateWishlistOptionVisibility(); };
+
+  const wishlistSendBtn = document.getElementById('btn-wishlist-send');
+  if (wishlistSendBtn) wishlistSendBtn.onclick = async () => {
+    if (!confirm(`This draws blind from something ${state.partner ? state.partner.display_name : 'they'} added themselves — you won't know which one until it's done. Send it?`)) return;
+    const deadlineVal = document.getElementById('d-blind-deadline').value;
+    const { error } = await sb.rpc('create_dare', {
+      p_category: categorySelect.value,
+      p_title: '🎁 A wish, granted',
+      p_instructions: '(drawn from their wishlist)',
+      p_teaser: null,
+      p_intensity: blindIntensitySelect.value,
+      p_deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
+      p_requires_confirmation: false,
+      p_reward_text: null,
+      p_reusable: false,
+      p_question_id: null,
+      p_image_path: null,
+      p_blind_sent: true,
+      p_library_dare_id: null,
+      p_wishlist_draw: true
+    });
+    if (error) { showToast(error.message); return; }
+    closeModal();
+    await loadDares();
+    showToast(`🎁 Sent — something ${state.partner ? state.partner.display_name : 'they'} wished for.`);
+  };
   writeOwnBtn.onclick = () => {
     populateIntensityOptions();
     document.getElementById('d-title').value = '';
@@ -2564,6 +2626,7 @@ function openCreateDareModal() {
   };
   populateIntensityOptions();
   populateBlindIntensityOptions();
+  updateWishlistOptionVisibility();
 
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -3356,14 +3419,16 @@ function openAccountModal() {
           <button type="button" class="btn btn-primary" id="btn-save-account">Save</button>
         </div>
         <div class="divider" style="margin:18px 0"></div>
-        <p class="hint-text" style="margin-bottom:10px">Want to re-see the welcome screens and the six questions, exactly as they first appeared? This only resets your own onboarding — your partner's answers, and everything else in the app, stay untouched.</p>
-        <button type="button" class="btn btn-ghost" id="btn-preview-onboarding" style="width:100%">Preview my onboarding again</button>
+        <p class="hint-text" style="margin-bottom:10px">Want to re-see the welcome screens and the six questions, exactly as they first appeared? This only resets your own onboarding — ${esc(state.partner ? state.partner.display_name : "your partner")}'s answers, and everything else in the app, stay untouched.</p>
+        <button type="button" class="btn btn-ghost" id="btn-preview-onboarding" style="width:100%; margin-bottom:14px">Preview my onboarding again</button>
+        <button type="button" class="btn btn-ghost" id="btn-open-wishlist" style="width:100%">My wishlist (${state.myWishlist.length})</button>
       </div>
     </div>
   `;
   render();
   document.getElementById('modal-cancel').onclick = closeModal;
   document.getElementById('btn-change-avatar-inline').onclick = openAvatarModal;
+  document.getElementById('btn-open-wishlist').onclick = openWishlistModal;
   document.getElementById('btn-save-account').onclick = async () => {
     const errEl = document.getElementById('account-error');
     const name = document.getElementById('account-name-input').value.trim();
@@ -3383,13 +3448,73 @@ function openAccountModal() {
   };
   const previewBtn = document.getElementById('btn-preview-onboarding');
   if (previewBtn) previewBtn.onclick = async () => {
-    if (!confirm("This resets your own welcome screens and six general questions so you can see them fresh. It won't touch your partner's data or anything else. Continue?")) return;
+    if (!confirm(`This resets your own welcome screens and six general questions so you can see them fresh. It won't touch ${state.partner ? state.partner.display_name : "your partner"}'s data or anything else. Continue?`)) return;
     const { error } = await sb.rpc('preview_my_onboarding');
     if (error) { showToast(error.message); return; }
     closeModal();
     await loadEverything();
     showToast('Ready — starting your onboarding fresh.');
   };
+}
+
+function openWishlistModal() {
+  const eligibleCats = state.categories.filter(c => {
+    const acc = state.headingAccess.find(h => h.category === c.name);
+    return !acc || acc.access !== 'off_table';
+  });
+  const grouped = {};
+  state.myWishlist.forEach(w => { (grouped[w.category] = grouped[w.category] || []).push(w); });
+
+  state.modal = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>My wishlist</h2>
+        <p class="hint-text" style="margin-bottom:16px">Private to you. ${esc(state.partner ? state.partner.display_name : 'Your partner')} never sees this list — only ever a random one, blind, and only for a temptation that's already open. Write what you'd love to receive, not what you'd do to them.</p>
+        ${eligibleCats.length === 0 ? `<p class="hint-text">Nothing's open to add to yet — answer more questions together first.</p>` : `
+        <div class="field"><label>Temptation</label>
+          <select id="wl-category">${eligibleCats.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>
+        </div>
+        <div class="field" style="margin-bottom:12px"><label>Something you'd love ${esc(state.partner ? state.partner.display_name : 'them')} to try on you</label><textarea id="wl-content" placeholder="Be as specific as you like — this only ever comes back to you."></textarea></div>
+        <div id="wl-error" class="error-text" style="margin-bottom:10px"></div>
+        <button type="button" class="btn btn-primary" id="btn-add-wish" style="width:100%; margin-bottom:18px">Add to my wishlist</button>
+        `}
+        ${state.myWishlist.length ? `
+        <div class="divider" style="margin-bottom:14px"></div>
+        ${Object.keys(grouped).map(cat => `
+          <div style="margin-bottom:14px">
+            <div class="cat-name" style="margin-bottom:6px">${esc(cat)}</div>
+            ${grouped[cat].map(w => `
+              <div class="boundary-row" style="align-items:flex-start">
+                <div style="flex:1; font-size:14px; color:var(--text-dim); padding-right:10px">${esc(w.content)}${w.times_drawn > 0 ? `<div class="hint-text" style="margin-top:2px">Drawn ${w.times_drawn} time${w.times_drawn===1?'':'s'}</div>` : ''}</div>
+                <button type="button" class="link-btn" data-delete-wish="${w.id}" style="color:var(--wine)">Remove</button>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+        ` : ''}
+        <button type="button" class="btn btn-ghost" id="modal-cancel" style="width:100%; margin-top:6px">Close</button>
+      </div>
+    </div>
+  `;
+  render();
+  document.getElementById('modal-cancel').onclick = closeModal;
+  const addBtn = document.getElementById('btn-add-wish');
+  if (addBtn) addBtn.onclick = async () => {
+    const errEl = document.getElementById('wl-error');
+    const category = document.getElementById('wl-category').value;
+    const content = document.getElementById('wl-content').value.trim();
+    if (!content) { errEl.textContent = 'Write something first.'; return; }
+    const { error } = await sb.rpc('add_wishlist_entry', { p_category: category, p_content: content });
+    if (error) { errEl.textContent = error.message; return; }
+    await loadMyWishlist();
+    openWishlistModal();
+  };
+  $app.querySelectorAll('[data-delete-wish]').forEach(el => el.onclick = async () => {
+    const id = el.dataset.deleteWish;
+    await sb.from('dare_wishlist').delete().eq('id', id);
+    await loadMyWishlist();
+    openWishlistModal();
+  });
 }
 
 function openAvatarModal() {
@@ -3905,7 +4030,7 @@ function openCompleteModal(dareId) {
           <button class="btn btn-primary" data-complete-kind="no_proof" data-complete-id="${dareId}">Completed</button>
           <button class="btn btn-ghost" data-complete-kind="proof_in_person" data-complete-id="${dareId}">Completed — proof shown in person</button>
           <button class="btn btn-ghost" data-complete-kind="proof_sent_externally" data-complete-id="${dareId}">Completed — proof sent separately</button>
-          <button class="btn btn-ghost" data-complete-kind="confirmed_by_partner" data-complete-id="${dareId}">Completed — confirmed by partner</button>
+          <button class="btn btn-ghost" data-complete-kind="confirmed_by_partner" data-complete-id="${dareId}">Completed — confirmed by ${esc(state.partner ? state.partner.display_name : 'partner')}</button>
           <button class="link-btn" id="modal-cancel">Cancel</button>
         </div>
       </div>
