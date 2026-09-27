@@ -16,50 +16,50 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <style>
   :root{
-    /* Neutral default, used before a theme (gender) is chosen — auth/signup only */
-    --bg:#14100F;
-    --surface:#221A18;
-    --surface-raised:#2C221F;
-    --line:#3D302B;
-    --wine:#B8483F;
-    --wine-bright:#D65A50;
-    --gold:#D9A857;
-    --text:#F3E9E0;
-    --text-dim:#B9A99C;
-    --text-faint:#7D6D63;
+    /* Falls back to night mode until the clock-based check runs (applyDayNightMode, called immediately at load) */
+    --bg:#3B1A2A;
+    --surface:#4D2238;
+    --surface-raised:#5A2A42;
+    --line:#6B3350;
+    --wine:#FF5C8D;
+    --wine-bright:#FF7CA3;
+    --gold:#E0B563;
+    --text:#FDEEF5;
+    --text-dim:#F0C9DA;
+    --text-faint:#C98BA6;
     --good:#8FB37F;
     --radius-s:6px;
     --radius-m:10px;
     --serif: 'Fraunces', Georgia, serif;
     --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
-  /* Deep, rose-red theme */
-  body.theme-female{
-    --bg:#180F12;
-    --surface:#261A1E;
-    --surface-raised:#302026;
-    --line:#443036;
-    --wine:#E0567F;
-    --wine-bright:#F0708F;
-    --gold:#D9A857;
-    --text:#F5E6EA;
-    --text-dim:#C2A3AC;
-    --text-faint:#8A6D75;
+  /* Intimate, after-dark — deep plum ground, same pink/gold accents as day */
+  body.mode-night{
+    --bg:#3B1A2A;
+    --surface:#4D2238;
+    --surface-raised:#5A2A42;
+    --line:#6B3350;
+    --wine:#FF5C8D;
+    --wine-bright:#FF7CA3;
+    --gold:#E0B563;
+    --text:#FDEEF5;
+    --text-dim:#F0C9DA;
+    --text-faint:#C98BA6;
     --good:#8FB37F;
   }
-  /* Deep, cool-blue theme */
-  body.theme-male{
-    --bg:#0E1218;
-    --surface:#1A222C;
-    --surface-raised:#212B37;
-    --line:#2E3B48;
-    --wine:#5B8FC7;
-    --wine-bright:#75A6DA;
-    --gold:#D9A857;
-    --text:#E8EEF5;
-    --text-dim:#9FB0C0;
-    --text-faint:#66788A;
-    --good:#8FB37F;
+  /* Bright, playful, sun-lit — warm cream ground, same pink/gold accents as night */
+  body.mode-day{
+    --bg:#FFF1ED;
+    --surface:#FFFFFF;
+    --surface-raised:#FFFFFF;
+    --line:#F2C7CE;
+    --wine:#FF5C8D;
+    --wine-bright:#D6336C;
+    --gold:#D98D2B;
+    --text:#3A1B26;
+    --text-dim:#7A5568;
+    --text-faint:#A9808F;
+    --good:#6B9459;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.74.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.75.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.74.1';
+const APP_VERSION = '1.75.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -591,6 +591,13 @@ function fmtCountdown(iso) {
    BOOTSTRAP
    ========================================================================== */
 async function boot() {
+  applyDayNightMode();
+  // The boundary can be crossed while the app just sits open (nobody
+  // reloads at exactly 6am or 7pm) — recheck periodically, and on
+  // return-to-tab, rather than only at load.
+  setInterval(applyDayNightMode, 10 * 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') applyDayNightMode(); });
+
   const urlParams = new URLSearchParams(window.location.search);
   const inviteFromUrl = urlParams.get('invite');
   if (inviteFromUrl) { state.urlInviteCode = inviteFromUrl.trim().toUpperCase(); state.authMode = 'signup'; }
@@ -647,19 +654,23 @@ function resetState() {
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
   state.notifications = []; state.tab = 'home';
-  applyTheme(null);
 }
 
-function applyTheme(gender) {
-  document.body.classList.remove('theme-male', 'theme-female');
-  if (gender === 'male') document.body.classList.add('theme-male');
-  if (gender === 'female') document.body.classList.add('theme-female');
+// Day/night is purely a clock check now — nothing about it depends on
+// login state or profile, so it's safe to call before either exists.
+function computeDayOrNight() {
+  const hour = new Date().getHours();
+  return (hour >= 6 && hour < 19) ? 'day' : 'night';
+}
+function applyDayNightMode() {
+  const mode = computeDayOrNight();
+  document.body.classList.toggle('mode-day', mode === 'day');
+  document.body.classList.toggle('mode-night', mode === 'night');
 }
 
 async function loadAllData() {
   try {
     await loadProfile();
-    applyTheme(state.profile ? state.profile.gender : null);
     if (state.profile) {
       await loadCouple();
       if (state.coupleId) {
@@ -1386,14 +1397,15 @@ function attachAuthHandlers() {
 function renderCreateProfile() {
   return `
     <div class="center-screen">
-      <div class="auth-hero"><h1>Almost there</h1><p>What should your partner see you as?</p></div>
+      <div class="auth-hero"><h1>Almost there</h1><p>A couple of details before we start.</p></div>
       <form id="profile-form" class="stack">
         <div class="field"><input type="text" id="profile-name" placeholder="Your name" required></div>
-        <div class="field"><label>Theme</label>
+        <div class="field"><label>Your gender</label>
           <select id="profile-gender">
-            <option value="female">Warmer theme — deep rose and gold</option>
-            <option value="male">Cooler theme — deep blue and gold</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
           </select>
+          <p class="hint-text" style="margin-top:4px">Only used to match content that's written with a particular gender in mind — never shown to your partner, never a factor in anything else.</p>
         </div>
         <button type="submit" class="btn btn-primary">Continue</button>
       </form>
@@ -1413,10 +1425,10 @@ function attachCreateProfileHandlers() {
 function renderChooseTheme() {
   return `
     <div class="center-screen">
-      <div class="auth-hero"><h1>Pick a theme</h1><p>You can't change this later without asking me to — but it's just a colour, nothing else depends on it.</p></div>
+      <div class="auth-hero"><h1>One more thing</h1><p>Your gender — only used to match content that's written with a particular gender in mind. Never shown to your partner.</p></div>
       <div class="stack">
-        <button class="btn btn-primary" data-pick-gender="female">Warmer theme — deep rose and gold</button>
-        <button class="btn btn-primary" data-pick-gender="male">Cooler theme — deep blue and gold</button>
+        <button class="btn btn-primary" data-pick-gender="female">Female</button>
+        <button class="btn btn-primary" data-pick-gender="male">Male</button>
       </div>
     </div>
   `;
@@ -3411,6 +3423,13 @@ function openAccountModal() {
           <button class="link-btn" id="btn-change-avatar-inline">${state.avatarUrl ? 'Change photo' : 'Add a photo'}</button>
         </div>
         <div class="field" style="margin-bottom:14px"><label>Your name</label><input type="text" id="account-name-input" value="${esc(currentName)}"></div>
+        <div class="field" style="margin-bottom:14px"><label>Your gender</label>
+          <select id="account-gender-input">
+            <option value="female" ${state.profile && state.profile.gender === 'female' ? 'selected' : ''}>Female</option>
+            <option value="male" ${state.profile && state.profile.gender === 'male' ? 'selected' : ''}>Male</option>
+          </select>
+          <p class="hint-text" style="margin-top:4px">Only used to match content that's written with a particular gender in mind — never shown to ${esc(state.partner ? state.partner.display_name : 'your partner')}, never a factor in colour.</p>
+        </div>
         <div class="field"><label>Your Signal number</label><input type="tel" id="signal-number-input" value="${esc(currentPhone)}" placeholder="+447700900000"></div>
         <p class="hint-text" style="margin-top:6px">Lets ${esc(state.partner ? state.partner.display_name : 'your partner')} message you on Signal with one tap during an in-play dare. Include the country code.</p>
         <div id="account-error" class="error-text" style="margin-top:8px"></div>
@@ -3432,15 +3451,17 @@ function openAccountModal() {
   document.getElementById('btn-save-account').onclick = async () => {
     const errEl = document.getElementById('account-error');
     const name = document.getElementById('account-name-input').value.trim();
+    const gender = document.getElementById('account-gender-input').value;
     const phone = document.getElementById('signal-number-input').value.trim();
     if (!name) { errEl.textContent = 'Name can\'t be empty.'; return; }
     if (phone && !/^\+[1-9]\d{6,14}$/.test(phone)) {
       errEl.textContent = 'Enter the Signal number in international format, starting with + and the country code.';
       return;
     }
-    const { error } = await sb.from('profiles').update({ display_name: name, signal_phone: phone || null }).eq('id', state.session.user.id);
+    const { error } = await sb.from('profiles').update({ display_name: name, gender, signal_phone: phone || null }).eq('id', state.session.user.id);
     if (error) { errEl.textContent = error.message; return; }
     state.profile.display_name = name;
+    state.profile.gender = gender;
     state.profile.signal_phone = phone || null;
     closeModal();
     render();

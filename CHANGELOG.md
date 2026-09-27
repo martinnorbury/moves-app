@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.75.1 — self-serve gender field in Account
+
+- Added "Your gender" to the Account modal, next to name and Signal
+  number, so each person can set or change it themselves at any time —
+  not just once, at signup. Same honest label and hint as the signup
+  screen: used only to match gendered content, never shown to your
+  partner, never a factor in colour (that's automatic day/night now,
+  see 1.75.0).
+- Reasoning: this field used to double as a color preference, so it
+  didn't much matter what value was stored. Now that it's decoupled
+  and genuinely drives content matching, it needs to be something each
+  person can correct themselves rather than something only fixable by
+  editing the database directly — worth having even at two-person
+  scale, and a prerequisite if this ever grows beyond it.
+
+## 1.75.0 — automatic day/night mode, replacing the manual theme picker
+
+- Removed the manual "theme" picker entirely. The app no longer lets
+  you choose a color scheme — it's decided for you, automatically, by
+  the clock: Day mode from 6am–7pm, Night mode the rest of the time.
+  Checked again every 10 minutes and whenever you come back to the tab,
+  so it never gets stuck in the wrong mode if the app is left open
+  across the boundary.
+- Night mode is the deep-plum, pink/gold palette approved last round —
+  intimate, classy, after-dark. Day mode is a new warm-cream, same
+  pink/gold accent family — bright, playful, sun-lit, for daytime
+  flirting. Both share the same wine/gold accent hues for brand
+  continuity; only the ground and text flip.
+- The old "Theme" dropdown asked a color-preference question dressed
+  up as a setting. What it was actually storing — each person's
+  gender — has a real, separate job: matching dare/forfeit content
+  that's written with a particular gender in mind. Relabeled the
+  signup field and the one-time picker honestly as "Your gender," and
+  said plainly what it's used for (content matching only, never shown
+  to your partner, never a factor in color).
+- Note for you, not yet acted on: both your account and Jacki's
+  currently have this field set to "female" — worth double-checking
+  whether that's accurate for you now that it's decoupled from color,
+  since it now feeds content matching on its own.
+
 ## 1.74.1 — replaced impersonal "partner"/"them" with the actual name, throughout
 
 - Swept the app for user-facing copy that said "your partner," "they,"
