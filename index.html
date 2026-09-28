@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.81.2)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.82.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.81.2';
+const APP_VERSION = '1.82.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -403,7 +403,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $app = document.getElementById('app');
 
 const ANSWER_LABELS = {
-  full_spark: 'All In', warming_up: 'Keen', blushing_yes: 'Curious', just_for_you: "If You're Up For It", cold_card: 'Not For Me'
+  full_spark: 'All in', warming_up: 'Keen', blushing_yes: 'Curious', just_for_you: 'If you want it', cold_card: 'Not for me'
 };
 const ANSWER_ORDER = ['full_spark', 'warming_up', 'blushing_yes', 'just_for_you', 'cold_card'];
 const GAUGE_ORDER = ['cold_card', 'just_for_you', 'blushing_yes', 'warming_up', 'full_spark'];
@@ -988,33 +988,33 @@ const NARRATIVE_DEFAULTS = {
   arrival_beat_1_prompt: "Curious, or cautious?",
   arrival_beat_1_option_a: "Curious",
   arrival_beat_1_option_b: "Cautious",
-  arrival_beat_1_response: "Either way — something's coming.",
+  arrival_beat_1_response: "",
   arrival_beat_2: "This is a space just for the two of us. Nobody else ever sees it, not even a little.",
-  arrival_beat_3: "A little game, just for the two of us. You're going to like this.",
+  arrival_beat_3: "",
   arrival_beat_4: "Ready to actually look?",
   arrival_beat_4_cta: "Let's go",
-  wizard_intro_subtitle: "(yes — as in foreplay. That's rather the idea.)",
-  wizard_intro_para1: "You got an email. It didn't say much. You clicked it anyway — that was rather the point.",
-  wizard_intro_para2: "Here's what it actually is: a private game, just for us. It learns where we both stand — what excites us, what doesn't, how far is fun rather than too far — then plays accordingly. Nothing forced. Nothing either of us doesn't want.",
-  wizard_intro_para3: "It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where we overlap.",
-  wizard_intro_para4: "One thing that matters before anything else: if something's genuinely not for you, just say so. That's the end of it — it won't come up again, won't get suggested, and I'll never see it or ask why. This only ever plays in the space we both actually want to be in, nothing more.",
-  wizard_intro_para5: "Once we've both answered, everything opens up — dares tailored to exactly where we are, together.",
+  wizard_intro_subtitle: "The slow texts were the start. This is the rest.",
+  wizard_intro_para1: "Six short questions. One theme each. You on your side, me on mine. The game only plays where we both said yes.",
+  wizard_intro_para2: "If something is a hard no, mark it. I never see that answer. I never ask why.",
+  wizard_intro_para3: "When you are ready — first six.",
+  wizard_intro_para4: "",
+  wizard_intro_para5: "",
   wizard_intro_cta: "Let's begin →",
   temptations_preview_title: "Six things to explore",
-  temptations_preview_para1: "Each of these gets its own general question first, then more specific ones later as you both get further in.",
-  temptations_preview_para2: "However you answer, it's just for finding where we overlap — and if something's a real no, that's respected completely and quietly, no explaining needed to each other.",
+  temptations_preview_para1: "One general question each. More specific later, if we both want that.",
+  temptations_preview_para2: "",
   temptations_preview_cta: "Let's begin →",
+  partner_teaser_title: "{{partner}} has already answered.",
   partner_teaser_body: "Answer the same {{count}} questions. Your answers merge into one shared report — nobody sees the other's individual answers, only the joint result.",
-  partner_teaser_privacy_title: "Your answers stay private",
-  partner_teaser_privacy_body: "{{partner}} only ever sees the joint result once you've both answered, never your individual answers.",
+  partner_teaser_hint: "These are {{partner}}'s answers, shuffled — which one belongs to which question stays hidden until you've answered too.",
   partner_teaser_cta: "Let's start",
-  app_explainer_title: "One more thing before we're in",
-  app_explainer_subtitle: "The quick version — where everything lives, and how a dare actually works.",
-  app_explainer_dare_text: "one of us picks a Temptation and an intensity, then sends it blind — neither of us sees which specific dare it is until it's actually done, or writes one from scratch instead. The other accepts, declines, or counters it, always their call. Complete it, and points land.",
-  app_explainer_heat_text: "a shared bar on Playroom that fills up a little every time we complete a dare together. Fill it past a threshold, and a reward unlocks.",
-  app_explainer_no_text: "anything either of us closes off is gone for good — never suggested, never brought up, never something the other person even sees. Everything the game offers is already something we've both said yes to.",
-  app_explainer_forfeits_text: "each week, whoever's behind on points picks their own — never chosen for them. Worth remembering: nothing here is fixed forever, and nothing's ever asked of you twice — you're always free to go back and see if an area still feels the way it did. A forfeit nearby can be a gentle nudge to check, since a little real experience often shifts things more than imagining it does. And even if a door does open, you're still fully in charge of what comes through it — accept it, counter it, or just let it pass.",
-  app_explainer_account_text: "tap your name up top any time to add a photo, change your name, or add your Signal number — that's how we can message each other securely, one tap, while a dare's in play.",
+  app_explainer_title: "How a dare works",
+  app_explainer_subtitle: "The quick version.",
+  app_explainer_dare_text: "One of us picks a theme we both opened and how warm. The exact dare stays hidden until it is done. Accept it, change it, or pass — always your call.",
+  app_explainer_heat_text: "Playroom is home. A shared bar fills when we finish a dare.",
+  app_explainer_no_text: "",
+  app_explainer_forfeits_text: "",
+  app_explainer_account_text: "",
   app_explainer_cta: "Into the app →",
   step1_title: "Step 1 complete 🎉",
   step1_subtitle: "You've both answered the general question for every temptation. Here's where that leaves you.",
@@ -1154,23 +1154,29 @@ function renderWizardIntro() {
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
         ${esc(nc('wizard_intro_para3'))}
       </p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
-        ${esc(nc('wizard_intro_para4'))}
-      </p>
-      <div class="gauge-track" style="margin-bottom:8px"></div>
-      <div class="gauge-row" style="margin-bottom:28px">
-        ${GAUGE_ORDER.map(a => `<div class="gauge-stop" style="cursor:default">${GAUGE_ICONS[a]}</div>`).join('')}
-      </div>
-      <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:28px">
-        ${esc(nc('wizard_intro_para5'))}
-      </p>
-      <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%">${esc(nc('wizard_intro_cta'))}</button>
+      ${nc('wizard_intro_para4') ? `<p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">${esc(nc('wizard_intro_para4'))}</p>` : ''}
+      ${nc('wizard_intro_para5') ? `<p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:28px">${esc(nc('wizard_intro_para5'))}</p>` : ''}
+      <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%; margin-top:8px">${esc(nc('wizard_intro_cta'))}</button>
     </div>
   `;
 }
 function attachWizardIntroHandlers() {
   const step1Btn = document.getElementById('btn-wizard-intro-start');
-  if (step1Btn) step1Btn.onclick = () => { state.wizardIntroStep = 2; render(); };
+  if (step1Btn) step1Btn.onclick = async () => {
+    // Partner's already answered — don't show both the six-theme preview
+    // AND the "they've already answered" teaser, that's two essays where
+    // one will do. Skip straight past the preview to the teaser gate,
+    // which render() checks right after seen_wizard_intro.
+    if (state.partnerTeaser.length > 0 && !state.viewedTeaser) {
+      state.profile.seen_wizard_intro = true;
+      state.wizardIntroStep = 1;
+      render();
+      await sb.from('profiles').update({ seen_wizard_intro: true }).eq('id', state.session.user.id);
+      return;
+    }
+    state.wizardIntroStep = 2;
+    render();
+  };
 
   const step2Btn = document.getElementById('btn-temptations-preview-start');
   if (step2Btn) step2Btn.onclick = async () => {
@@ -1195,8 +1201,8 @@ function renderTemptationsPreview() {
       <div class="auth-hero">
         <h1>${esc(nc('temptations_preview_title'))}</h1>
       </div>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:14px">${esc(nc('temptations_preview_para1'))}</p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('temptations_preview_para2'))}</p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('temptations_preview_para1'))}</p>
+      ${nc('temptations_preview_para2') ? `<p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('temptations_preview_para2'))}</p>` : ''}
       ${state.categories.map(c => `
         <div class="category-row" style="cursor:default">
           <div>
@@ -1216,7 +1222,7 @@ function renderPartnerTeaser() {
   return `
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
-        <h1>${esc(partnerName)} already started and is waiting for you</h1>
+        <h1>${esc(ncr('partner_teaser_title', { partner: partnerName }))}</h1>
       </div>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(ncr('partner_teaser_body', { count: total }))}</p>
       <div class="teaser-grid">
@@ -1227,11 +1233,7 @@ function renderPartnerTeaser() {
           <div class="teaser-legend-item"><span class="teaser-legend-swatch" style="background:${{full_spark:'#C24C63',warming_up:'#D9A65C',blushing_yes:'#A8A196',just_for_you:'#7FAAC7',cold_card:'#3D6690'}[a]}"></span>${ANSWER_LABELS[a]}</div>
         `).join('')}
       </div>
-      <p class="hint-text" style="margin-top:-10px; margin-bottom:20px">These are ${esc(partnerName)}'s answers, shuffled — which one belongs to which question stays hidden until you've answered too.</p>
-      <div class="privacy-note">
-        <div class="title">${esc(nc('partner_teaser_privacy_title'))}</div>
-        <div class="body">${esc(ncr('partner_teaser_privacy_body', { partner: partnerName }))}</div>
-      </div>
+      <p class="hint-text" style="margin-bottom:20px">${esc(ncr('partner_teaser_hint', { partner: partnerName }))}</p>
       <button class="btn btn-gold" id="btn-teaser-start" style="width:100%">${esc(nc('partner_teaser_cta'))}</button>
     </div>
   `;
@@ -1246,34 +1248,19 @@ function renderAppExplainer() {
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
         <h1>${esc(nc('app_explainer_title'))}</h1>
-        <p>${esc(nc('app_explainer_subtitle'))}</p>
+        ${nc('app_explainer_subtitle') ? `<p>${esc(nc('app_explainer_subtitle'))}</p>` : ''}
       </div>
 
-      <div class="category-row" style="cursor:default"><div><div class="cat-name">Playroom</div><div class="cat-count">Home base — what's happening right now, and our scores.</div></div></div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('app_explainer_dare_text'))}</p>
+
+      <div class="category-row" style="cursor:default"><div><div class="cat-name">Playroom</div><div class="cat-count">${esc(nc('app_explainer_heat_text'))}</div></div></div>
       <div class="category-row" style="cursor:default"><div><div class="cat-name">Kinks</div><div class="cat-count">Where our answers live, and how we compare, area by area.</div></div></div>
-      <div class="category-row" style="cursor:default"><div><div class="cat-name">Dares</div><div class="cat-count">The actual game — dares sent, waiting on us, and done.</div></div></div>
-      <div class="category-row" style="cursor:default"><div><div class="cat-name">Rewards</div><div class="cat-count">What unlocks together as we go.</div></div></div>
-      <div class="category-row" style="cursor:default"><div><div class="cat-name">History</div><div class="cat-count">A running record of everything.</div></div></div>
 
-      <div class="divider" style="margin:24px 0"></div>
+      ${nc('app_explainer_no_text') ? `<p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-top:20px">${esc(nc('app_explainer_no_text'))}</p>` : ''}
+      ${nc('app_explainer_forfeits_text') ? `<p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-top:16px">${esc(nc('app_explainer_forfeits_text'))}</p>` : ''}
+      ${nc('app_explainer_account_text') ? `<p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-top:16px">${esc(nc('app_explainer_account_text'))}</p>` : ''}
 
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">How a dare actually works:</b> ${esc(nc('app_explainer_dare_text'))}
-      </p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">The Heat Meter:</b> ${esc(nc('app_explainer_heat_text'))}
-      </p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">A genuine no stays a no:</b> ${esc(nc('app_explainer_no_text'))}
-      </p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">Forfeits:</b> ${esc(nc('app_explainer_forfeits_text'))}
-      </p>
-      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
-        <b style="color:var(--text)">Your account:</b> ${esc(nc('app_explainer_account_text'))}
-      </p>
-
-      <button class="btn btn-gold" id="btn-app-explainer-done" style="width:100%">${esc(nc('app_explainer_cta'))}</button>
+      <button class="btn btn-gold" id="btn-app-explainer-done" style="width:100%; margin-top:28px">${esc(nc('app_explainer_cta'))}</button>
     </div>
   `;
 }
@@ -1556,7 +1543,7 @@ function attachCreateProfileHandlers() {
 function renderChooseTheme() {
   return `
     <div class="center-screen">
-      <div class="auth-hero"><h1>One more thing</h1><p>Your gender — only used to match content that's written with a particular gender in mind. Never shown to your partner.</p></div>
+      <div class="auth-hero"><h1>Your gender</h1><p>Only used to match content that's written with a particular gender in mind. Never shown to your partner.</p></div>
       <div class="stack">
         <button class="btn btn-primary" data-pick-gender="female">Female</button>
         <button class="btn btn-primary" data-pick-gender="male">Male</button>
@@ -1694,7 +1681,7 @@ function renderArrivalSequence() {
   } else if (stage === 1) {
     body = `
       <p class="hint-text" style="font-size:16px; line-height:1.6; color:var(--text)">${esc(nc('arrival_beat_1_prompt'))}</p>
-      ${state.arrivalTapped ? `<p class="hint-text" style="margin-top:14px">${esc(nc('arrival_beat_1_response'))}</p>` : `
+      ${state.arrivalTapped ? (nc('arrival_beat_1_response') ? `<p class="hint-text" style="margin-top:14px">${esc(nc('arrival_beat_1_response'))}</p>` : '') : `
       <div class="btn-row" style="margin-top:16px">
         <button type="button" class="btn btn-ghost" id="btn-arrival-tap-a" style="flex:1">${esc(nc('arrival_beat_1_option_a'))}</button>
         <button type="button" class="btn btn-ghost" id="btn-arrival-tap-b" style="flex:1">${esc(nc('arrival_beat_1_option_b'))}</button>
@@ -2367,33 +2354,33 @@ const NARRATIVE_FIELDS = [
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_prompt', label: 'Beat 2 — prompt' },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_option_a', label: 'Beat 2 — option A' },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_option_b', label: 'Beat 2 — option B' },
-  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_response', label: 'Beat 2 — response after tapping' },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_response', label: 'Beat 2 — response after tapping — leave blank to hide' },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_2', label: 'Beat 3', multiline: true },
-  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_3', label: 'Beat 4', multiline: true },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_3', label: 'Beat 4 — currently skipped entirely (the app jumps straight past this stage; ask if you want it back)', multiline: true },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_4', label: 'Beat 5', multiline: true },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_4_cta', label: 'Beat 5 — button text' },
   { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_subtitle', label: 'Subtitle, under the title' },
   { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para1', label: 'Paragraph 1', multiline: true },
   { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para2', label: 'Paragraph 2', multiline: true },
   { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para3', label: 'Paragraph 3', multiline: true },
-  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para4', label: 'Paragraph 4', multiline: true },
-  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para5', label: 'Paragraph 5', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para4', label: 'Paragraph 4 — leave blank to hide', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para5', label: 'Paragraph 5 — leave blank to hide', multiline: true },
   { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_cta', label: 'Button text' },
   { group: 'Six Temptations preview', key: 'temptations_preview_title', label: 'Title' },
   { group: 'Six Temptations preview', key: 'temptations_preview_para1', label: 'Paragraph 1', multiline: true },
-  { group: 'Six Temptations preview', key: 'temptations_preview_para2', label: 'Paragraph 2', multiline: true },
+  { group: 'Six Temptations preview', key: 'temptations_preview_para2', label: 'Paragraph 2 — leave blank to hide', multiline: true },
   { group: 'Six Temptations preview', key: 'temptations_preview_cta', label: 'Button text' },
+  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_title', label: 'Title — use {{partner}} for their name' },
   { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_body', label: 'Body — use {{count}} for the question count', multiline: true },
-  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_privacy_title', label: 'Privacy note — title' },
-  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_privacy_body', label: 'Privacy note — body — use {{partner}} for their name', multiline: true },
+  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_hint', label: 'Hint line, above the button — use {{partner}} for their name', multiline: true },
   { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_cta', label: 'Button text' },
   { group: 'App explainer (how everything works)', key: 'app_explainer_title', label: 'Title' },
-  { group: 'App explainer (how everything works)', key: 'app_explainer_subtitle', label: 'Subtitle' },
-  { group: 'App explainer (how everything works)', key: 'app_explainer_dare_text', label: 'How a dare works — text after the bold lead-in', multiline: true },
-  { group: 'App explainer (how everything works)', key: 'app_explainer_heat_text', label: 'The Heat Meter — text after the bold lead-in', multiline: true },
-  { group: 'App explainer (how everything works)', key: 'app_explainer_no_text', label: 'A genuine no stays a no — text after the bold lead-in', multiline: true },
-  { group: 'App explainer (how everything works)', key: 'app_explainer_forfeits_text', label: 'Forfeits — text after the bold lead-in', multiline: true },
-  { group: 'App explainer (how everything works)', key: 'app_explainer_account_text', label: 'Your account — text after the bold lead-in', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_subtitle', label: 'Subtitle — leave blank to hide' },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_dare_text', label: 'How a dare works — opening paragraph', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_heat_text', label: 'Playroom caption, under the Playroom row', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_no_text', label: 'Extra paragraph — leave blank to hide', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_forfeits_text', label: 'Extra paragraph — leave blank to hide', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_account_text', label: 'Extra paragraph — leave blank to hide', multiline: true },
   { group: 'App explainer (how everything works)', key: 'app_explainer_cta', label: 'Button text' },
   { group: 'Step 1 complete', key: 'step1_title', label: 'Title' },
   { group: 'Step 1 complete', key: 'step1_subtitle', label: 'Subtitle' },

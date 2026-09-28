@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.82.0 — trimmed the invitee path: fewer essays, one privacy mention, no manual
+
+Per your onboarding-pass notes — shortens the whole tease-to-Playroom path without touching pairing, auth, gender, the wizard questions, the match report, or Playroom itself.
+
+- **Arrival sequence**: beat 3 ("A little game, just for the two of us...") is now skipped entirely — the app jumps straight from beat 2 to beat 4, server-side, so nobody waits 12 hours for a card that isn't there. Beat 2's tap response ("Either way — something's coming.") is now blank and hidden by default too. Both are still there in the narrative editor if you want either back — just fill the field back in.
+- **Welcome screen**: rewritten to three short lines instead of five paragraphs, the foreplay joke is gone from the subtitle, and the five snowflake-to-heart icons are gone from this screen (they still appear where they're actually functional — on the real questions).
+- **Six things to explore / partner-already-answered**: these no longer both show. If she's opening this after you've already answered, she goes straight to "already answered" and skips the six-theme preview — one screen, not two.
+- **Partner-already-answered screen**: headline shortened to "[name] has already answered.", and the duplicate privacy mention (a full private-note card underneath a sentence that already said the same thing) is down to one sentence.
+- **App explainer**: renamed "How a dare works", cut from five bold-lead-in paragraphs plus a five-room caption list down to three facts — how a dare works, what Playroom is, what Kinks is. Forfeits, Signal, and History are unmentioned here (they're still fully there in the app once she's in — just not part of the gate before she's even seen a dare).
+- **Scale words**: unified to one set everywhere a temptation answer is shown — Not for me / If you want it / Curious / Keen / All in — replacing "If You're Up For It" / "Not For Me" on the partner-teaser legend, which had drifted from the wording used on the actual questions.
+- **Gender screen**: heading renamed from "One more thing" (which collided with the old app-explainer title) to "Your gender".
+- All new/changed copy lives in the narrative editor as usual — nothing here needed a code change to adjust later, only to build the skip-logic and empty-field handling in the first place.
+
 ## 1.81.2 — fixed narrative edits reverting mid-edit, and saving bouncing you out
 
 - Root cause of the reverting: the app pulls fresh data in the
