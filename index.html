@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.81.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.81.2)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.81.1';
+const APP_VERSION = '1.81.2';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -757,6 +757,13 @@ async function silentRefresh() {
   // entirely while one's open; it'll catch up on the next trigger once
   // it closes.
   if (state.modal) return;
+  // Same problem as a modal, different shape: a background render while a
+  // narrative field is mid-edit replaces the whole screen's HTML, and with
+  // it, whatever you'd typed but not yet saved — the new DOM comes back
+  // from nc()/state.narrativeContent, which still holds the old value.
+  // Skip entirely while a narrative page is open; it'll catch up once you
+  // back out to the page list.
+  if (state.narrativeEditorGroup) return;
   await loadAllData();
   render();
   if (isOnboardingComplete()) checkForCompletionReveal();
@@ -2502,7 +2509,11 @@ function attachNarrativeEditorHandlers() {
     }
     saveBtn.disabled = false;
     showToast('Narrative updated.');
-    state.narrativeEditorGroup = null;
+    // Stay on this page rather than bouncing back to the page list —
+    // editing several fields on one screen is one tap into it, not one
+    // tap per field, and the "back to page list" row is right there
+    // whenever you're actually done with this page. (render() already
+    // re-attaches this and every other handler via attachMainHandlers().)
     render();
   };
 }

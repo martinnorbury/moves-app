@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.81.2 — fixed narrative edits reverting mid-edit, and saving bouncing you out
+
+- Root cause of the reverting: the app pulls fresh data in the
+  background every 45 seconds (and whenever you switch back to the
+  tab), and that background refresh replaces the whole screen's HTML
+  — including the narrative editor, rebuilt from the last *saved*
+  value. Anything typed but not yet saved was silently overwritten.
+  There was already a matching guard for this exact problem when a
+  modal's open; the narrative editor just didn't have one. Fixed by
+  skipping the background refresh entirely while a narrative page is
+  open, the same way it already skips it for a modal.
+- Root cause of "drops back to the previous section": saving used to
+  send you back to the page list every time, so editing more than one
+  field meant saving one, re-opening the page, saving the next, and so
+  on. Saving now keeps you on the same page — the "back to page list"
+  row is right there whenever you're actually done with it.
+
 ## 1.81.1 — fixed the too-narrow paragraph wrap on several onboarding screens
 
 - Root cause: `.auth-hero p` has a `max-width: 34ch` rule, written for
