@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.76.0 — editable narrative, an arrival sequence, and a WhatsApp invite option
+
+- New: an "Edit narrative" section in Admin lets you rewrite every piece of
+  scripted copy — the invite email, the WhatsApp invite message, and the
+  new arrival sequence below — without touching code. Changes take effect
+  immediately for both accounts. Currently 16 fields, grouped by where
+  they appear; any future narrative copy should be added here rather than
+  hardcoded, so it stays in one editable place.
+- New: an "arrival sequence" for whoever redeems an invite (not you, since
+  you're the one setting it up) — five short beats, roughly 12 hours apart
+  but pulled forward if she checks back sooner, standing in front of the
+  six general questions rather than dropping straight into them. Nothing
+  to do, nothing to answer for real — pure atmosphere and one harmless tap
+  — so the invite can now be a genuine surprise without skipping the
+  run-up the original plan was giving it via warm-up weeks.
+- New: "Copy WhatsApp message" alongside "Copy email" on the Awaiting
+  Partner screen — a plain-text invite message, since that's realistically
+  the channel it'll be sent through.
+- Rewrote the invite email: dropped the line that read as a warning
+  ("there's no pretending you don't know what's there"), removed the
+  Signal-number paragraph entirely (one channel to think about, not two),
+  and moved it off the near-black background onto the warm-cream palette
+  from the day/night work, so it reads as an invitation in an inbox
+  rather than a dark, separate-feeling card.
+- Database: `remove_partner()` had the same incomplete-wipe gap as
+  `reset_couple_gameplay()` (fixed last build) — dare events, evidence,
+  and wishlist entries were left behind, and rewards were only marked
+  "not completed" rather than deleted. Fixed to match.
+
+## Database — reset_couple_gameplay() now does a true full wipe
+
+- Not a client build, no version bump — this is a Supabase function fix
+  only. The in-app "Reset gameplay" admin action previously left
+  several things behind: dare events, dare/forfeit evidence, wishlist
+  entries, and old invite codes were never touched, and rewards were
+  only marked "not completed" rather than actually deleted. Fixed it
+  to clear all of these, so the button now genuinely returns a couple
+  to day one.
+- Used this fixed version to do a full reset ahead of the pre-launch
+  test: wiped all gameplay data for both accounts, and removed the
+  test "Jacki" account entirely (profile + auth login) so a fresh
+  invite/signup can be walked through as a real first-time experience.
+
 ## 1.75.1 — self-serve gender field in Account
 
 - Added "Your gender" to the Account modal, next to name and Signal

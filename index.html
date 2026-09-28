@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.75.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.76.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.75.1';
+const APP_VERSION = '1.76.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -466,6 +466,9 @@ let state = {
   partnerRoleLean: 'unknown',   // dom / surrender / switch / unknown — from get_partner_role_lean(), only meaningful for Dominance & Surrender
   myWishlist: [],                // my own private wishlist entries — from dare_wishlist, own rows only
   partnerWishlistCategories: [], // which categories the partner has wishlist entries in — content never exposed, from get_partner_wishlist_categories()
+  narrativeContent: {},         // editable copy overrides — from get_narrative_content(), keyed by content key; NARRATIVE_DEFAULTS backs any missing key
+  arrivalTapped: false,         // ephemeral UI-only flag for the arrival sequence's one cosmetic tap (beat 1) — never persisted
+  narrativeEditorOpen: false,   // collapsed by default in the admin panel
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
   passwordRecoveryMode: false,  // set when arriving via a password-reset link — shows a dedicated set-new-password screen
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
@@ -649,7 +652,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = [];
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = []; state.narrativeContent = {}; state.arrivalTapped = false;
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -675,7 +678,7 @@ async function loadAllData() {
       await loadCouple();
       if (state.coupleId) {
         await Promise.all([
-          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(), loadPartnerRoleLean(), loadMyWishlist(), loadPartnerWishlistCategories(),
+          loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(), loadPartnerRoleLean(), loadMyWishlist(), loadPartnerWishlistCategories(), loadNarrativeContent(),
           loadDares(), loadScoreboard(), loadHeat(), loadRewards(), loadNotifications(), loadWeeklyScore(), loadForfeitLibrary()
         ]);
         checkForNewlyRevealedRewards();
@@ -910,6 +913,34 @@ async function loadMyWishlist() {
 async function loadPartnerWishlistCategories() {
   const { data, error } = await sb.rpc('get_partner_wishlist_categories');
   state.partnerWishlistCategories = error ? [] : (data || []).map(r => r.category);
+}
+async function loadNarrativeContent() {
+  const { data, error } = await sb.rpc('get_narrative_content');
+  state.narrativeContent = error ? {} : Object.fromEntries((data || []).map(r => [r.key, r.value]));
+}
+// Fallback copy — used until loadNarrativeContent() resolves, or if a key is
+// ever missing from the DB. Keep these in sync with the seed row wording so
+// an unedited install reads identically either way.
+const NARRATIVE_DEFAULTS = {
+  invite_email_para1: "I've put together a little something, just for us. Nothing to prepare for, nothing waiting on the other side that needs a conversation first.",
+  invite_email_para2: "It's private — just the two of us — and there's no rush about when you look, or how.",
+  invite_email_para3: "I'm not going to tell you what's inside. I'd rather you find out for yourself.",
+  invite_email_closing: "Whatever you find, it stays between us.",
+  invite_email_cta: "Step inside",
+  whatsapp_line1: "made you a little something",
+  whatsapp_line2: "that's all you're getting out of me 😏",
+  arrival_beat_0: "You're in. That's all that happens today — come back later and there'll be a bit more.",
+  arrival_beat_1_prompt: "Curious, or cautious?",
+  arrival_beat_1_option_a: "Curious",
+  arrival_beat_1_option_b: "Cautious",
+  arrival_beat_1_response: "Either way — something's coming.",
+  arrival_beat_2: "This is a space just for the two of us. Nobody else ever sees it, not even a little.",
+  arrival_beat_3: "A little game, just for the two of us. You're going to like this.",
+  arrival_beat_4: "Ready to actually look?",
+  arrival_beat_4_cta: "Let's go",
+};
+function nc(key) {
+  return (state.narrativeContent && state.narrativeContent[key]) || NARRATIVE_DEFAULTS[key] || '';
 }
 async function loadWeeklyScore() {
   const { data, error } = await sb.rpc('get_weekly_score');
@@ -1245,6 +1276,7 @@ function render() {
   if (!state.profile.gender) { $app.innerHTML = renderChooseTheme(); attachChooseThemeHandlers(); return; }
   if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
   if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
+  if (state.profile.arrival_stage < 5) { $app.innerHTML = renderArrivalSequence(); attachArrivalSequenceHandlers(); return; }
 
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
   if (wizardQueue.length > 0 && state.profile && !state.profile.seen_wizard_intro) {
@@ -1493,15 +1525,15 @@ function renderAwaitingPartner() {
            <div class="field"><input type="text" id="invite-link-display" value="${esc(buildInviteUrl(state.pendingInviteCode))}" readonly></div>
            <button class="btn btn-ghost" id="btn-copy-invite-link" style="margin-top:8px">Copy link</button>
            <div class="divider" style="margin:20px 0"></div>
+           <p class="hint-text" style="margin-bottom:10px">Or copy a WhatsApp message, ready to paste straight into a chat — usually the more natural way to send this:</p>
+           <button class="btn btn-gold" id="btn-copy-invite-whatsapp" style="width:100%">Copy WhatsApp message</button>
+           <div class="divider" style="margin:20px 0"></div>
            <p class="hint-text" style="margin-bottom:10px">Or copy a proper invitation email, ready to paste straight into Mail:</p>
            <div class="field"><label>Their name (optional)</label><input type="text" id="invite-email-name" placeholder="e.g. Jacki"></div>
            <div class="field" style="margin-top:10px"><label>Subject line</label><input type="text" id="invite-email-subject" value="${esc(INVITE_EMAIL_SUBJECT)}" readonly></div>
            <button class="link-btn" id="btn-copy-invite-subject" style="padding:0; margin-top:4px">Copy subject</button>
-           <button class="btn btn-gold" id="btn-copy-invite-email" style="margin-top:14px; width:100%">Copy email</button>
-           <p class="hint-text" style="margin-top:6px">Paste doesn't carry the subject line over — copy it separately into Mail's Subject field, then paste the email into the body.</p>
-           ${state.profile && state.profile.signal_phone
-             ? `<p class="hint-text" style="margin-top:6px">Includes a Signal link to your number, so they can say hello there first if they'd rather.</p>`
-             : `<p class="hint-text" style="margin-top:6px">Add your Signal number under Account to have a Signal link included in this email automatically.</p>`}`
+           <button class="btn btn-ghost" id="btn-copy-invite-email" style="margin-top:14px; width:100%">Copy email</button>
+           <p class="hint-text" style="margin-top:6px">Paste doesn't carry the subject line over — copy it separately into Mail's Subject field, then paste the email into the body.</p>`
         : `<p class="hint-text" style="margin-bottom:16px">No active code found — it may have expired.</p>`
       }
       <button class="btn btn-ghost" id="btn-new-code" style="margin-top:16px">Generate a new code</button>
@@ -1514,28 +1546,92 @@ function buildInviteUrl(code) {
   return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(code)}`;
 }
 
+/* ==========================================================================
+   ARRIVAL SEQUENCE
+   A short, unskippable "day one" experience for whoever redeems an invite —
+   the couple's creator (arrival_stage defaults to 5 for them) never sees
+   this. Each beat requires roughly 12 hours since the last one, enforced
+   server-side by advance_arrival_stage() — the client only decides whether
+   to show a "Continue" affordance yet, never whether the advance succeeds.
+   ========================================================================== */
+const ARRIVAL_GATE_HOURS = 12;
+function hoursSinceArrivalStage() {
+  if (!state.profile || !state.profile.arrival_stage_at) return 0;
+  return (Date.now() - new Date(state.profile.arrival_stage_at).getTime()) / 3600000;
+}
+function renderArrivalSequence() {
+  const stage = state.profile.arrival_stage;
+  const canAdvance = hoursSinceArrivalStage() >= ARRIVAL_GATE_HOURS;
+  let body = '';
+  if (stage === 0) {
+    body = `<p class="hint-text" style="font-size:16px; line-height:1.6; color:var(--text)">${esc(nc('arrival_beat_0'))}</p>`;
+  } else if (stage === 1) {
+    body = `
+      <p class="hint-text" style="font-size:16px; line-height:1.6; color:var(--text)">${esc(nc('arrival_beat_1_prompt'))}</p>
+      ${state.arrivalTapped ? `<p class="hint-text" style="margin-top:14px">${esc(nc('arrival_beat_1_response'))}</p>` : `
+      <div class="btn-row" style="margin-top:16px">
+        <button type="button" class="btn btn-ghost" id="btn-arrival-tap-a" style="flex:1">${esc(nc('arrival_beat_1_option_a'))}</button>
+        <button type="button" class="btn btn-ghost" id="btn-arrival-tap-b" style="flex:1">${esc(nc('arrival_beat_1_option_b'))}</button>
+      </div>`}`;
+  } else if (stage === 2) {
+    body = `<p class="hint-text" style="font-size:16px; line-height:1.6; color:var(--text)">${esc(nc('arrival_beat_2'))}</p>`;
+  } else if (stage === 3) {
+    body = `<p class="hint-text" style="font-size:16px; line-height:1.6; color:var(--text)">${esc(nc('arrival_beat_3'))}</p>`;
+  } else if (stage === 4) {
+    body = `<p class="hint-text" style="font-size:16px; line-height:1.6; color:var(--text)">${esc(nc('arrival_beat_4'))}</p>`;
+  }
+  const showContinue = canAdvance && !(stage === 1 && !state.arrivalTapped);
+  const continueLabel = stage === 4 ? nc('arrival_beat_4_cta') : 'Continue';
+  return `
+    <div class="center-screen">
+      <div class="auth-hero" style="margin-bottom:8px"><h1>&nbsp;</h1></div>
+      ${body}
+      ${showContinue
+        ? `<button type="button" class="btn btn-primary" id="btn-arrival-continue" style="margin-top:24px; width:100%">${esc(continueLabel)}</button>`
+        : `<p class="hint-text" style="margin-top:24px; opacity:0.7">Check back a little later.</p>`}
+    </div>
+  `;
+}
+function attachArrivalSequenceHandlers() {
+  const tapA = document.getElementById('btn-arrival-tap-a');
+  const tapB = document.getElementById('btn-arrival-tap-b');
+  if (tapA) tapA.onclick = () => { state.arrivalTapped = true; render(); attachArrivalSequenceHandlers(); };
+  if (tapB) tapB.onclick = () => { state.arrivalTapped = true; render(); attachArrivalSequenceHandlers(); };
+  const continueBtn = document.getElementById('btn-arrival-continue');
+  if (continueBtn) continueBtn.onclick = async () => {
+    continueBtn.disabled = true;
+    const { error } = await sb.rpc('advance_arrival_stage');
+    if (error) { showToast(error.message); continueBtn.disabled = false; return; }
+    state.arrivalTapped = false;
+    await loadProfile();
+    render();
+  };
+}
+
 const INVITE_EMAIL_SUBJECT = "A little something's waiting for you…";
 
-function buildInviteEmailHtml(name, url, signalPhone) {
+function buildInviteEmailHtml(name, url) {
   const greeting = name ? esc(name) + ',' : 'Hey,';
-  const signalLink = signalPhone ? `https://signal.me/#p/${encodeURIComponent(signalPhone)}` : null;
-  return `<!DOCTYPE html><html><body style="margin:0; padding:0; background-color:#2B1620;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#2B1620;">
+  return `<!DOCTYPE html><html><body style="margin:0; padding:0; background-color:#FFF1ED;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFF1ED;">
 <tr><td align="center" style="padding:56px 20px;">
 <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%;">
-<tr><td style="padding-bottom:28px;"><div style="width:36px; height:2px; background-color:#C9A15C;"></div></td></tr>
-<tr><td style="font-family:Georgia,'Times New Roman',serif; font-size:29px; line-height:1.3; color:#F0E6DC; padding-bottom:26px;">${greeting}</td></tr>
-<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:20px;">Martin has arranged something for you. Not really a link — more of an invitation.</td></tr>
-<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:20px;">It's private. It's just the two of you. And once you step inside, there's no pretending you don't know what's there.</td></tr>
-<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#E7D9CD; padding-bottom:36px;">He isn't going to tell you what it is. That's rather the point.</td></tr>
-<tr><td align="center" style="padding-bottom:${signalLink ? '18px' : '36px'};"><a href="${esc(url)}" style="display:inline-block; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; letter-spacing:0.3px; color:#2B1620; background-color:#C9A15C; padding:15px 38px; border-radius:3px; text-decoration:none;">Step inside</a></td></tr>
-${signalLink ? `<tr><td align="center" style="font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:13.5px; line-height:1.6; color:#B89C8E; padding-bottom:36px;">Rather ease in somewhere familiar first? <a href="${esc(signalLink)}" style="color:#B89C8E; text-decoration:underline;">Say hello on Signal</a> — just as private as everything else here.</td></tr>` : ''}
-<tr><td style="font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:15px; line-height:1.6; color:#B89C8E; padding-bottom:4px;">Whatever you find, it stays between the two of you.</td></tr>
-<tr><td style="padding-top:28px;"><div style="width:36px; height:2px; background-color:#C9A15C;"></div></td></tr>
+<tr><td style="padding-bottom:28px;"><div style="width:36px; height:2px; background-color:#D98D2B;"></div></td></tr>
+<tr><td style="font-family:Georgia,'Times New Roman',serif; font-size:29px; line-height:1.3; color:#3A1B26; padding-bottom:26px;">${greeting}</td></tr>
+<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#5A3540; padding-bottom:20px;">${esc(nc('invite_email_para1'))}</td></tr>
+<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#5A3540; padding-bottom:20px;">${esc(nc('invite_email_para2'))}</td></tr>
+<tr><td style="font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.65; color:#5A3540; padding-bottom:36px;">${esc(nc('invite_email_para3'))}</td></tr>
+<tr><td align="center" style="padding-bottom:36px;"><a href="${esc(url)}" style="display:inline-block; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; letter-spacing:0.3px; color:#fff; background-color:#FF5C8D; padding:15px 38px; border-radius:3px; text-decoration:none;">${esc(nc('invite_email_cta'))}</a></td></tr>
+<tr><td style="font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:15px; line-height:1.6; color:#B8546F; padding-bottom:4px;">${esc(nc('invite_email_closing'))}</td></tr>
+<tr><td style="padding-top:28px;"><div style="width:36px; height:2px; background-color:#D98D2B;"></div></td></tr>
 </table>
 </td></tr>
 </table>
 </body></html>`;
+}
+
+function buildInviteWhatsAppMessage(url) {
+  return `${nc('whatsapp_line1')}\n${url}\n${nc('whatsapp_line2')}`;
 }
 
 async function copyRichEmailToClipboard(html) {
@@ -1580,13 +1676,23 @@ function attachAwaitingPartnerHandlers() {
   if (copyEmailBtn) copyEmailBtn.onclick = async () => {
     const name = document.getElementById('invite-email-name').value.trim();
     const url = buildInviteUrl(state.pendingInviteCode);
-    const signalPhone = state.profile ? state.profile.signal_phone : null;
-    const html = buildInviteEmailHtml(name, url, signalPhone);
+    const html = buildInviteEmailHtml(name, url);
     try {
       await copyRichEmailToClipboard(html);
       showToast('Email copied — paste into a new message in Mail.');
     } catch {
       showToast('Copy failed — your browser may not support rich copy here.');
+    }
+  };
+  const copyWhatsAppBtn = document.getElementById('btn-copy-invite-whatsapp');
+  if (copyWhatsAppBtn) copyWhatsAppBtn.onclick = async () => {
+    const url = buildInviteUrl(state.pendingInviteCode);
+    const message = buildInviteWhatsAppMessage(url);
+    try {
+      await navigator.clipboard.writeText(message);
+      showToast('Message copied — paste into WhatsApp.');
+    } catch {
+      showToast('Copy failed — select the text and copy manually.');
     }
   };
 }
@@ -2086,6 +2192,85 @@ function renderBoundariesTab(unanswered) {
   `;
 }
 
+/* ==========================================================================
+   NARRATIVE EDITOR (admin) — every editable piece of copy so far, grouped
+   by where it appears. Add a new field here whenever a new piece of
+   scripted narrative copy is written, rather than hardcoding it.
+   ========================================================================== */
+const NARRATIVE_FIELDS = [
+  { group: 'Invite email', key: 'invite_email_para1', label: 'Opening line', multiline: true },
+  { group: 'Invite email', key: 'invite_email_para2', label: 'Second line', multiline: true },
+  { group: 'Invite email', key: 'invite_email_para3', label: 'Third line', multiline: true },
+  { group: 'Invite email', key: 'invite_email_closing', label: 'Closing line', multiline: true },
+  { group: 'Invite email', key: 'invite_email_cta', label: 'Button text' },
+  { group: 'WhatsApp invite message', key: 'whatsapp_line1', label: 'First line' },
+  { group: 'WhatsApp invite message', key: 'whatsapp_line2', label: 'Second line' },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_0', label: 'Beat 1 — right after joining', multiline: true },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_prompt', label: 'Beat 2 — prompt' },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_option_a', label: 'Beat 2 — option A' },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_option_b', label: 'Beat 2 — option B' },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_1_response', label: 'Beat 2 — response after tapping' },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_2', label: 'Beat 3', multiline: true },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_3', label: 'Beat 4', multiline: true },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_4', label: 'Beat 5', multiline: true },
+  { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_4_cta', label: 'Beat 5 — button text' },
+];
+function renderNarrativeEditorSection() {
+  const open = state.narrativeEditorOpen;
+  const groups = [...new Set(NARRATIVE_FIELDS.map(f => f.group))];
+  return `
+    <div>
+      <div class="category-row" id="btn-toggle-narrative-editor" style="cursor:pointer">
+        <div>
+          <div class="cat-name">Edit narrative</div>
+          <div class="cat-count">The invite messages and the arrival sequence — change the wording here any time, no code needed</div>
+        </div>
+        <div class="cat-arrow">${open ? '⌄' : '›'}</div>
+      </div>
+      ${open ? `
+        <div style="margin-top:14px">
+          ${groups.map(group => `
+            <div style="margin-bottom:18px">
+              <div class="cat-count" style="margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; font-size:10.5px">${esc(group)}</div>
+              ${NARRATIVE_FIELDS.filter(f => f.group === group).map(f => `
+                <div class="field" style="margin-bottom:10px">
+                  <label>${esc(f.label)}</label>
+                  ${f.multiline
+                    ? `<textarea id="narrative-${f.key}" rows="2" style="width:100%; font-family:inherit; font-size:14px; padding:10px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface); color:var(--text)">${esc(nc(f.key))}</textarea>`
+                    : `<input type="text" id="narrative-${f.key}" value="${esc(nc(f.key))}">`}
+                </div>
+              `).join('')}
+            </div>
+          `).join('')}
+          <button type="button" class="btn btn-primary" id="btn-save-narrative" style="width:100%">Save narrative changes</button>
+          <div id="narrative-save-error" class="error-text" style="margin-top:8px"></div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+function attachNarrativeEditorHandlers() {
+  const toggleBtn = document.getElementById('btn-toggle-narrative-editor');
+  if (toggleBtn) toggleBtn.onclick = () => { state.narrativeEditorOpen = !state.narrativeEditorOpen; render(); };
+  const saveBtn = document.getElementById('btn-save-narrative');
+  if (saveBtn) saveBtn.onclick = async () => {
+    const errEl = document.getElementById('narrative-save-error');
+    saveBtn.disabled = true;
+    for (const f of NARRATIVE_FIELDS) {
+      const el = document.getElementById(`narrative-${f.key}`);
+      if (!el) continue;
+      const value = el.value;
+      if (value === nc(f.key)) continue; // unchanged — skip the round trip
+      const { error } = await sb.rpc('set_narrative_content', { p_key: f.key, p_value: value });
+      if (error) { errEl.textContent = error.message; saveBtn.disabled = false; return; }
+      state.narrativeContent[f.key] = value;
+    }
+    saveBtn.disabled = false;
+    showToast('Narrative updated.');
+    render();
+  };
+}
+
 function renderSetupArea() {
   if (state.openCategory) return renderDeckView();
   if (state.openDareCategory) return renderDareHeadingView();
@@ -2100,6 +2285,8 @@ function renderSetupArea() {
     <div class="divider"></div>
     <div class="section-head" style="margin-top:0"><h2>Rewards</h2></div>
     <p class="hint-text" style="margin-bottom:16px">Rewards moved to the Rewards tab — since they're something you'll both experience, either of you can add, edit, or delete them there directly.</p>
+    <div class="divider"></div>
+    ${renderNarrativeEditorSection()}
     <div class="divider"></div>
     <div style="border:1.5px solid var(--wine-bright); border-radius:var(--radius-m); padding:16px; margin-top:6px">
       <div class="section-head" style="margin-top:0"><h2 style="color:var(--wine-bright)">Start again</h2></div>
@@ -2976,6 +3163,7 @@ function attachMainHandlers() {
   if (startAgainBtn) startAgainBtn.onclick = openResetConfirmModal;
   const removePartnerBtn = document.getElementById('btn-remove-partner');
   if (removePartnerBtn) removePartnerBtn.onclick = openRemovePartnerConfirmModal;
+  attachNarrativeEditorHandlers();
   const questionsSearchInput = document.getElementById('questions-search');
   if (questionsSearchInput) {
     questionsSearchInput.oninput = () => { state.questionsSearch = questionsSearchInput.value; state.lastFocusedSearch = 'questions-search'; render(); };
