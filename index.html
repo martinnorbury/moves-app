@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.80.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.81.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.80.0';
+const APP_VERSION = '1.81.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -472,6 +472,7 @@ let state = {
   partnerJoinedPending: false,  // true from the moment a partner is detected until you click through the "they're in" screen — blocks render() so it can never be missed while you're away from the app
   arrivalTapped: false,         // ephemeral UI-only flag for the arrival sequence's one cosmetic tap (beat 1) — never persisted
   narrativeEditorOpen: false,   // collapsed by default in the admin panel
+  narrativeEditorGroup: null,   // null = showing the page list; a group name = editing just that page's fields
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
   passwordRecoveryMode: false,  // set when arriving via a password-reset link — shows a dedicated set-new-password screen
   wizardIntroStep: 1,             // 1 = welcome, 2 = the six Temptations preview
@@ -2394,48 +2395,101 @@ const NARRATIVE_FIELDS = [
   { group: 'Step 1 complete', key: 'step1_wishlist_cta', label: 'Wishlist button text' },
   { group: 'Step 1 complete', key: 'step1_continue_cta', label: 'Continue button text' },
 ];
+// Narrative editor is a two-level picker rather than one long scroll of
+// every field on every screen: tap "Edit narrative" to see a list of pages
+// (one row per screen, with a live word count), tap a page to see only
+// that page's fields, edit, save, and land back on the page list — never
+// scrolling past copy for screens you're not touching.
 function renderNarrativeEditorSection() {
   const open = state.narrativeEditorOpen;
+  const group = state.narrativeEditorGroup;
   const groups = [...new Set(NARRATIVE_FIELDS.map(f => f.group))];
+  if (!open) {
+    return `
+      <div>
+        <div class="category-row" id="btn-toggle-narrative-editor" style="cursor:pointer">
+          <div>
+            <div class="cat-name">Edit narrative</div>
+            <div class="cat-count">Every fixed screen of copy, from the invite through to Step 1 complete — change any of it here, no code needed</div>
+          </div>
+          <div class="cat-arrow">›</div>
+        </div>
+      </div>
+    `;
+  }
+  if (!group) {
+    // Page list — one row per screen, so finding the right copy is a single tap.
+    return `
+      <div>
+        <div class="category-row" id="btn-toggle-narrative-editor" style="cursor:pointer">
+          <div>
+            <div class="cat-name">Edit narrative</div>
+            <div class="cat-count">Pick a page to edit its wording</div>
+          </div>
+          <div class="cat-arrow">⌄</div>
+        </div>
+        <div style="margin-top:10px">
+          ${groups.map(g => {
+            const fields = NARRATIVE_FIELDS.filter(f => f.group === g);
+            const wordCount = fields.reduce((sum, f) => sum + nc(f.key).split(/\s+/).filter(Boolean).length, 0);
+            return `
+              <div class="category-row" data-narrative-group="${esc(g)}" style="cursor:pointer">
+                <div>
+                  <div class="cat-name">${esc(g)}</div>
+                  <div class="cat-count">${fields.length} field${fields.length === 1 ? '' : 's'} · ~${wordCount} words</div>
+                </div>
+                <div class="cat-arrow">›</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+  // A single page's fields.
+  const fields = NARRATIVE_FIELDS.filter(f => f.group === group);
   return `
     <div>
-      <div class="category-row" id="btn-toggle-narrative-editor" style="cursor:pointer">
+      <div class="category-row" id="btn-narrative-back" style="cursor:pointer">
         <div>
-          <div class="cat-name">Edit narrative</div>
-          <div class="cat-count">The invite messages and the arrival sequence — change the wording here any time, no code needed</div>
+          <div class="cat-name">‹ ${esc(group)}</div>
+          <div class="cat-count">Back to the page list</div>
         </div>
-        <div class="cat-arrow">${open ? '⌄' : '›'}</div>
       </div>
-      ${open ? `
-        <div style="margin-top:14px">
-          ${groups.map(group => `
-            <div style="margin-bottom:18px">
-              <div class="cat-count" style="margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; font-size:10.5px">${esc(group)}</div>
-              ${NARRATIVE_FIELDS.filter(f => f.group === group).map(f => `
-                <div class="field" style="margin-bottom:10px">
-                  <label>${esc(f.label)}</label>
-                  ${f.multiline
-                    ? `<textarea id="narrative-${f.key}" rows="2" style="width:100%; font-family:inherit; font-size:14px; padding:10px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface); color:var(--text)">${esc(nc(f.key))}</textarea>`
-                    : `<input type="text" id="narrative-${f.key}" value="${esc(nc(f.key))}">`}
-                </div>
-              `).join('')}
-            </div>
-          `).join('')}
-          <button type="button" class="btn btn-primary" id="btn-save-narrative" style="width:100%">Save narrative changes</button>
-          <div id="narrative-save-error" class="error-text" style="margin-top:8px"></div>
-        </div>
-      ` : ''}
+      <div style="margin-top:14px">
+        ${fields.map(f => `
+          <div class="field" style="margin-bottom:10px">
+            <label>${esc(f.label)}</label>
+            ${f.multiline
+              ? `<textarea id="narrative-${f.key}" rows="3" style="width:100%; font-family:inherit; font-size:14px; padding:10px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface); color:var(--text)">${esc(nc(f.key))}</textarea>`
+              : `<input type="text" id="narrative-${f.key}" value="${esc(nc(f.key))}">`}
+          </div>
+        `).join('')}
+        <button type="button" class="btn btn-primary" id="btn-save-narrative" style="width:100%">Save this page</button>
+        <div id="narrative-save-error" class="error-text" style="margin-top:8px"></div>
+      </div>
     </div>
   `;
 }
 function attachNarrativeEditorHandlers() {
   const toggleBtn = document.getElementById('btn-toggle-narrative-editor');
-  if (toggleBtn) toggleBtn.onclick = () => { state.narrativeEditorOpen = !state.narrativeEditorOpen; render(); };
+  if (toggleBtn) toggleBtn.onclick = () => {
+    state.narrativeEditorOpen = !state.narrativeEditorOpen;
+    state.narrativeEditorGroup = null;
+    render();
+  };
+  $app.querySelectorAll('[data-narrative-group]').forEach(el => el.onclick = () => {
+    state.narrativeEditorGroup = el.dataset.narrativeGroup;
+    render();
+  });
+  const backBtn = document.getElementById('btn-narrative-back');
+  if (backBtn) backBtn.onclick = () => { state.narrativeEditorGroup = null; render(); };
   const saveBtn = document.getElementById('btn-save-narrative');
   if (saveBtn) saveBtn.onclick = async () => {
     const errEl = document.getElementById('narrative-save-error');
+    const fields = NARRATIVE_FIELDS.filter(f => f.group === state.narrativeEditorGroup);
     saveBtn.disabled = true;
-    for (const f of NARRATIVE_FIELDS) {
+    for (const f of fields) {
       const el = document.getElementById(`narrative-${f.key}`);
       if (!el) continue;
       const value = el.value;
@@ -2446,6 +2500,7 @@ function attachNarrativeEditorHandlers() {
     }
     saveBtn.disabled = false;
     showToast('Narrative updated.');
+    state.narrativeEditorGroup = null;
     render();
   };
 }

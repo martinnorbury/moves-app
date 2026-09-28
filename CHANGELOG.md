@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.81.0 — narrative editor is now a page picker, not one long scroll
+
+- Edit narrative used to unfold into every field on every screen at
+  once — nine groups deep, all expanded, scroll after scroll to find
+  the one line you wanted. It's now two levels: tap Edit narrative to
+  see a list of pages (one row per screen, each showing its field
+  count and a rough word count), tap a page to see only that page's
+  fields, edit, Save this page, and you're back on the page list.
+- Saving now only round-trips the fields on the page you were
+  actually editing, not every field across every screen.
+
 ## 1.80.0 — every onboarding screen's wording is now editable, not just the invite
 
 - The narrative editor (admin → Edit narrative) now covers every fixed
