@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.80.0 — every onboarding screen's wording is now editable, not just the invite
+
+- The narrative editor (admin → Edit narrative) now covers every fixed
+  screen of prose between joining and actually getting into the app —
+  previously only the invite email, WhatsApp message, and the arrival
+  sequence were editable; everything after that ("Welcome to TwoPlay…
+  You got an email. It didn't say much…", the Six Temptations preview,
+  the partner-already-answered screen, the "one more thing before
+  we're in" explainer, and Step 1 complete) was still hardcoded.
+- Five new groups added to the editor: Welcome screen, Six Temptations
+  preview, Partner already answered, App explainer, Step 1 complete —
+  every paragraph, subtitle and button label on those screens can now
+  be changed from Save narrative changes without a new build.
+- A couple of fields use a placeholder token you can leave in place or
+  move around — {{partner}} for their name, {{count}} for the number
+  of questions — swapped in automatically when the screen renders.
+
 ## 1.79.0 — the "she's in" moment now waits for you, and her name actually shows up
 
 - The "[name] just joined 🎉" moment is no longer a toast — a toast can

@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.79.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.80.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.79.0';
+const APP_VERSION = '1.80.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -985,9 +985,45 @@ const NARRATIVE_DEFAULTS = {
   arrival_beat_3: "A little game, just for the two of us. You're going to like this.",
   arrival_beat_4: "Ready to actually look?",
   arrival_beat_4_cta: "Let's go",
+  wizard_intro_subtitle: "(yes — as in foreplay. That's rather the idea.)",
+  wizard_intro_para1: "You got an email. It didn't say much. You clicked it anyway — that was rather the point.",
+  wizard_intro_para2: "Here's what it actually is: a private game, just for us. It learns where we both stand — what excites us, what doesn't, how far is fun rather than too far — then plays accordingly. Nothing forced. Nothing either of us doesn't want.",
+  wizard_intro_para3: "It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where we overlap.",
+  wizard_intro_para4: "One thing that matters before anything else: if something's genuinely not for you, just say so. That's the end of it — it won't come up again, won't get suggested, and I'll never see it or ask why. This only ever plays in the space we both actually want to be in, nothing more.",
+  wizard_intro_para5: "Once we've both answered, everything opens up — dares tailored to exactly where we are, together.",
+  wizard_intro_cta: "Let's begin →",
+  temptations_preview_title: "Six things to explore",
+  temptations_preview_para1: "Each of these gets its own general question first, then more specific ones later as you both get further in.",
+  temptations_preview_para2: "However you answer, it's just for finding where we overlap — and if something's a real no, that's respected completely and quietly, no explaining needed to each other.",
+  temptations_preview_cta: "Let's begin →",
+  partner_teaser_body: "Answer the same {{count}} questions. Your answers merge into one shared report — nobody sees the other's individual answers, only the joint result.",
+  partner_teaser_privacy_title: "Your answers stay private",
+  partner_teaser_privacy_body: "{{partner}} only ever sees the joint result once you've both answered, never your individual answers.",
+  partner_teaser_cta: "Let's start",
+  app_explainer_title: "One more thing before we're in",
+  app_explainer_subtitle: "The quick version — where everything lives, and how a dare actually works.",
+  app_explainer_dare_text: "one of us picks a Temptation and an intensity, then sends it blind — neither of us sees which specific dare it is until it's actually done, or writes one from scratch instead. The other accepts, declines, or counters it, always their call. Complete it, and points land.",
+  app_explainer_heat_text: "a shared bar on Playroom that fills up a little every time we complete a dare together. Fill it past a threshold, and a reward unlocks.",
+  app_explainer_no_text: "anything either of us closes off is gone for good — never suggested, never brought up, never something the other person even sees. Everything the game offers is already something we've both said yes to.",
+  app_explainer_forfeits_text: "each week, whoever's behind on points picks their own — never chosen for them. Worth remembering: nothing here is fixed forever, and nothing's ever asked of you twice — you're always free to go back and see if an area still feels the way it did. A forfeit nearby can be a gentle nudge to check, since a little real experience often shifts things more than imagining it does. And even if a door does open, you're still fully in charge of what comes through it — accept it, counter it, or just let it pass.",
+  app_explainer_account_text: "tap your name up top any time to add a photo, change your name, or add your Signal number — that's how we can message each other securely, one tap, while a dare's in play.",
+  app_explainer_cta: "Into the app →",
+  step1_title: "Step 1 complete 🎉",
+  step1_subtitle: "You've both answered the general question for every temptation. Here's where that leaves you.",
+  step1_section2_title: "Step 2: your first dare",
+  step1_section2_body: "Next up is actually sending each other a dare. We'll figure out together how that gets suggested to you — for now, head into the app and take a look around.",
+  step1_section3_title: "While we're here",
+  step1_section3_body: "Want to jot down a few things you'd love {{partner}} to try on you sometime? {{partner}}'ll never see the list — only ever get one at random, blind, and only for a Temptation you've already said yes to.",
+  step1_wishlist_cta: "Add to my wishlist",
+  step1_continue_cta: "Let's go",
 };
 function nc(key) {
   return (state.narrativeContent && state.narrativeContent[key]) || NARRATIVE_DEFAULTS[key] || '';
+}
+function ncr(key, vars) {
+  let s = nc(key);
+  for (const k in vars) s = s.split(`{{${k}}}`).join(vars[k]);
+  return s;
 }
 async function loadWeeklyScore() {
   const { data, error } = await sb.rpc('get_weekly_score');
@@ -1099,26 +1135,26 @@ function renderWizardIntro() {
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
         <h1>Welcome to TwoPlay${name ? ', ' + esc(name) : ''}</h1>
-        <p style="font-style:italic; font-size:13.5px; color:var(--text-faint); margin-bottom:14px">(yes — as in foreplay. That's rather the idea.)</p>
-        <p>You got an email. It didn't say much. You clicked it anyway — that was rather the point.</p>
+        <p style="font-style:italic; font-size:13.5px; color:var(--text-faint); margin-bottom:14px">${esc(nc('wizard_intro_subtitle'))}</p>
+        <p>${esc(nc('wizard_intro_para1'))}</p>
       </div>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">
-        Here's what it actually is: a private game, just for us. It learns where we both stand — what excites us, what doesn't, how far is fun rather than too far — then plays accordingly. Nothing forced. Nothing either of us doesn't want.
+        ${esc(nc('wizard_intro_para2'))}
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
-        It starts gently. A handful of quick questions, one for each of six different themes. Nothing detailed, nothing graphic — just enough to see where we overlap.
+        ${esc(nc('wizard_intro_para3'))}
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:24px">
-        One thing that matters before anything else: if something's genuinely not for you, just say so. That's the end of it — it won't come up again, won't get suggested, and I'll never see it or ask why. This only ever plays in the space we both actually want to be in, nothing more.
+        ${esc(nc('wizard_intro_para4'))}
       </p>
       <div class="gauge-track" style="margin-bottom:8px"></div>
       <div class="gauge-row" style="margin-bottom:28px">
         ${GAUGE_ORDER.map(a => `<div class="gauge-stop" style="cursor:default">${GAUGE_ICONS[a]}</div>`).join('')}
       </div>
       <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:28px">
-        Once we've both answered, everything opens up — dares tailored to exactly where we are, together.
+        ${esc(nc('wizard_intro_para5'))}
       </p>
-      <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%">Let's begin →</button>
+      <button class="btn btn-gold" id="btn-wizard-intro-start" style="width:100%">${esc(nc('wizard_intro_cta'))}</button>
     </div>
   `;
 }
@@ -1147,9 +1183,9 @@ function renderTemptationsPreview() {
   return `
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
-        <h1>Six things to explore</h1>
-        <p>Each of these gets its own general question first, then more specific ones later as you both get further in.</p>
-        <p>However you answer, it's just for finding where we overlap — and if something's a real no, that's respected completely and quietly, no explaining needed to each other.</p>
+        <h1>${esc(nc('temptations_preview_title'))}</h1>
+        <p>${esc(nc('temptations_preview_para1'))}</p>
+        <p>${esc(nc('temptations_preview_para2'))}</p>
       </div>
       ${state.categories.map(c => `
         <div class="category-row" style="cursor:default">
@@ -1159,7 +1195,7 @@ function renderTemptationsPreview() {
           </div>
         </div>
       `).join('')}
-      <button class="btn btn-gold" id="btn-temptations-preview-start" style="width:100%; margin-top:24px">Let's begin →</button>
+      <button class="btn btn-gold" id="btn-temptations-preview-start" style="width:100%; margin-top:24px">${esc(nc('temptations_preview_cta'))}</button>
     </div>
   `;
 }
@@ -1171,7 +1207,7 @@ function renderPartnerTeaser() {
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
         <h1>${esc(partnerName)} already started and is waiting for you</h1>
-        <p>Answer the same ${total} questions. Your answers merge into one shared report — nobody sees the other's individual answers, only the joint result.</p>
+        <p>${esc(ncr('partner_teaser_body', { count: total }))}</p>
       </div>
       <div class="teaser-grid">
         ${state.partnerTeaser.map(t => `<div class="teaser-block ${t.answer}"></div>`).join('')}
@@ -1183,10 +1219,10 @@ function renderPartnerTeaser() {
       </div>
       <p class="hint-text" style="margin-top:-10px; margin-bottom:20px">These are ${esc(partnerName)}'s answers, shuffled — which one belongs to which question stays hidden until you've answered too.</p>
       <div class="privacy-note">
-        <div class="title">Your answers stay private</div>
-        <div class="body">${esc(partnerName)} only ever sees the joint result once you've both answered, never your individual answers.</div>
+        <div class="title">${esc(nc('partner_teaser_privacy_title'))}</div>
+        <div class="body">${esc(ncr('partner_teaser_privacy_body', { partner: partnerName }))}</div>
       </div>
-      <button class="btn btn-gold" id="btn-teaser-start" style="width:100%">Let's start</button>
+      <button class="btn btn-gold" id="btn-teaser-start" style="width:100%">${esc(nc('partner_teaser_cta'))}</button>
     </div>
   `;
 }
@@ -1199,8 +1235,8 @@ function renderAppExplainer() {
   return `
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
-        <h1>One more thing before we're in</h1>
-        <p>The quick version — where everything lives, and how a dare actually works.</p>
+        <h1>${esc(nc('app_explainer_title'))}</h1>
+        <p>${esc(nc('app_explainer_subtitle'))}</p>
       </div>
 
       <div class="category-row" style="cursor:default"><div><div class="cat-name">Playroom</div><div class="cat-count">Home base — what's happening right now, and our scores.</div></div></div>
@@ -1212,22 +1248,22 @@ function renderAppExplainer() {
       <div class="divider" style="margin:24px 0"></div>
 
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">How a dare actually works:</b> one of us picks a Temptation and an intensity, then sends it blind — neither of us sees which specific dare it is until it's actually done, or writes one from scratch instead. The other accepts, declines, or counters it, always their call. Complete it, and points land.
+        <b style="color:var(--text)">How a dare actually works:</b> ${esc(nc('app_explainer_dare_text'))}
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">The Heat Meter:</b> a shared bar on Playroom that fills up a little every time we complete a dare together. Fill it past a threshold, and a reward unlocks.
+        <b style="color:var(--text)">The Heat Meter:</b> ${esc(nc('app_explainer_heat_text'))}
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">A genuine no stays a no:</b> anything either of us closes off is gone for good — never suggested, never brought up, never something the other person even sees. Everything the game offers is already something we've both said yes to.
+        <b style="color:var(--text)">A genuine no stays a no:</b> ${esc(nc('app_explainer_no_text'))}
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:16px">
-        <b style="color:var(--text)">Forfeits:</b> each week, whoever's behind on points picks their own — never chosen for them. Worth remembering: nothing here is fixed forever, and nothing's ever asked of you twice — you're always free to go back and see if an area still feels the way it did. A forfeit nearby can be a gentle nudge to check, since a little real experience often shifts things more than imagining it does. And even if a door does open, you're still fully in charge of what comes through it — accept it, counter it, or just let it pass.
+        <b style="color:var(--text)">Forfeits:</b> ${esc(nc('app_explainer_forfeits_text'))}
       </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:28px">
-        <b style="color:var(--text)">Your account:</b> tap your name up top any time to add a photo, change your name, or add your Signal number — that's how we can message each other securely, one tap, while a dare's in play.
+        <b style="color:var(--text)">Your account:</b> ${esc(nc('app_explainer_account_text'))}
       </p>
 
-      <button class="btn btn-gold" id="btn-app-explainer-done" style="width:100%">Into the app →</button>
+      <button class="btn btn-gold" id="btn-app-explainer-done" style="width:100%">${esc(nc('app_explainer_cta'))}</button>
     </div>
   `;
 }
@@ -1245,23 +1281,23 @@ function renderStep1Complete() {
   return `
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
-        <h1>Step 1 complete 🎉</h1>
-        <p>You've both answered the general question for every temptation. Here's where that leaves you.</p>
+        <h1>${esc(nc('step1_title'))}</h1>
+        <p>${esc(nc('step1_subtitle'))}</p>
       </div>
       ${renderOverallStanding()}
       ${renderHeadingAccessList()}
       <div class="divider"></div>
       <div class="auth-hero" style="margin-top:0">
-        <h1 style="font-size:22px">Step 2: your first dare</h1>
-        <p>Next up is actually sending each other a dare. We'll figure out together how that gets suggested to you — for now, head into the app and take a look around.</p>
+        <h1 style="font-size:22px">${esc(nc('step1_section2_title'))}</h1>
+        <p>${esc(nc('step1_section2_body'))}</p>
       </div>
       <div class="divider"></div>
       <div class="auth-hero" style="margin-top:0">
-        <h1 style="font-size:20px">While we're here</h1>
-        <p>Want to jot down a few things you'd love ${esc(state.partner ? state.partner.display_name : 'your partner')} to try on you sometime? ${esc(state.partner ? state.partner.display_name : 'They')}'ll never see the list — only ever get one at random, blind, and only for a Temptation you've already said yes to.</p>
+        <h1 style="font-size:20px">${esc(nc('step1_section3_title'))}</h1>
+        <p>${esc(ncr('step1_section3_body', { partner: state.partner ? state.partner.display_name : 'your partner' }))}</p>
       </div>
-      <button class="btn btn-ghost" id="btn-step1-wishlist" style="width:100%; margin-bottom:14px">Add to my wishlist</button>
-      <button class="btn btn-gold" id="btn-step1-continue" style="width:100%">Let's go</button>
+      <button class="btn btn-ghost" id="btn-step1-wishlist" style="width:100%; margin-bottom:14px">${esc(nc('step1_wishlist_cta'))}</button>
+      <button class="btn btn-gold" id="btn-step1-continue" style="width:100%">${esc(nc('step1_continue_cta'))}</button>
     </div>
   `;
 }
@@ -2326,6 +2362,37 @@ const NARRATIVE_FIELDS = [
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_3', label: 'Beat 4', multiline: true },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_4', label: 'Beat 5', multiline: true },
   { group: 'Arrival sequence (shown once, to whoever redeems an invite)', key: 'arrival_beat_4_cta', label: 'Beat 5 — button text' },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_subtitle', label: 'Subtitle, under the title' },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para1', label: 'Paragraph 1', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para2', label: 'Paragraph 2', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para3', label: 'Paragraph 3', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para4', label: 'Paragraph 4', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_para5', label: 'Paragraph 5', multiline: true },
+  { group: 'Welcome screen (after the arrival sequence, before the questions)', key: 'wizard_intro_cta', label: 'Button text' },
+  { group: 'Six Temptations preview', key: 'temptations_preview_title', label: 'Title' },
+  { group: 'Six Temptations preview', key: 'temptations_preview_para1', label: 'Paragraph 1', multiline: true },
+  { group: 'Six Temptations preview', key: 'temptations_preview_para2', label: 'Paragraph 2', multiline: true },
+  { group: 'Six Temptations preview', key: 'temptations_preview_cta', label: 'Button text' },
+  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_body', label: 'Body — use {{count}} for the question count', multiline: true },
+  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_privacy_title', label: 'Privacy note — title' },
+  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_privacy_body', label: 'Privacy note — body — use {{partner}} for their name', multiline: true },
+  { group: 'Partner already answered (teaser screen)', key: 'partner_teaser_cta', label: 'Button text' },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_title', label: 'Title' },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_subtitle', label: 'Subtitle' },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_dare_text', label: 'How a dare works — text after the bold lead-in', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_heat_text', label: 'The Heat Meter — text after the bold lead-in', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_no_text', label: 'A genuine no stays a no — text after the bold lead-in', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_forfeits_text', label: 'Forfeits — text after the bold lead-in', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_account_text', label: 'Your account — text after the bold lead-in', multiline: true },
+  { group: 'App explainer (how everything works)', key: 'app_explainer_cta', label: 'Button text' },
+  { group: 'Step 1 complete', key: 'step1_title', label: 'Title' },
+  { group: 'Step 1 complete', key: 'step1_subtitle', label: 'Subtitle' },
+  { group: 'Step 1 complete', key: 'step1_section2_title', label: '"Step 2" section — title' },
+  { group: 'Step 1 complete', key: 'step1_section2_body', label: '"Step 2" section — body', multiline: true },
+  { group: 'Step 1 complete', key: 'step1_section3_title', label: '"While we\'re here" section — title' },
+  { group: 'Step 1 complete', key: 'step1_section3_body', label: '"While we\'re here" section — body — use {{partner}} for their name', multiline: true },
+  { group: 'Step 1 complete', key: 'step1_wishlist_cta', label: 'Wishlist button text' },
+  { group: 'Step 1 complete', key: 'step1_continue_cta', label: 'Continue button text' },
 ];
 function renderNarrativeEditorSection() {
   const open = state.narrativeEditorOpen;
