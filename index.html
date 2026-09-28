@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.76.1)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.77.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.76.1';
+const APP_VERSION = '1.77.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -467,6 +467,7 @@ let state = {
   myWishlist: [],                // my own private wishlist entries — from dare_wishlist, own rows only
   partnerWishlistCategories: [], // which categories the partner has wishlist entries in — content never exposed, from get_partner_wishlist_categories()
   narrativeContent: {},         // editable copy overrides — from get_narrative_content(), keyed by content key; NARRATIVE_DEFAULTS backs any missing key
+  pendingMagicLink: null,       // a generated passwordless sign-in link for the pending invite code, from the invite_by_email edge function
   arrivalTapped: false,         // ephemeral UI-only flag for the arrival sequence's one cosmetic tap (beat 1) — never persisted
   narrativeEditorOpen: false,   // collapsed by default in the admin panel
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
@@ -652,7 +653,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = []; state.narrativeContent = {}; state.arrivalTapped = false;
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = []; state.narrativeContent = {}; state.arrivalTapped = false; state.pendingMagicLink = null;
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -674,8 +675,24 @@ function applyDayNightMode() {
 async function loadAllData() {
   try {
     await loadProfile();
+    if (state.session && !state.profile) {
+      // Arrived via a magic sign-in link, which skips the sign-up form
+      // (and with it, the only place a profile row used to get created).
+      // Create one silently with sensible defaults — she can rename
+      // herself, or fix the gender default, in Account any time.
+      const fallbackName = (state.session.user.email || 'Player').split('@')[0];
+      await sb.from('profiles').insert({ id: state.session.user.id, display_name: fallbackName, gender: 'female' });
+      await loadProfile();
+    }
     if (state.profile) {
       await loadCouple();
+      if (!state.coupleId && state.urlInviteCode) {
+        // Arrived via an invite link (magic-link flow never goes through
+        // the sign-up form's own redeem step) but isn't paired yet —
+        // redeem it now rather than requiring a manual step.
+        const { error: redeemError } = await sb.rpc('redeem_couple_invite', { p_code: state.urlInviteCode });
+        if (!redeemError) { state.urlInviteCode = null; await loadCouple(); }
+      }
       if (state.coupleId) {
         await Promise.all([
           loadCategories(), loadQuestions(), loadOwnAnswers(), loadBoundary(), loadHeadingAccess(), loadCardReport(), loadPartnerTeaser(), loadDareLibrary(), loadDareEvidence(), loadForfeitEvidence(), loadPartnerRoleLean(), loadMyWishlist(), loadPartnerWishlistCategories(), loadNarrativeContent(),
@@ -854,6 +871,7 @@ async function loadCouple() {
   const { data } = await sb.from('couple_members').select('couple_id').eq('user_id', state.session.user.id).maybeSingle();
   state.coupleId = data ? data.couple_id : null;
   state.partner = null;
+  const previousCode = state.pendingInviteCode;
   state.pendingInviteCode = null;
   if (state.coupleId) {
     const { data: partner } = await sb.rpc('get_partner_profile');
@@ -863,6 +881,9 @@ async function loadCouple() {
       state.pendingInviteCode = code || null;
     }
   }
+  // A generated sign-in link is only valid for the code it was built
+  // against — drop it if the active code has changed underneath.
+  if (state.pendingInviteCode !== previousCode) state.pendingMagicLink = null;
 }
 
 async function loadCategories() {
@@ -928,7 +949,7 @@ const NARRATIVE_DEFAULTS = {
   invite_email_closing: "Whatever you find, it stays between us.",
   invite_email_cta: "Step inside",
   whatsapp_line1: "made you a little something",
-  whatsapp_line2: "that's all you're getting out of me 😏",
+  whatsapp_line2: "it's a bit impatient though, so don't leave it too long 😈",
   arrival_beat_0: "You're in. That's all that happens today — come back later and there'll be a bit more.",
   arrival_beat_1_prompt: "Curious, or cautious?",
   arrival_beat_1_option_a: "Curious",
@@ -1521,13 +1542,24 @@ function attachPairingHandlers() {
 }
 
 function renderAwaitingPartner() {
+  const linkUrl = state.pendingMagicLink || (state.pendingInviteCode ? buildInviteUrl(state.pendingInviteCode) : null);
   return `
     <div class="center-screen">
-      <div class="auth-hero"><h1>Waiting on your partner</h1><p>Share this code with them — it stays here until they join.</p></div>
+      <div class="auth-hero"><h1>Waiting on your partner</h1><p>Share this with them — it stays here until they join.</p></div>
       ${state.pendingInviteCode
-        ? `<div class="code-display">${esc(state.pendingInviteCode)}</div>
-           <p class="hint-text" style="margin:10px 0 4px">Or send this link — it fills the code in for them automatically:</p>
-           <div class="field"><input type="text" id="invite-link-display" value="${esc(buildInviteUrl(state.pendingInviteCode))}" readonly></div>
+        ? `${!state.pendingMagicLink ? `
+           <p class="hint-text" style="margin-bottom:10px">Enter their email to skip the sign-up screen entirely — the link logs them straight in, no form, no password:</p>
+           <div class="field"><input type="email" id="invite-email-address" placeholder="their email"></div>
+           <button type="button" class="btn btn-primary" id="btn-generate-magic-link" style="margin-top:10px; width:100%">Generate sign-in link</button>
+           <div id="magic-link-error" class="error-text" style="margin-top:8px"></div>
+           <div class="divider" style="margin:20px 0"></div>
+           <p class="hint-text" style="margin-bottom:10px">Or skip that and share the plain code below (they'll see a normal sign-up screen instead):</p>
+           ` : `
+           <p class="hint-text" style="margin-bottom:10px; color:var(--good)">Sign-in link ready — this one logs them straight in, no form.</p>
+           `}
+           <div class="code-display">${esc(state.pendingInviteCode)}</div>
+           <p class="hint-text" style="margin:10px 0 4px">${state.pendingMagicLink ? 'Send this link — it signs them straight in:' : 'Or send this link — it fills the code in for them automatically:'}</p>
+           <div class="field"><input type="text" id="invite-link-display" value="${esc(linkUrl)}" readonly></div>
            <button class="btn btn-ghost" id="btn-copy-invite-link" style="margin-top:8px">Copy link</button>
            <div class="divider" style="margin:20px 0"></div>
            <p class="hint-text" style="margin-bottom:10px">Or copy a WhatsApp message, ready to paste straight into a chat — usually the more natural way to send this:</p>
@@ -1654,9 +1686,27 @@ function attachAwaitingPartnerHandlers() {
     const { data, error } = await sb.rpc('create_additional_invite');
     if (error) { state.authError = error.message; render(); return; }
     state.pendingInviteCode = data;
+    state.pendingMagicLink = null; // a new code needs its own sign-in link, generated fresh
     render();
   };
   document.getElementById('btn-refresh-status').onclick = async () => { await loadEverything(); };
+  const magicLinkBtn = document.getElementById('btn-generate-magic-link');
+  if (magicLinkBtn) magicLinkBtn.onclick = async () => {
+    const errEl = document.getElementById('magic-link-error');
+    const email = document.getElementById('invite-email-address').value.trim();
+    if (!email) { errEl.textContent = 'Enter their email first.'; return; }
+    magicLinkBtn.disabled = true;
+    errEl.textContent = '';
+    const redirectTo = buildInviteUrl(state.pendingInviteCode);
+    const { data, error } = await sb.functions.invoke('invite_by_email', { body: { email, redirectTo } });
+    magicLinkBtn.disabled = false;
+    if (error || !data || !data.link) {
+      errEl.textContent = (data && data.error) || (error && error.message) || 'Could not generate a sign-in link.';
+      return;
+    }
+    state.pendingMagicLink = data.link;
+    render();
+  };
   const copyBtn = document.getElementById('btn-copy-invite-link');
   if (copyBtn) copyBtn.onclick = async () => {
     const linkInput = document.getElementById('invite-link-display');
@@ -1680,7 +1730,7 @@ function attachAwaitingPartnerHandlers() {
   const copyEmailBtn = document.getElementById('btn-copy-invite-email');
   if (copyEmailBtn) copyEmailBtn.onclick = async () => {
     const name = document.getElementById('invite-email-name').value.trim();
-    const url = buildInviteUrl(state.pendingInviteCode);
+    const url = state.pendingMagicLink || buildInviteUrl(state.pendingInviteCode);
     const html = buildInviteEmailHtml(name, url);
     try {
       await copyRichEmailToClipboard(html);
@@ -1691,7 +1741,7 @@ function attachAwaitingPartnerHandlers() {
   };
   const copyWhatsAppBtn = document.getElementById('btn-copy-invite-whatsapp');
   if (copyWhatsAppBtn) copyWhatsAppBtn.onclick = async () => {
-    const url = buildInviteUrl(state.pendingInviteCode);
+    const url = state.pendingMagicLink || buildInviteUrl(state.pendingInviteCode);
     const message = buildInviteWhatsAppMessage(url);
     try {
       await navigator.clipboard.writeText(message);
