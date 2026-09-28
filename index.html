@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.76.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.76.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.76.0';
+const APP_VERSION = '1.76.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1375,13 +1375,7 @@ function renderAuth() {
       </div>
       <form id="auth-form" class="stack">
         ${state.authMode==='signup' ? `
-        <div class="field"><label>Your name</label><input type="text" id="auth-name" placeholder="How your partner will see you" required></div>
-        <div class="field"><label>Theme</label>
-          <select id="auth-gender">
-            <option value="female">Warmer theme — deep rose and gold</option>
-            <option value="male">Cooler theme — deep blue and gold</option>
-          </select>
-        </div>` : ''}
+        <div class="field"><label>Your name</label><input type="text" id="auth-name" placeholder="How your partner will see you" required></div>` : ''}
         <div class="field"><label>Email</label><input type="email" id="auth-email" required></div>
         <div class="field"><label>Password</label><input type="password" id="auth-password" minlength="8" required></div>
         ${state.authError ? `<div class="error-text">${esc(state.authError)}</div>` : ''}
@@ -1406,17 +1400,28 @@ function attachAuthHandlers() {
     try {
       if (state.authMode === 'signup') {
         const name = document.getElementById('auth-name').value.trim();
-        const gender = document.getElementById('auth-gender').value;
         const { data, error } = await sb.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
-          await sb.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0], gender });
+          // Gender defaults here rather than asking at sign-up — it only
+          // matters for matching content later, never for anything shown
+          // this early, and it's a one-tap fix in Account any time. Asking
+          // for it here just adds a form to a screen that should feel like
+          // nothing more than "you're in."
+          await sb.from('profiles').insert({ id: data.user.id, display_name: name || email.split('@')[0], gender: 'female' });
         }
         state.session = data.session;
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
         state.session = data.session;
+      }
+      if (state.session && state.urlInviteCode) {
+        // Carry the invite straight through — no separate "Pairing" screen,
+        // no extra button to press. If this fails (expired code, say) she
+        // still lands on the manual Pairing screen as a fallback.
+        const { error: redeemError } = await sb.rpc('redeem_couple_invite', { p_code: state.urlInviteCode });
+        if (!redeemError) state.urlInviteCode = null;
       }
       await loadEverything();
     } catch (err) {

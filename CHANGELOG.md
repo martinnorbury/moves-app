@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.76.1 — fixed real friction found in a first sign-up test
+
+- Found and removed a leftover "Theme — warmer/cooler" dropdown still
+  sitting on the actual sign-up form. The 1.75.0 relabeling pass only
+  caught the two fallback gender screens, not this one — it's the one
+  screen a genuinely new person actually hits, so it's the one that
+  mattered most and the one I missed. Gender now defaults quietly at
+  sign-up and is only ever changed later, in Account, if it's wrong.
+- The invite code no longer just pre-fills a field on a separate Pairing
+  screen — signing up (or signing in) with an invite link in the URL now
+  redeems it automatically, in the same step. One less screen, one less
+  button between "you're in" and the arrival sequence starting.
+- Not fixable in this file: the "wait for a Supabase confirmation email,
+  then come back and sign in separately" step is a Supabase Auth project
+  setting, not app code. To remove it: Supabase dashboard → Authentication
+  → Sign In / Providers → Email → turn off "Confirm email". With it off,
+  sign-up logs straight in with no round trip.
+
 ## 1.76.0 — editable narrative, an arrival sequence, and a WhatsApp invite option
 
 - New: an "Edit narrative" section in Admin lets you rewrite every piece of
