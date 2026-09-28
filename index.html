@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.77.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.79.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.77.0';
+const APP_VERSION = '1.79.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -468,6 +468,8 @@ let state = {
   partnerWishlistCategories: [], // which categories the partner has wishlist entries in — content never exposed, from get_partner_wishlist_categories()
   narrativeContent: {},         // editable copy overrides — from get_narrative_content(), keyed by content key; NARRATIVE_DEFAULTS backs any missing key
   pendingMagicLink: null,       // a generated passwordless sign-in link for the pending invite code, from the invite_by_email edge function
+  hasSeenAwaitingPartner: false, // true once this session has actually rendered the Awaiting Partner screen — gates the "they just joined" toast so a fresh login into an already-paired couple never fires it
+  partnerJoinedPending: false,  // true from the moment a partner is detected until you click through the "they're in" screen — blocks render() so it can never be missed while you're away from the app
   arrivalTapped: false,         // ephemeral UI-only flag for the arrival sequence's one cosmetic tap (beat 1) — never persisted
   narrativeEditorOpen: false,   // collapsed by default in the admin panel
   seenRevealedRewardIds: null,  // null until first seeded — avoids toasting for rewards already unlocked before this session
@@ -653,7 +655,7 @@ function resetState() {
   state.imageUrls = {}; state.avatarUrl = null; state.openCategory = null; state.openDareCategory = null; state.deckIndex = 0;
   state.wizardSkipped = new Set();
   state.headingAccess = [];
-  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = []; state.narrativeContent = {}; state.arrivalTapped = false; state.pendingMagicLink = null;
+  state.cardReport = []; state.partnerTeaser = []; state.viewedTeaser = false; state.expandedHeadings = new Set(); state.expandedCardLists = new Set(); state.expandedAnswerCategories = new Set(); state.pendingComparisonCards = []; state.seenRevealedRewardIds = null; state.dareEvidence = []; state.forfeitEvidence = []; state.partnerRoleLean = 'unknown'; state.myWishlist = []; state.partnerWishlistCategories = []; state.narrativeContent = {}; state.arrivalTapped = false; state.pendingMagicLink = null; state.hasSeenAwaitingPartner = false; state.partnerJoinedPending = false;
   state.weeklyScore = []; state.currentSettlement = null; state.forfeitLibrary = [];
   state.viewingAllAnswers = false; state.allAnswersFilter = '';
   state.dares = []; state.scoreboard = []; state.heat = 0; state.rewards = [];
@@ -680,7 +682,8 @@ async function loadAllData() {
       // (and with it, the only place a profile row used to get created).
       // Create one silently with sensible defaults — she can rename
       // herself, or fix the gender default, in Account any time.
-      const fallbackName = (state.session.user.email || 'Player').split('@')[0];
+      const metaName = state.session.user.user_metadata && state.session.user.user_metadata.display_name;
+      const fallbackName = (metaName && metaName.trim()) || (state.session.user.email || 'Player').split('@')[0];
       await sb.from('profiles').insert({ id: state.session.user.id, display_name: fallbackName, gender: 'female' });
       await loadProfile();
     }
@@ -691,7 +694,15 @@ async function loadAllData() {
         // the sign-up form's own redeem step) but isn't paired yet —
         // redeem it now rather than requiring a manual step.
         const { error: redeemError } = await sb.rpc('redeem_couple_invite', { p_code: state.urlInviteCode });
-        if (!redeemError) { state.urlInviteCode = null; await loadCouple(); }
+        if (!redeemError) {
+          state.urlInviteCode = null;
+          // redeem_couple_invite() also sets arrival_stage on this profile
+          // server-side — reload it too, not just the couple, or the stale
+          // in-memory copy (still "skip") wins and the arrival sequence
+          // never shows.
+          await loadProfile();
+          await loadCouple();
+        }
       }
       if (state.coupleId) {
         await Promise.all([
@@ -868,6 +879,7 @@ async function loadProfile() {
 }
 
 async function loadCouple() {
+  const hadPartnerBefore = !!state.partner;
   const { data } = await sb.from('couple_members').select('couple_id').eq('user_id', state.session.user.id).maybeSingle();
   state.coupleId = data ? data.couple_id : null;
   state.partner = null;
@@ -884,6 +896,20 @@ async function loadCouple() {
   // A generated sign-in link is only valid for the code it was built
   // against — drop it if the active code has changed underneath.
   if (state.pendingInviteCode !== previousCode) state.pendingMagicLink = null;
+
+  // The moment a partner appears where there wasn't one a load ago — but
+  // only if this session actually watched the Awaiting Partner screen for
+  // it (set below in render()). Without that guard, an ordinary fresh
+  // login into an already-paired couple would fire this every time, which
+  // isn't "they just joined," it's just you opening the app.
+  // This sets a blocking flag rather than a toast — a toast can fire and
+  // clear itself while you're not looking at the screen, so you'd never
+  // actually see it. The blocking screen waits for you, however long that is.
+  if (!hadPartnerBefore && state.partner && state.hasSeenAwaitingPartner) {
+    state.hasSeenAwaitingPartner = false;
+    state.partnerJoinedPending = true;
+    fireConfetti();
+  }
 }
 
 async function loadCategories() {
@@ -1296,7 +1322,8 @@ function render() {
   if (!state.profile) { $app.innerHTML = renderCreateProfile(); attachCreateProfileHandlers(); return; }
   if (!state.profile.gender) { $app.innerHTML = renderChooseTheme(); attachChooseThemeHandlers(); return; }
   if (!state.coupleId) { $app.innerHTML = renderPairing(); attachPairingHandlers(); return; }
-  if (!state.partner) { $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
+  if (!state.partner) { state.hasSeenAwaitingPartner = true; $app.innerHTML = renderAwaitingPartner(); attachAwaitingPartnerHandlers(); return; }
+  if (state.partnerJoinedPending) { $app.innerHTML = renderPartnerJoined(); attachPartnerJoinedHandlers(); return; }
   if (state.profile.arrival_stage < 5) { $app.innerHTML = renderArrivalSequence(); attachArrivalSequenceHandlers(); return; }
 
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
@@ -1548,8 +1575,9 @@ function renderAwaitingPartner() {
       <div class="auth-hero"><h1>Waiting on your partner</h1><p>Share this with them — it stays here until they join.</p></div>
       ${state.pendingInviteCode
         ? `${!state.pendingMagicLink ? `
-           <p class="hint-text" style="margin-bottom:10px">Enter their email to skip the sign-up screen entirely — the link logs them straight in, no form, no password:</p>
+           <p class="hint-text" style="margin-bottom:10px">Enter their email to skip the sign-up screen entirely — the link logs them straight in, no form, no password. Since they'll never type it themselves, add their name here too, or they'll show up as their email address:</p>
            <div class="field"><input type="email" id="invite-email-address" placeholder="their email"></div>
+           <div class="field" style="margin-top:10px"><input type="text" id="invite-magic-name" placeholder="their name (e.g. Jacki)"></div>
            <button type="button" class="btn btn-primary" id="btn-generate-magic-link" style="margin-top:10px; width:100%">Generate sign-in link</button>
            <div id="magic-link-error" class="error-text" style="margin-top:8px"></div>
            <div class="divider" style="margin:20px 0"></div>
@@ -1581,6 +1609,21 @@ function renderAwaitingPartner() {
 }
 function buildInviteUrl(code) {
   return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(code)}`;
+}
+
+function renderPartnerJoined() {
+  const name = state.partner ? esc(state.partner.display_name) : 'Your partner';
+  return `
+    <div class="center-screen">
+      <div class="auth-hero" style="margin-bottom:8px"><h1>&nbsp;</h1></div>
+      <p class="hint-text" style="font-size:20px; line-height:1.5; color:var(--text); text-align:center">🎉 ${name} is in.</p>
+      <button type="button" class="btn btn-primary" id="btn-partner-joined-continue" style="margin-top:24px; width:100%">Let's go →</button>
+    </div>
+  `;
+}
+function attachPartnerJoinedHandlers() {
+  const btn = document.getElementById('btn-partner-joined-continue');
+  if (btn) btn.onclick = () => { state.partnerJoinedPending = false; render(); };
 }
 
 /* ==========================================================================
@@ -1625,7 +1668,8 @@ function renderArrivalSequence() {
       ${body}
       ${showContinue
         ? `<button type="button" class="btn btn-primary" id="btn-arrival-continue" style="margin-top:24px; width:100%">${esc(continueLabel)}</button>`
-        : `<p class="hint-text" style="margin-top:24px; opacity:0.7">Check back a little later.</p>`}
+        : `<p class="hint-text" style="margin-top:24px; opacity:0.7">Check back a little later.</p>
+           <p class="hint-text" style="margin-top:10px; opacity:0.5; font-size:12px; text-decoration:underline; cursor:pointer" id="btn-arrival-skip-testing">Testing — skip the wait</p>`}
     </div>
   `;
 }
@@ -1639,6 +1683,18 @@ function attachArrivalSequenceHandlers() {
     continueBtn.disabled = true;
     const { error } = await sb.rpc('advance_arrival_stage');
     if (error) { showToast(error.message); continueBtn.disabled = false; return; }
+    state.arrivalTapped = false;
+    await loadProfile();
+    render();
+  };
+  const skipBtn = document.getElementById('btn-arrival-skip-testing');
+  if (skipBtn) skipBtn.onclick = async () => {
+    // Pre-launch only — backdates nothing, just runs the same advance the
+    // gate would eventually allow, skipping the 12-hour wait so the whole
+    // sequence can be walked through in minutes while testing. Remove this
+    // link (and the advance_arrival_stage_testing RPC) before real launch.
+    const { error } = await sb.rpc('advance_arrival_stage_testing');
+    if (error) { showToast(error.message); return; }
     state.arrivalTapped = false;
     await loadProfile();
     render();
@@ -1694,11 +1750,12 @@ function attachAwaitingPartnerHandlers() {
   if (magicLinkBtn) magicLinkBtn.onclick = async () => {
     const errEl = document.getElementById('magic-link-error');
     const email = document.getElementById('invite-email-address').value.trim();
+    const name = document.getElementById('invite-magic-name').value.trim();
     if (!email) { errEl.textContent = 'Enter their email first.'; return; }
     magicLinkBtn.disabled = true;
     errEl.textContent = '';
     const redirectTo = buildInviteUrl(state.pendingInviteCode);
-    const { data, error } = await sb.functions.invoke('invite_by_email', { body: { email, redirectTo } });
+    const { data, error } = await sb.functions.invoke('invite_by_email', { body: { email, redirectTo, name: name || undefined } });
     magicLinkBtn.disabled = false;
     if (error || !data || !data.link) {
       errEl.textContent = (data && data.error) || (error && error.message) || 'Could not generate a sign-in link.';

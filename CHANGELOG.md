@@ -1,5 +1,84 @@
 # Changelog
 
+## 1.79.0 — the "she's in" moment now waits for you, and her name actually shows up
+
+- The "[name] just joined 🎉" moment is no longer a toast — a toast can
+  fire and clear itself in the 3 seconds you weren't looking at the
+  screen. It's now a dedicated screen that stays put ("🎉 [name] is
+  in." + a "Let's go →" button) until you actually click through it,
+  however long that takes. Confetti still fires the instant it's
+  detected; the screen just doesn't let you miss it.
+- Fixed: a partner who joins via the sign-in link (no sign-up form, so
+  nowhere to type a name) used to show up as her email address —
+  "Welcome to TwoPlay, martinjnorbury+jacki7". The name you type when
+  generating her sign-in link now actually gets used: it's passed
+  through to Supabase as part of her account, and the app reads it back
+  when creating her profile instead of falling back to her email.
+- Added a "their name" field next to the email field on the Awaiting
+  Partner screen's sign-in-link option — was previously only prompting
+  for the email.
+- Added a testing-only shortcut on the arrival sequence's "check back
+  a little later" screen — "Testing — skip the wait" advances the
+  same way the 12-hour gate eventually would, so the whole sequence
+  can be walked through in minutes instead of days while testing.
+  Should be removed before real launch (it's a visible link right now,
+  not hidden behind anything).
+
+## 1.78.0 — "they just joined" moment on your side too
+
+- While you're on the Awaiting Partner screen, the moment she actually
+  joins now shows a small confetti burst and a toast — "[name] just
+  joined 🎉" — instead of silently swapping your screen straight to
+  whatever's next. It fires through the same background refresh that was
+  already picking the join up (a periodic check, or coming back to the
+  tab), so nothing new to trigger it, just something to notice when it
+  happens.
+- Scoped so it only ever fires for a join that happens live, while this
+  session is actually watching that screen — an ordinary login into a
+  couple that's already paired (the normal case, every day) never shows
+  it, since that's not "they just joined," it's just you opening the app.
+
+## 1.77.1 — fixed the arrival sequence getting skipped on a magic-link sign-in
+
+- The magic-link path auto-creates a profile, then redeems the invite
+  code — and redeeming sets that profile's arrival stage to 0 (start the
+  sequence) server-side. The code was reloading the couple afterward but
+  not the profile, so it kept using the copy from a moment earlier, still
+  showing the "skip the sequence" default — landing straight on the
+  six-questions welcome screen instead of beat one. Now reloads both.
+  Confirmed against the live test account: the database had the right
+  value the whole time, it was purely a stale in-memory copy.
+
+## 1.77.0 — passwordless entry: no sign-up form at all
+
+- New: on the Awaiting Partner screen, enter their email and hit "Generate
+  sign-in link" — the "Step inside" link (email, WhatsApp, or copy-link)
+  can now be a genuine passwordless sign-in link instead of one that leads
+  to a sign-up form. Click it, and it logs straight into a paired, ready
+  account — no name field, no email field, no password, nothing to type.
+  The plain code/link still works underneath as a fallback if you'd rather
+  skip this.
+- Backend: a new `invite_by_email` Supabase Edge Function generates that
+  link, using the Auth Admin API — this can only happen server-side (it
+  needs the service role key, which never belongs in the browser), so a
+  small function was the only honest way to build this. It checks the
+  caller is the couple's admin before it will generate a link for any
+  email, same rule as everything else in Admin.
+- A profile is now created automatically the first time someone arrives
+  this way, with a placeholder name (from their email) and a default
+  gender — both changeable any time in Account, same as always. There was
+  previously no path that created a profile without the sign-up form
+  asking for a name directly, since nothing needed one before.
+- Two settings worth checking in the Supabase dashboard for this to feel
+  right end to end:
+  - Authentication → Sign In / Providers → Email → **turn off "Confirm
+    email"** (still applies to the plain sign-up fallback, if that's ever
+    used instead).
+  - Authentication → Sign In / Providers → Email → **set the email OTP /
+    magic-link expiry to 3 days.** This is what makes "click it whenever"
+    actually true — the default (around an hour) would make a genuinely
+    unhurried invite risk going stale before she opens it.
+
 ## 1.76.1 — fixed real friction found in a first sign-up test
 
 - Found and removed a leftover "Theme — warmer/cooler" dropdown still
