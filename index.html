@@ -382,7 +382,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.81.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 1.81.1)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +390,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '1.81.0';
+const APP_VERSION = '1.81.1';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -1136,9 +1136,11 @@ function renderWizardIntro() {
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
         <h1>Welcome to TwoPlay${name ? ', ' + esc(name) : ''}</h1>
-        <p style="font-style:italic; font-size:13.5px; color:var(--text-faint); margin-bottom:14px">${esc(nc('wizard_intro_subtitle'))}</p>
-        <p>${esc(nc('wizard_intro_para1'))}</p>
+        <p style="font-style:italic; font-size:13.5px; color:var(--text-faint); margin-bottom:0">${esc(nc('wizard_intro_subtitle'))}</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">
+        ${esc(nc('wizard_intro_para1'))}
+      </p>
       <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">
         ${esc(nc('wizard_intro_para2'))}
       </p>
@@ -1185,9 +1187,9 @@ function renderTemptationsPreview() {
     <div class="screen" style="padding-top:76px">
       <div class="auth-hero">
         <h1>${esc(nc('temptations_preview_title'))}</h1>
-        <p>${esc(nc('temptations_preview_para1'))}</p>
-        <p>${esc(nc('temptations_preview_para2'))}</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:14px">${esc(nc('temptations_preview_para1'))}</p>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('temptations_preview_para2'))}</p>
       ${state.categories.map(c => `
         <div class="category-row" style="cursor:default">
           <div>
@@ -1208,8 +1210,8 @@ function renderPartnerTeaser() {
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
         <h1>${esc(partnerName)} already started and is waiting for you</h1>
-        <p>${esc(ncr('partner_teaser_body', { count: total }))}</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(ncr('partner_teaser_body', { count: total }))}</p>
       <div class="teaser-grid">
         ${state.partnerTeaser.map(t => `<div class="teaser-block ${t.answer}"></div>`).join('')}
       </div>
@@ -1283,20 +1285,20 @@ function renderStep1Complete() {
     <div class="screen" style="padding-top:22px">
       <div class="auth-hero">
         <h1>${esc(nc('step1_title'))}</h1>
-        <p>${esc(nc('step1_subtitle'))}</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('step1_subtitle'))}</p>
       ${renderOverallStanding()}
       ${renderHeadingAccessList()}
       <div class="divider"></div>
-      <div class="auth-hero" style="margin-top:0">
+      <div class="auth-hero" style="margin-top:20px; margin-bottom:8px">
         <h1 style="font-size:22px">${esc(nc('step1_section2_title'))}</h1>
-        <p>${esc(nc('step1_section2_body'))}</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(nc('step1_section2_body'))}</p>
       <div class="divider"></div>
-      <div class="auth-hero" style="margin-top:0">
+      <div class="auth-hero" style="margin-top:20px; margin-bottom:8px">
         <h1 style="font-size:20px">${esc(nc('step1_section3_title'))}</h1>
-        <p>${esc(ncr('step1_section3_body', { partner: state.partner ? state.partner.display_name : 'your partner' }))}</p>
       </div>
+      <p style="color:var(--text-dim); font-size:15px; line-height:1.65; margin-bottom:20px">${esc(ncr('step1_section3_body', { partner: state.partner ? state.partner.display_name : 'your partner' }))}</p>
       <button class="btn btn-ghost" id="btn-step1-wishlist" style="width:100%; margin-bottom:14px">${esc(nc('step1_wishlist_cta'))}</button>
       <button class="btn btn-gold" id="btn-step1-continue" style="width:100%">${esc(nc('step1_continue_cta'))}</button>
     </div>

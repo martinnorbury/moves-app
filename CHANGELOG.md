@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.81.1 — fixed the too-narrow paragraph wrap on several onboarding screens
+
+- Root cause: `.auth-hero p` has a `max-width: 34ch` rule, written for
+  the short one-line taglines under a screen's title (e.g. "A private,
+  two-player game. Just for the two of you."). Several onboarding
+  screens built this session put full body paragraphs inside that
+  same `.auth-hero` block, so they inherited the 34-character cap and
+  wrapped far short of the screen edge — most visibly the Welcome
+  screen's "You got an invite. It didn't say much..." paragraph.
+- Fixed by moving every full paragraph out of `.auth-hero` (which now
+  only ever holds the title and, where there is one, a short single
+  line) on: the Welcome screen, the Six Temptations preview, the
+  partner-already-answered screen, and both sub-sections of Step 1
+  complete. Text now wraps at the full screen width on all of them.
+
 ## 1.81.0 — narrative editor is now a page picker, not one long scroll
 
 - Edit narrative used to unfold into every field on every screen at
