@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.82.1 — same narrow-wrap bug, one more spot
+
+- The Welcome screen's subtitle ("The slow texts were the start. This is
+  the rest.") was still sitting inside `.auth-hero`, same as the
+  paragraph fixed in 1.81.1 — it just hadn't been a problem yet because
+  the old one-line joke was short enough to not visibly wrap narrow.
+  The new two-sentence line is longer, so it hit the same 34-character
+  cap. Moved out to full width, same fix as before.
+
 ## 1.82.0 — trimmed the invitee path: fewer essays, one privacy mention, no manual
 
 Per your onboarding-pass notes — shortens the whole tease-to-Playroom path without touching pairing, auth, gender, the wizard questions, the match report, or Playroom itself.
