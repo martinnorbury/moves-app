@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0 — the ready screen is now your own door photo
+
+- Replaced the CSS/emoji locked-door with the door photo you made —
+  full-bleed backdrop, dark gradient at the bottom so the button stays
+  readable. Resized and compressed to ~107KB so it doesn't bloat the
+  app file (the original upload was a 5.9MB PNG).
+- Dropped the separate "Ready?" headline — the photo already has
+  "Enter" on it, and stacking our own headline on top just competed
+  with it. What's left editable in the narrative editor: an optional
+  small caption over the photo (blank by default) and the button text.
+
 ## 2.1.0 — one locked-door screen back, right before the questions
 
 - Added a single "Ready?" gate, shown once, right before the Six
