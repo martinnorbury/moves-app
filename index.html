@@ -156,6 +156,11 @@
   .auth-tab{background:none; border:none; color:var(--text-faint); padding:8px 0; font-size:14px; font-weight:600; border-bottom:2px solid transparent;}
   .auth-tab.active{color:var(--gold); border-bottom-color:var(--gold);}
 
+  /* ---------- ready gate (locked-door screen before the questions) ---------- */
+  .ready-door{width:132px; height:184px; margin:0 auto 28px; background:linear-gradient(180deg, var(--surface-raised), var(--surface)); border:2px solid var(--line); border-radius:66px 66px 10px 10px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 44px rgba(224,181,99,0.22);}
+  .ready-door-lock{font-size:52px; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.35));}
+  .ready-gate-title{font-size:42px; text-align:center; margin:0; color:var(--text);}
+
   /* ---------- pairing ---------- */
   .code-display{
     font-family:var(--serif); font-size:38px; letter-spacing:6px; color:var(--gold);
@@ -382,7 +387,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 2.0.0)</span></div></div>
+<div id="app"><div class="loading">Opening… <span style="opacity:0.5">(build 2.1.0)</span></div></div>
 
 <script>
 /* ======================================================================
@@ -390,7 +395,7 @@
    ====================================================================== */
 const SUPABASE_URL = 'https://hfjgqtzvqdihptsetzcj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmamdxdHp2cWRpaHB0c2V0emNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NTgwMDUsImV4cCI6MjEwNDAzNDAwNX0.ibTKITRHGKw5yd6ENTJ0Mna-48tkOs3Mz77Ov3AdLyA';
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
@@ -980,6 +985,9 @@ const NARRATIVE_DEFAULTS = {
   invite_email_cta: "Step inside",
   whatsapp_line1: "made you a little something",
   whatsapp_line2: "it's a bit impatient though, so don't leave it too long 😈",
+  ready_gate_title: "Ready?",
+  ready_gate_subtitle: "",
+  ready_gate_cta: "Open →",
   temptations_preview_title: "Six things to explore",
   temptations_preview_para1: "One general question each. More specific later, if we both want that.",
   temptations_preview_para2: "",
@@ -1101,11 +1109,32 @@ function renderAnswerControl(q, currentAnswer, attrsFor) {
   `;
 }
 
+// A single locked-door beat, shown once, right before the six-things-to-explore
+// screen — the only atmosphere left in-app now that the actual tease lives in
+// texts/WhatsApp beforehand. One tap, no essay.
+function renderReadyGate() {
+  return `
+    <div class="center-screen">
+      <div class="ready-door"><div class="ready-door-lock">🔒</div></div>
+      <h1 class="ready-gate-title">${esc(nc('ready_gate_title'))}</h1>
+      ${nc('ready_gate_subtitle') ? `<p class="hint-text" style="margin-top:10px; text-align:center">${esc(nc('ready_gate_subtitle'))}</p>` : ''}
+      <button type="button" class="btn btn-gold" id="btn-ready-gate-continue" style="margin-top:28px; width:100%">${esc(nc('ready_gate_cta'))}</button>
+    </div>
+  `;
+}
+function attachReadyGateHandlers() {
+  const btn = document.getElementById('btn-ready-gate-continue');
+  if (btn) btn.onclick = async () => {
+    state.profile.seen_ready_gate = true;
+    render();
+    await sb.from('profiles').update({ seen_ready_gate: true }).eq('id', state.session.user.id);
+  };
+}
+
 // Onboarding used to be a multi-screen tease inside the app itself
 // (arrival sequence, a welcome screen, a partner-already-answered teaser,
 // an app explainer) — that's all moved outside the app now (texts, WhatsApp,
-// whatever) so the invite goes straight to this one screen, then straight
-// into the six questions. This is deliberately the only screen left.
+// whatever) so the invite goes straight to this screen, then the questions.
 function renderTemptationsPreview() {
   const descriptions = {
     'Teasing & Dirty Talk': 'The build-up — words, hints, anticipation.',
@@ -1228,9 +1257,14 @@ function render() {
   if (state.partnerJoinedPending) { $app.innerHTML = renderPartnerJoined(); attachPartnerJoinedHandlers(); return; }
 
   // Onboarding is now everything outside the app (texts, WhatsApp, whatever) —
-  // the only in-app lead-in left is this one screen, then straight to the
-  // six questions themselves.
+  // the only in-app lead-in left is a one-tap "ready?" gate, then the six
+  // things to explore, then straight to the six questions themselves.
   const wizardQueue = getWizardQuestions().filter(q => !state.answers[q.id] && !state.wizardSkipped.has(q.id));
+  if (wizardQueue.length > 0 && state.profile && !state.profile.seen_ready_gate) {
+    $app.innerHTML = renderReadyGate();
+    attachReadyGateHandlers();
+    return;
+  }
   if (wizardQueue.length > 0 && state.profile && !state.profile.seen_wizard_intro) {
     $app.innerHTML = renderTemptationsPreview();
     attachTemptationsPreviewHandlers();
@@ -2140,6 +2174,9 @@ const NARRATIVE_FIELDS = [
   { group: 'Invite email', key: 'invite_email_cta', label: 'Button text' },
   { group: 'WhatsApp invite message', key: 'whatsapp_line1', label: 'First line' },
   { group: 'WhatsApp invite message', key: 'whatsapp_line2', label: 'Second line' },
+  { group: 'Ready screen (the locked-door gate before the questions)', key: 'ready_gate_title', label: 'Big headline' },
+  { group: 'Ready screen (the locked-door gate before the questions)', key: 'ready_gate_subtitle', label: 'Small line underneath — leave blank to hide' },
+  { group: 'Ready screen (the locked-door gate before the questions)', key: 'ready_gate_cta', label: 'Button text' },
   { group: 'Six Temptations preview', key: 'temptations_preview_title', label: 'Title' },
   { group: 'Six Temptations preview', key: 'temptations_preview_para1', label: 'Paragraph 1', multiline: true },
   { group: 'Six Temptations preview', key: 'temptations_preview_para2', label: 'Paragraph 2 — leave blank to hide', multiline: true },
@@ -3620,7 +3657,7 @@ function openAccountModal() {
           <button type="button" class="btn btn-primary" id="btn-save-account">Save</button>
         </div>
         <div class="divider" style="margin:18px 0"></div>
-        <p class="hint-text" style="margin-bottom:10px">Want to re-see the six-things-to-explore screen and the six questions, exactly as they first appeared? This only resets your own onboarding — ${esc(state.partner ? state.partner.display_name : "your partner")}'s answers, and everything else in the app, stay untouched.</p>
+        <p class="hint-text" style="margin-bottom:10px">Want to re-see the ready screen, the six-things-to-explore screen, and the six questions, exactly as they first appeared? This only resets your own onboarding — ${esc(state.partner ? state.partner.display_name : "your partner")}'s answers, and everything else in the app, stay untouched.</p>
         <button type="button" class="btn btn-ghost" id="btn-preview-onboarding" style="width:100%; margin-bottom:14px">Preview my onboarding again</button>
         <button type="button" class="btn btn-ghost" id="btn-open-wishlist" style="width:100%">My wishlist (${state.myWishlist.length})</button>
       </div>
@@ -3651,7 +3688,7 @@ function openAccountModal() {
   };
   const previewBtn = document.getElementById('btn-preview-onboarding');
   if (previewBtn) previewBtn.onclick = async () => {
-    if (!confirm(`This resets your own six-things-to-explore screen and six general questions so you can see them fresh. It won't touch ${state.partner ? state.partner.display_name : "your partner"}'s data or anything else. Continue?`)) return;
+    if (!confirm(`This resets your own ready screen, six-things-to-explore screen, and six general questions so you can see them fresh. It won't touch ${state.partner ? state.partner.display_name : "your partner"}'s data or anything else. Continue?`)) return;
     const { error } = await sb.rpc('preview_my_onboarding');
     if (error) { showToast(error.message); return; }
     closeModal();

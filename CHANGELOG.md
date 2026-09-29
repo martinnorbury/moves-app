@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.0 — one locked-door screen back, right before the questions
+
+- Added a single "Ready?" gate, shown once, right before the Six
+  things to explore screen — a stylised locked door (CSS, no image
+  needed) with a big headline and one tap to continue. This is the
+  only atmosphere left in-app; everything else in the tease still
+  lives outside it, in texts/WhatsApp.
+- Headline, an optional small line underneath, and the button text
+  are all editable in the narrative editor (new "Ready screen" page),
+  same as everything else.
+- "Preview my onboarding again" now also resets this screen so you
+  can see it fresh.
+
 ## 2.0.0 — onboarding moves outside the app entirely
 
 The idea: the tease and anticipation live in texts, WhatsApp, whatever medium you choose to use before she ever opens the link — not inside the app itself. So the app's own onboarding is cut down to almost nothing.
