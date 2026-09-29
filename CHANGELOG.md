@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.0 — onboarding moves outside the app entirely
+
+The idea: the tease and anticipation live in texts, WhatsApp, whatever medium you choose to use before she ever opens the link — not inside the app itself. So the app's own onboarding is cut down to almost nothing.
+
+**Removed entirely** (render code, narrative copy, and the admin-editor fields for all of them):
+- The arrival sequence (the 5-beat "day one" experience gated behind a 12-hour wait after redeeming an invite) — gone completely, including its narrative fields, the testing skip-wait button, and the underlying gate logic.
+- The Welcome screen ("Welcome to TwoPlay... the slow texts were the start...").
+- The "[partner] has already answered" teaser screen, shown when one of you starts before the other.
+- The app explainer ("How a dare works", shown after the match report, before Playroom).
+
+**Kept, as the only screen left**: Six things to explore — the one-time preview of the six temptation categories, shown once, right before the six general questions.
+
+**New click path for anyone joining**: redeem invite → pick gender (unchanged, needed for content matching) → Six things to explore → six questions → match report (Step 1 complete, unchanged) → straight into Playroom.
+
+Nothing about pairing, auth, the gender screen, the wizard questions themselves, the match report, or Playroom changed — this only removed the narrative screens around them. The "Preview my onboarding again" admin button still works, now just re-showing the one remaining screen plus the six questions.
+
 ## 1.82.1 — same narrow-wrap bug, one more spot
 
 - The Welcome screen's subtitle ("The slow texts were the start. This is
